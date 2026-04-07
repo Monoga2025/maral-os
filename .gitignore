@@ -1,0 +1,39 @@
+# Dependencies
+node_modules/
+
+# Build artifacts
+dist/
+build/
+frontend/dist/
+
+# Environment — NUNCA commitear .env reales
+.env
+.env.local
+.env.production
+.env.development
+backend/.env
+frontend/.env
+
+# Uploads (archivos de usuarios)
+uploads/
+backend/uploads/
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Claude Code session state
+.claude/qa-session/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
