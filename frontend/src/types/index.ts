@@ -166,6 +166,7 @@ export interface Quotation {
   subtotal: number
   tax: number
   total: number
+  validUntil?: string
   items: QuotationItem[]
   createdAt: string
   updatedAt: string
@@ -345,6 +346,7 @@ export interface DashboardData {
 
 export interface PaginatedResponse<T> {
   data: T[]
+  total: number
   pagination: {
     page: number
     limit: number
