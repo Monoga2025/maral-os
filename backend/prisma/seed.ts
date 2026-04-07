@@ -1,12 +1,9 @@
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
-
 const prisma = new PrismaClient();
 const SALT_ROUNDS = 10;
-
 async function main() {
   console.log('🌱 Starting MARAL OS seed...\n');
-
   // ── Clean up existing data ──────────────────────────────
   console.log('Cleaning existing data...');
   await prisma.activityLog.deleteMany();
@@ -29,11 +26,9 @@ async function main() {
   await prisma.client.deleteMany();
   await prisma.user.deleteMany();
   console.log('Done.\n');
-
   // ── Users ───────────────────────────────────────────────
   console.log('Creating users...');
   const passwordHash = await bcrypt.hash('maral2024', SALT_ROUNDS);
-
   const gerente = await prisma.user.create({
     data: {
       name: 'John Mónoga',
@@ -42,7 +37,6 @@ async function main() {
       role: 'GERENTE',
     },
   });
-
   const vendedora = await prisma.user.create({
     data: {
       name: 'Lady García',
@@ -51,7 +45,6 @@ async function main() {
       role: 'VENTAS',
     },
   });
-
   const logistica = await prisma.user.create({
     data: {
       name: 'Angelo Pérez',
@@ -60,14 +53,11 @@ async function main() {
       role: 'LOGISTICA',
     },
   });
-
   console.log(`  ✓ ${gerente.name} (GERENTE)`);
   console.log(`  ✓ ${vendedora.name} (VENTAS)`);
   console.log(`  ✓ ${logistica.name} (LOGISTICA)\n`);
-
   // ── Clients ─────────────────────────────────────────────
   console.log('Creating clients...');
-
   const clientsData = [
     {
       name: 'Carlos Méndez',
@@ -313,15 +303,11 @@ async function main() {
       notes: 'Especialistas en seguridad privada y comunicaciones.',
     },
   ];
-
   const clients = await Promise.all(clientsData.map((c) => prisma.client.create({ data: c })));
   console.log(`  ✓ ${clients.length} clientes creados\n`);
-
   const [meltec, isec, eleinco, radiotrans, comllano, , rfBga, antenasYMas, colwave, comsat] = clients;
-
   // ── Products ─────────────────────────────────────────────
   console.log('Creating products...');
-
   const productsData = [
     // Estación Base
     {
@@ -650,10 +636,8 @@ async function main() {
       specs: { material: 'Latón dorado' },
     },
   ];
-
   const products = await Promise.all(productsData.map((p) => prisma.product.create({ data: p })));
   console.log(`  ✓ ${products.length} productos creados\n`);
-
   const [
     antG6Vhf, antG6VhfP, antG6Uhf, antG7Vhf, antG7Uhf,
     antDipVhf, antDipUhf,
@@ -663,10 +647,8 @@ async function main() {
     cabRg58, cabRg8,
     conPl259, conNm, conSo239, conBnc,
   ] = products;
-
   // ── Suppliers ────────────────────────────────────────────
   console.log('Creating suppliers...');
-
   const suppliersData = [
     {
       name: 'Insumos Metálicos Colombia',
@@ -693,15 +675,11 @@ async function main() {
       notes: 'Importador de componentes RF especializados.',
     },
   ];
-
   const suppliers = await Promise.all(suppliersData.map((s) => prisma.supplier.create({ data: s })));
   console.log(`  ✓ ${suppliers.length} proveedores creados\n`);
-
   const [insumosMetalicos, electronicaValle, importacionesRF] = suppliers;
-
   // ── Quotations ───────────────────────────────────────────
   console.log('Creating quotations...');
-
   const q1 = await prisma.quotation.create({
     data: {
       clientId: meltec.id,
@@ -723,12 +701,11 @@ async function main() {
       },
     },
   });
-
   const q2 = await prisma.quotation.create({
     data: {
       clientId: isec.id,
       sellerId: vendedora.id,
-      status: 'VISTA',
+      status: 'ENVIADA',
       validityDays: 15,
       paymentTerms: '30 días crédito',
       subtotal: 1720000,
@@ -745,12 +722,11 @@ async function main() {
       },
     },
   });
-
   const q3 = await prisma.quotation.create({
     data: {
       clientId: eleinco.id,
       sellerId: gerente.id,
-      status: 'ACEPTADA',
+      status: 'APROBADA',
       validityDays: 15,
       paymentTerms: '30 días crédito',
       subtotal: 3400000,
@@ -767,7 +743,6 @@ async function main() {
       },
     },
   });
-
   const q4 = await prisma.quotation.create({
     data: {
       clientId: comsat.id,
@@ -787,7 +762,6 @@ async function main() {
       },
     },
   });
-
   const q5 = await prisma.quotation.create({
     data: {
       clientId: radiotrans.id,
@@ -807,12 +781,9 @@ async function main() {
       },
     },
   });
-
   console.log(`  ✓ 5 cotizaciones creadas\n`);
-
   // ── Orders ───────────────────────────────────────────────
   console.log('Creating orders...');
-
   // Order 1 - Meltec, DESPACHADO (converted from q3 equivalent)
   const order1 = await prisma.order.create({
     data: {
@@ -841,7 +812,6 @@ async function main() {
       },
     },
   });
-
   // Order 2 - ISEC, EN_PRODUCCION
   const order2 = await prisma.order.create({
     data: {
@@ -866,7 +836,6 @@ async function main() {
       },
     },
   });
-
   // Order 3 - Eleinco, CONFIRMADO (unconfirmed)
   const order3 = await prisma.order.create({
     data: {
@@ -891,7 +860,6 @@ async function main() {
       },
     },
   });
-
   // Order 4 - Radiotrans, EMPACADO
   const order4 = await prisma.order.create({
     data: {
@@ -916,7 +884,6 @@ async function main() {
       },
     },
   });
-
   // Order 5 - ComLlano, ENTREGADO
   await prisma.order.create({
     data: {
@@ -943,7 +910,6 @@ async function main() {
       },
     },
   });
-
   // Order 6 - RF Bga, CONFIRMADO
   await prisma.order.create({
     data: {
@@ -967,7 +933,6 @@ async function main() {
       },
     },
   });
-
   // Order 7 - Antenas y Más, GARANTIA
   await prisma.order.create({
     data: {
@@ -991,7 +956,6 @@ async function main() {
       },
     },
   });
-
   // Order 8 - Colwave, CANCELADO
   await prisma.order.create({
     data: {
@@ -1016,12 +980,9 @@ async function main() {
       },
     },
   });
-
   console.log('  ✓ 8 pedidos creados\n');
-
   // ── Production Orders ────────────────────────────────────
   console.log('Creating production orders...');
-
   await prisma.productionOrder.create({
     data: {
       orderId: order2.id,
@@ -1034,7 +995,6 @@ async function main() {
       requiredDate: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000),
     },
   });
-
   await prisma.productionOrder.create({
     data: {
       orderId: order2.id,
@@ -1045,7 +1005,6 @@ async function main() {
       requiredDate: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000),
     },
   });
-
   await prisma.productionOrder.create({
     data: {
       productId: antG7Vhf.id,
@@ -1056,12 +1015,9 @@ async function main() {
       requiredDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
     },
   });
-
   console.log('  ✓ 3 órdenes de producción creadas\n');
-
   // ── Purchase Orders ──────────────────────────────────────
   console.log('Creating purchase orders...');
-
   await prisma.purchaseOrder.create({
     data: {
       supplierId: electronicaValle.id,
@@ -1076,7 +1032,6 @@ async function main() {
       },
     },
   });
-
   await prisma.purchaseOrder.create({
     data: {
       supplierId: insumosMetalicos.id,
@@ -1092,7 +1047,6 @@ async function main() {
       },
     },
   });
-
   await prisma.purchaseOrder.create({
     data: {
       supplierId: importacionesRF.id,
@@ -1107,12 +1061,9 @@ async function main() {
       },
     },
   });
-
   console.log('  ✓ 3 órdenes de compra creadas\n');
-
   // ── Invoices ─────────────────────────────────────────────
   console.log('Creating invoices...');
-
   // Invoice for order1 (Meltec) - PAGADA
   await prisma.invoice.create({
     data: {
@@ -1124,7 +1075,6 @@ async function main() {
       status: 'PAGADA',
     },
   });
-
   // Invoice for order4 (Radiotrans) - VIGENTE
   await prisma.invoice.create({
     data: {
@@ -1135,7 +1085,6 @@ async function main() {
       status: 'VIGENTE',
     },
   });
-
   // Old invoice for ISEC - VENCIDA
   await prisma.invoice.create({
     data: {
@@ -1145,7 +1094,6 @@ async function main() {
       status: 'VENCIDA',
     },
   });
-
   // Another invoice for Meltec - VIGENTE
   await prisma.invoice.create({
     data: {
@@ -1155,7 +1103,6 @@ async function main() {
       status: 'VIGENTE',
     },
   });
-
   // Overdue invoice for Eleinco
   await prisma.invoice.create({
     data: {
@@ -1165,12 +1112,9 @@ async function main() {
       status: 'VENCIDA',
     },
   });
-
   console.log('  ✓ 5 facturas creadas\n');
-
   // ── Activity Logs ────────────────────────────────────────
   console.log('Creating activity logs...');
-
   const logEntries = [
     { userId: vendedora.id, action: 'LOGIN', entityType: 'User', entityId: vendedora.id, metadata: { ip: '192.168.1.10' } },
     { userId: vendedora.id, action: 'CREATE', entityType: 'Quotation', entityId: q1.id, metadata: { number: q1.number, total: 2760000 } },
@@ -1183,13 +1127,10 @@ async function main() {
     { userId: logistica.id, action: 'INVENTORY_MOVEMENT', entityType: 'Product', entityId: antG6Vhf.id, metadata: { type: 'SALIDA', qty: 3 } },
     { userId: gerente.id, action: 'LOGIN', entityType: 'User', entityId: gerente.id, metadata: { ip: '192.168.1.1' } },
   ];
-
   for (const entry of logEntries) {
     await prisma.activityLog.create({ data: entry });
   }
-
   console.log(`  ✓ ${logEntries.length} registros de actividad creados\n`);
-
   // ── Summary ──────────────────────────────────────────────
   console.log('═══════════════════════════════════════════');
   console.log('  MARAL OS — Seed completado exitosamente');
@@ -1214,7 +1155,6 @@ async function main() {
   console.log('  → 5 facturas');
   console.log('');
 }
-
 main()
   .catch((e) => {
     console.error('Seed error:', e);
