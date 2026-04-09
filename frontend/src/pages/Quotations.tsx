@@ -386,7 +386,7 @@ export default function Quotations() {
                           {isOverdueFollowup && (
                             <span className="h-2 w-2 rounded-full bg-orange-500 shrink-0" title="Seguimiento vencido" />
                           )}
-                          <span className="font-semibold text-blue-600">
+                          <span className="font-semibold text-blue-600 hover:underline">
                             {q.number}
                           </span>
                         </div>

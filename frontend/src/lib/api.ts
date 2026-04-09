@@ -67,6 +67,8 @@ export const authApi = {
 // Dashboard
 export const dashboardApi = {
   getSummary: () => api.get<DashboardData>('/dashboard/kpis'),
+  getSalesChart: () => api.get<{ month: string; label: string; sales: number; orders: number }[]>('/dashboard/sales-chart'),
+  getSalesByLine: () => api.get<{ byLine: { line: string; revenue: number; units: number; percentage: number }[] }>('/dashboard/sales-by-line'),
 }
 
 // Clients

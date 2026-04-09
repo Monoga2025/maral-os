@@ -208,8 +208,10 @@ router.get('/operations', async (req: AuthRequest, res: Response) => {
         const days =
           (new Date(order.dispatchDate).getTime() - new Date(order.createdAt).getTime()) /
           (1000 * 60 * 60 * 24);
-        totalFulfillmentDays += days;
-        fulfillmentCount++;
+        if (days >= 0) {
+          totalFulfillmentDays += days;
+          fulfillmentCount++;
+        }
       }
     });
 

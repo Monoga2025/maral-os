@@ -51,6 +51,18 @@ export default function Dashboard() {
     refetchInterval: 60_000,
   })
 
+  const { data: salesChart } = useQuery({
+    queryKey: ['dashboard-sales-chart'],
+    queryFn: () => dashboardApi.getSalesChart().then((r) => r.data),
+    refetchInterval: 60_000,
+  })
+
+  const { data: salesByLine } = useQuery({
+    queryKey: ['dashboard-sales-by-line'],
+    queryFn: () => dashboardApi.getSalesByLine().then((r) => r.data),
+    refetchInterval: 60_000,
+  })
+
   const { data: pendingTasks } = useQuery<Task[]>({
     queryKey: ['tasks-pending'],
     queryFn: () => tasksApi.getAll({ status: 'PENDIENTE' }).then((r) => r.data),
@@ -66,15 +78,15 @@ export default function Dashboard() {
     : 0
 
   const salesChartData =
-    data?.salesLast6Months?.map((s) => ({
-      mes: s.month,
-      ventas: s.amount,
+    salesChart?.map((s) => ({
+      mes: s.label,
+      ventas: s.sales,
     })) ?? []
 
   const barChartData =
-    data?.salesByLine?.map((s) => ({
+    salesByLine?.byLine?.map((s) => ({
       linea: lineLabels[s.line] ?? s.line,
-      ventas: s.amount,
+      ventas: s.revenue,
     })) ?? []
 
   return (

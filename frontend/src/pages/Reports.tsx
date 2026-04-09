@@ -128,7 +128,7 @@ export default function Reports() {
                 <h2 className="font-semibold text-gray-900 mb-4">Por Línea de Producto</h2>
                 <ResponsiveContainer width="100%" height={220}>
                   <PieChart>
-                    <Pie data={sales.byLine} dataKey="amount" nameKey="line" cx="50%" cy="50%" outerRadius={80}
+                    <Pie data={sales.byLine} dataKey="revenue" nameKey="line" cx="50%" cy="50%" outerRadius={80}
                       label={({ line, percent }: { line: string; percent: number }) => `${LINE_LABELS[line] ?? line} ${(percent * 100).toFixed(0)}%`}>
                       {(sales.byLine ?? []).map((_: unknown, i: number) => (
                         <Cell key={i} fill={COLORS[i % COLORS.length]} />

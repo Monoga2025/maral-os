@@ -239,7 +239,13 @@ export default function Orders() {
                   <td className="px-4 py-3 font-semibold text-gray-900">{formatCOP(order.total)}</td>
                   <td className="px-4 py-3 text-gray-500">{formatDate(order.createdAt)}</td>
                   <td className="px-4 py-3">
-                    <Eye size={16} className="text-gray-400" />
+                    <button
+                      className="flex h-7 w-7 items-center justify-center rounded-lg text-blue-500 hover:bg-blue-50 transition-colors"
+                      onClick={(e) => { e.stopPropagation(); navigate(`/pedidos/${order.id}`) }}
+                      title="Ver detalle"
+                    >
+                      <Eye size={16} />
+                    </button>
                   </td>
                 </tr>
               ))}
