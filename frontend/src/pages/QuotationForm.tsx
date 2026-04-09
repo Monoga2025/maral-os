@@ -458,7 +458,7 @@ export default function QuotationForm() {
                 onChange={(e) => setClientSearch(e.target.value)}
                 prefix={<Search className="h-4 w-4" />}
               />
-              {clientResults?.data?.length && clientSearch.length > 1 ? (
+              {clientResults?.data?.length && clientSearch.length > 0 ? (
                 <div className="absolute z-10 mt-1 w-full rounded-xl border border-gray-200 bg-white shadow-lg overflow-hidden">
                   {clientResults.data.map((client) => (
                     <button
@@ -743,41 +743,117 @@ export default function QuotationForm() {
             <CardHeader>
               <CardTitle>Condiciones de la cotización</CardTitle>
             </CardHeader>
-            <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <Input label="Validez (días)" type="number" min="1" {...register('validityDays')} />
-              <Select label="Forma de pago" {...register('paymentTerms')}>
-                <option value="Contado">Contado</option>
-                <option value="15 días">15 días</option>
-                <option value="30 días">30 días</option>
-                <option value="45 días">45 días</option>
-                <option value="60 días">60 días</option>
-                <option value="Crédito acordado">Crédito acordado</option>
-              </Select>
+            <CardContent className="space-y-5">
+              {/* Validez */}
+              <div>
+                <p className="text-sm font-medium text-gray-700 mb-2">Validez</p>
+                <div className="flex flex-wrap gap-2 items-center">
+                  {[5, 10, 15, 30].map((d) => (
+                    <button
+                      key={d}
+                      type="button"
+                      onClick={() => setValue('validityDays', d)}
+                      className={`rounded-full border px-4 py-1.5 text-sm font-medium transition-all ${
+                        watch('validityDays') === d
+                          ? 'bg-blue-600 text-white border-transparent shadow-sm'
+                          : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
+                      }`}
+                    >
+                      {d} días
+                    </button>
+                  ))}
+                  <div className="flex items-center gap-1.5 ml-1">
+                    <input
+                      type="number"
+                      min="1"
+                      placeholder="Otro"
+                      {...register('validityDays')}
+                      className="w-20 rounded-lg border border-gray-200 px-2 py-1.5 text-sm text-center focus:border-blue-500 focus:outline-none"
+                    />
+                    <span className="text-sm text-gray-400">días</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Forma de pago */}
+              <div>
+                <p className="text-sm font-medium text-gray-700 mb-2">Forma de pago</p>
+                <div className="flex flex-wrap gap-2">
+                  {['Contado', '15 días', '30 días', '45 días', '60 días', 'Crédito acordado'].map((opt) => (
+                    <button
+                      key={opt}
+                      type="button"
+                      onClick={() => setValue('paymentTerms', opt)}
+                      className={`rounded-full border px-4 py-1.5 text-sm font-medium transition-all ${
+                        watch('paymentTerms') === opt
+                          ? 'bg-blue-600 text-white border-transparent shadow-sm'
+                          : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
+                      }`}
+                    >
+                      {opt}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Seguimiento */}
+              <div>
+                <p className="text-sm font-medium text-gray-700 mb-1">
+                  Próximo seguimiento
+                  <span className="ml-1.5 text-xs font-normal text-gray-400">(¿cuándo llamar al cliente?)</span>
+                </p>
+                <div className="flex flex-wrap gap-2 mb-2">
+                  {[
+                    { label: 'En 3 días', days: 3 },
+                    { label: 'En 1 semana', days: 7 },
+                    { label: 'En 2 semanas', days: 14 },
+                    { label: 'En 1 mes', days: 30 },
+                  ].map(({ label, days }) => {
+                    const d = new Date()
+                    d.setDate(d.getDate() + days)
+                    const iso = d.toISOString().split('T')[0]
+                    return (
+                      <button
+                        key={label}
+                        type="button"
+                        onClick={() => setValue('followUpDate', iso)}
+                        className={`rounded-full border px-3 py-1.5 text-sm font-medium transition-all ${
+                          watch('followUpDate') === iso
+                            ? 'bg-blue-600 text-white border-transparent shadow-sm'
+                            : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    )
+                  })}
+                  <input
+                    type="date"
+                    min="2024-01-01"
+                    max="2035-12-31"
+                    {...register('followUpDate')}
+                    className="rounded-lg border border-gray-200 px-2 py-1.5 text-sm focus:border-blue-500 focus:outline-none"
+                  />
+                </div>
+                {watch('followUpDate') && (
+                  <p className="text-xs text-blue-600 font-medium">
+                    Seguimiento el {new Date(watch('followUpDate') + 'T12:00:00').toLocaleDateString('es-CO', { weekday: 'long', day: 'numeric', month: 'long' })}
+                  </p>
+                )}
+              </div>
+
               <Input
-                label="Próximo seguimiento"
-                type="date"
-                min="2024-01-01"
-                max="2035-12-31"
-                hint="Fecha en la que debes llamar al cliente para preguntar si va a aceptar la cotización"
-                {...register('followUpDate')}
+                label="Dirección de envío"
+                placeholder="Ej: Carrera 7 # 45-28, Bogotá, Cundinamarca"
+                hint="Aparece en la etiqueta de envío del PDF. Se prellenó con la dirección del cliente."
+                {...register('shippingAddress')}
               />
-              <div />
-              <div className="md:col-span-2">
-                <Input
-                  label="Dirección de envío"
-                  placeholder="Ej: Carrera 7 # 45-28, Bogotá, Cundinamarca"
-                  hint="Aparece en la etiqueta de envío del PDF. Se prellenó con la dirección del cliente."
-                  {...register('shippingAddress')}
-                />
-              </div>
-              <div className="md:col-span-2">
-                <Textarea
-                  label="Observaciones"
-                  placeholder="Incluye notas, condiciones especiales, garantías..."
-                  rows={3}
-                  {...register('notes')}
-                />
-              </div>
+              <Textarea
+                label="Observaciones"
+                placeholder="Incluye notas, condiciones especiales, garantías..."
+                rows={3}
+                {...register('notes')}
+              />
             </CardContent>
           </Card>
 

@@ -293,139 +293,171 @@ export default function Tareas() {
       {/* Create modal */}
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-md rounded-xl bg-white shadow-xl">
+          <div className="w-full max-w-lg rounded-2xl bg-white shadow-2xl">
             <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4">
               <h2 className="text-lg font-semibold text-gray-900">Nueva Tarea</h2>
               <button
-                onClick={() => {
-                  setShowModal(false)
-                  setForm(DEFAULT_FORM)
-                }}
-                className="text-gray-400 hover:text-gray-600 text-xl leading-none"
+                onClick={() => { setShowModal(false); setForm(DEFAULT_FORM) }}
+                className="flex h-7 w-7 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors text-xl leading-none"
               >
                 ×
               </button>
             </div>
-            <form onSubmit={handleSubmit} className="p-6 space-y-4">
+            <form onSubmit={handleSubmit} className="p-6 space-y-5">
               {/* Title */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Título <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  value={form.title}
-                  onChange={(e) => setForm({ ...form, title: e.target.value })}
-                  placeholder="Describe la tarea..."
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                />
-              </div>
+              <input
+                // eslint-disable-next-line jsx-a11y/no-autofocus
+                autoFocus
+                type="text"
+                value={form.title}
+                onChange={(e) => setForm({ ...form, title: e.target.value })}
+                placeholder="¿Qué hay que hacer?"
+                className="w-full rounded-xl border-2 border-gray-200 px-4 py-3 text-base font-medium placeholder-gray-300 focus:border-blue-500 focus:outline-none transition-colors"
+              />
 
               {/* Description */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Descripción
-                </label>
-                <textarea
-                  value={form.description}
-                  onChange={(e) => setForm({ ...form, description: e.target.value })}
-                  placeholder="Detalles adicionales (opcional)..."
-                  rows={3}
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 resize-none"
-                />
-              </div>
+              <textarea
+                value={form.description}
+                onChange={(e) => setForm({ ...form, description: e.target.value })}
+                placeholder="Detalles adicionales (opcional)..."
+                rows={2}
+                className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm placeholder-gray-300 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 resize-none"
+              />
 
-              {/* Priority */}
+              {/* Priority pills */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Prioridad
-                </label>
-                <select
-                  value={form.priority}
-                  onChange={(e) => setForm({ ...form, priority: e.target.value as TaskPriority })}
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                >
-                  <option value="URGENTE">Urgente</option>
-                  <option value="NORMAL">Normal</option>
-                  <option value="DESPUES">Después</option>
-                </select>
-              </div>
-
-              {/* Assigned to */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Asignar a
-                </label>
-                <select
-                  value={form.assignedToId}
-                  onChange={(e) => setForm({ ...form, assignedToId: e.target.value })}
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                >
-                  <option value="">Yo mismo</option>
-                  {users?.map((u) => (
-                    <option key={u.id} value={u.id}>
-                      {u.name}
-                    </option>
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Prioridad</p>
+                <div className="flex gap-2">
+                  {([['URGENTE', 'Urgente 🔴', 'bg-red-600 text-white', 'border-red-200 text-red-700 hover:bg-red-50'],
+                    ['NORMAL', 'Normal', 'bg-blue-600 text-white', 'border-blue-200 text-blue-700 hover:bg-blue-50'],
+                    ['DESPUES', 'Después', 'bg-gray-600 text-white', 'border-gray-200 text-gray-600 hover:bg-gray-100']] as const).map(([val, label, activeClass, inactiveClass]) => (
+                    <button
+                      key={val}
+                      type="button"
+                      onClick={() => setForm({ ...form, priority: val as TaskPriority })}
+                      className={`flex-1 rounded-full border py-1.5 text-sm font-semibold transition-all ${
+                        form.priority === val ? activeClass + ' border-transparent shadow-sm' : 'bg-white ' + inactiveClass
+                      }`}
+                    >
+                      {label}
+                    </button>
                   ))}
-                </select>
-              </div>
-
-              {/* Due date — solo mes y día, el año es el actual */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Fecha límite
-                  <span className="ml-1.5 text-xs font-normal text-gray-400">
-                    ({new Date().getFullYear()})
-                  </span>
-                </label>
-                <div className="grid grid-cols-2 gap-2">
-                  <select
-                    value={form.dueDate ? parseInt(form.dueDate.split('-')[1]) : new Date().getMonth() + 1}
-                    onChange={(e) => {
-                      const year = new Date().getFullYear()
-                      const month = parseInt(e.target.value)
-                      const day = form.dueDate ? parseInt(form.dueDate.split('-')[2]) : new Date().getDate()
-                      const maxDay = new Date(year, month, 0).getDate()
-                      setForm({ ...form, dueDate: `${year}-${String(month).padStart(2,'0')}-${String(Math.min(day, maxDay)).padStart(2,'0')}` })
-                    }}
-                    className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                  >
-                    {MONTHS.map((m, i) => (
-                      <option key={i + 1} value={i + 1}>{m}</option>
-                    ))}
-                  </select>
-                  <select
-                    value={form.dueDate ? parseInt(form.dueDate.split('-')[2]) : new Date().getDate()}
-                    onChange={(e) => {
-                      const year = new Date().getFullYear()
-                      const month = form.dueDate ? parseInt(form.dueDate.split('-')[1]) : new Date().getMonth() + 1
-                      const day = parseInt(e.target.value)
-                      setForm({ ...form, dueDate: `${year}-${String(month).padStart(2,'0')}-${String(day).padStart(2,'0')}` })
-                    }}
-                    className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                  >
-                    {Array.from({ length: new Date(new Date().getFullYear(), form.dueDate ? parseInt(form.dueDate.split('-')[1]) : new Date().getMonth() + 1, 0).getDate() }, (_, i) => (
-                      <option key={i + 1} value={i + 1}>Día {i + 1}</option>
-                    ))}
-                  </select>
                 </div>
               </div>
 
-              <div className="flex justify-end gap-3 pt-2">
+              {/* Assigned to chips */}
+              <div>
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Asignar a</p>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setForm({ ...form, assignedToId: '' })}
+                    className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-medium transition-all ${
+                      !form.assignedToId ? 'bg-blue-600 text-white border-transparent shadow-sm' : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
+                    }`}
+                  >
+                    <span className="flex h-5 w-5 items-center justify-center rounded-full bg-white/20 text-xs font-bold">
+                      {user?.name?.[0] ?? 'Y'}
+                    </span>
+                    Yo
+                  </button>
+                  {users?.filter((u) => u.id !== user?.id).map((u) => (
+                    <button
+                      key={u.id}
+                      type="button"
+                      onClick={() => setForm({ ...form, assignedToId: u.id })}
+                      className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-medium transition-all ${
+                        form.assignedToId === u.id ? 'bg-blue-600 text-white border-transparent shadow-sm' : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
+                      }`}
+                    >
+                      <span className={`flex h-5 w-5 items-center justify-center rounded-full text-xs font-bold ${form.assignedToId === u.id ? 'bg-white/20 text-white' : 'bg-blue-100 text-blue-700'}`}>
+                        {u.name[0]}
+                      </span>
+                      {u.name.split(' ')[0]}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Quick date presets */}
+              <div>
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Fecha límite</p>
+                <div className="flex flex-wrap gap-2">
+                  {[
+                    { label: 'Hoy', days: 0 },
+                    { label: 'Mañana', days: 1 },
+                    { label: '3 días', days: 3 },
+                    { label: '1 semana', days: 7 },
+                    { label: '2 semanas', days: 14 },
+                  ].map(({ label, days }) => {
+                    const d = new Date()
+                    d.setDate(d.getDate() + days)
+                    const iso = d.toISOString().split('T')[0]
+                    return (
+                      <button
+                        key={label}
+                        type="button"
+                        onClick={() => setForm({ ...form, dueDate: iso })}
+                        className={`rounded-full border px-3 py-1.5 text-sm font-medium transition-all ${
+                          form.dueDate === iso
+                            ? 'bg-blue-600 text-white border-transparent shadow-sm'
+                            : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    )
+                  })}
+                  {/* Custom date - month+day selects */}
+                  <div className="flex gap-1.5 items-center">
+                    <select
+                      value={form.dueDate ? parseInt(form.dueDate.split('-')[1]) : ''}
+                      onChange={(e) => {
+                        const year = new Date().getFullYear()
+                        const month = parseInt(e.target.value)
+                        const day = form.dueDate ? Math.min(parseInt(form.dueDate.split('-')[2]), new Date(year, month, 0).getDate()) : 1
+                        setForm({ ...form, dueDate: `${year}-${String(month).padStart(2,'0')}-${String(day).padStart(2,'0')}` })
+                      }}
+                      className="rounded-lg border border-gray-200 px-2 py-1.5 text-xs focus:border-blue-500 focus:outline-none"
+                    >
+                      <option value="">Mes</option>
+                      {MONTHS.map((m, i) => <option key={i+1} value={i+1}>{m.slice(0,3)}</option>)}
+                    </select>
+                    <select
+                      value={form.dueDate ? parseInt(form.dueDate.split('-')[2]) : ''}
+                      onChange={(e) => {
+                        const year = new Date().getFullYear()
+                        const month = form.dueDate ? parseInt(form.dueDate.split('-')[1]) : new Date().getMonth() + 1
+                        setForm({ ...form, dueDate: `${year}-${String(month).padStart(2,'0')}-${String(parseInt(e.target.value)).padStart(2,'0')}` })
+                      }}
+                      className="rounded-lg border border-gray-200 px-2 py-1.5 text-xs focus:border-blue-500 focus:outline-none"
+                    >
+                      <option value="">Día</option>
+                      {Array.from({ length: form.dueDate ? new Date(new Date().getFullYear(), parseInt(form.dueDate.split('-')[1]), 0).getDate() : 31 }, (_, i) => (
+                        <option key={i+1} value={i+1}>{i+1}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+                {form.dueDate && (
+                  <p className="mt-1.5 text-xs text-blue-600 font-medium">
+                    Vence el {new Date(form.dueDate + 'T12:00:00').toLocaleDateString('es-CO', { weekday: 'long', day: 'numeric', month: 'long' })}
+                  </p>
+                )}
+              </div>
+
+              <div className="flex justify-end gap-3 pt-1 border-t border-gray-100">
                 <button
                   type="button"
-                  onClick={() => {
-                    setShowModal(false)
-                    setForm({ ...DEFAULT_FORM, dueDate: todayISO() })
-                  }}
-                  className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+                  onClick={() => { setShowModal(false); setForm(DEFAULT_FORM) }}
+                  className="rounded-xl border border-gray-200 px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
-                  disabled={createMutation.isPending}
-                  className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-60 transition-colors"
+                  disabled={createMutation.isPending || !form.title.trim()}
+                  className="rounded-xl bg-blue-600 px-5 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50 transition-colors"
                 >
                   {createMutation.isPending ? 'Creando...' : 'Crear Tarea'}
                 </button>

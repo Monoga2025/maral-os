@@ -74,28 +74,28 @@ export function Header() {
 
   // Calcular alertas reales
   const alerts = [
-    kpis?.overdueReceivables > 0 && {
+    (kpis?.overdueReceivables ?? 0) > 0 && {
       id: 'cartera',
       icon: <AlertTriangle className="h-4 w-4 text-red-500" />,
       bg: 'bg-red-50',
       title: 'Cartera vencida',
-      desc: `${formatCOP(kpis.overdueReceivables)} en facturas por cobrar`,
+      desc: `${formatCOP(kpis?.overdueReceivables ?? 0)} en facturas por cobrar`,
       path: '/credito',
     },
-    kpis?.overdueFollowUps > 0 && {
+    (kpis?.overdueFollowUps ?? 0) > 0 && {
       id: 'seguimientos',
       icon: <Clock className="h-4 w-4 text-orange-500" />,
       bg: 'bg-orange-50',
       title: 'Seguimientos vencidos',
-      desc: `${kpis.overdueFollowUps} cotizaciones sin respuesta`,
+      desc: `${kpis?.overdueFollowUps} cotizaciones sin respuesta`,
       path: '/cotizaciones',
     },
-    kpis?.criticalStock > 0 && {
+    (kpis?.criticalStock ?? 0) > 0 && {
       id: 'stock',
       icon: <Package className="h-4 w-4 text-yellow-600" />,
       bg: 'bg-yellow-50',
       title: 'Stock crítico',
-      desc: `${kpis.criticalStock} productos por debajo del mínimo`,
+      desc: `${kpis?.criticalStock} productos por debajo del mínimo`,
       path: '/inventario',
     },
   ].filter(Boolean) as { id: string; icon: React.ReactNode; bg: string; title: string; desc: string; path: string }[]

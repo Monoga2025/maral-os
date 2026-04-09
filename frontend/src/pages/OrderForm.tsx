@@ -287,48 +287,92 @@ export default function OrderForm() {
                   placeholder="Ej: Bogotá, Medellín, Cali"
                   className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
               </div>
-              <div>
-                <label className="text-xs text-gray-500 font-medium">Transportadora *</label>
-                <select value={carrier} onChange={(e) => setCarrier(e.target.value)}
-                  className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-                  <option value="">Seleccionar...</option>
-                  {CARRIERS.map((c) => <option key={c} value={c}>{c}</option>)}
-                </select>
+              <div className="col-span-2">
+                <div className="flex items-center gap-1 mb-2">
+                  <label className="text-xs text-gray-500 font-medium">Transportadora *</label>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {CARRIERS.map((c) => (
+                    <button
+                      key={c}
+                      type="button"
+                      onClick={() => setCarrier(c)}
+                      className={`rounded-full border px-3 py-1.5 text-sm font-medium transition-all ${
+                        carrier === c
+                          ? 'bg-blue-600 text-white border-transparent shadow-sm'
+                          : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
+                      }`}
+                    >
+                      {c}
+                    </button>
+                  ))}
+                </div>
               </div>
               <div>
-                <div className="flex items-center gap-1">
+                <div className="flex items-center gap-1 mb-2">
                   <label className="text-xs text-gray-500 font-medium">Quién paga el flete</label>
                   <Hint text="Si el cliente lo paga se llama flete en cobro. Si Maral lo paga, es flete prepagado." side="top" />
                 </div>
-                <select value={freightPayer} onChange={(e) => setFreightPayer(e.target.value)}
-                  className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-                  <option>Remitente</option>
-                  <option>Destinatario</option>
-                </select>
+                <div className="flex gap-2">
+                  {['Remitente', 'Destinatario'].map((opt) => (
+                    <button
+                      key={opt}
+                      type="button"
+                      onClick={() => setFreightPayer(opt)}
+                      className={`flex-1 rounded-full border py-1.5 text-sm font-medium transition-all ${
+                        freightPayer === opt
+                          ? 'bg-blue-600 text-white border-transparent shadow-sm'
+                          : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
+                      }`}
+                    >
+                      {opt}
+                    </button>
+                  ))}
+                </div>
               </div>
               <div>
-                <div className="flex items-center gap-1">
+                <div className="flex items-center gap-1 mb-2">
                   <label className="text-xs text-gray-500 font-medium">Forma de pago flete</label>
                   <Hint text="Cómo se le pagó a la transportadora al momento del despacho." side="top" />
                 </div>
-                <select value={freightPayment} onChange={(e) => setFreightPayment(e.target.value)}
-                  className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-                  <option>Nequi</option>
-                  <option>Efectivo</option>
-                  <option>Ya pagado</option>
-                </select>
+                <div className="flex gap-2">
+                  {['Nequi', 'Efectivo', 'Ya pagado'].map((opt) => (
+                    <button
+                      key={opt}
+                      type="button"
+                      onClick={() => setFreightPayment(opt)}
+                      className={`flex-1 rounded-full border py-1.5 text-sm font-medium transition-all ${
+                        freightPayment === opt
+                          ? 'bg-blue-600 text-white border-transparent shadow-sm'
+                          : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
+                      }`}
+                    >
+                      {opt}
+                    </button>
+                  ))}
+                </div>
               </div>
               <div>
-                <div className="flex items-center gap-1">
+                <div className="flex items-center gap-1 mb-2">
                   <label className="text-xs text-gray-500 font-medium">Tipo de pedido</label>
                   <Hint text="Garantía es para reponer un producto con falla sin cobrar. Muestra es para que el cliente evalúe el producto." side="top" />
                 </div>
-                <select value={type} onChange={(e) => setType(e.target.value as typeof type)}
-                  className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-                  <option value="PEDIDO">Pedido</option>
-                  <option value="GARANTIA">Garantía</option>
-                  <option value="MUESTRA">Muestra</option>
-                </select>
+                <div className="flex gap-2">
+                  {[['PEDIDO', 'Pedido'], ['GARANTIA', 'Garantía'], ['MUESTRA', 'Muestra']].map(([val, label]) => (
+                    <button
+                      key={val}
+                      type="button"
+                      onClick={() => setType(val as typeof type)}
+                      className={`flex-1 rounded-full border py-1.5 text-sm font-medium transition-all ${
+                        type === val
+                          ? 'bg-blue-600 text-white border-transparent shadow-sm'
+                          : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
             <div>
