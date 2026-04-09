@@ -58,6 +58,15 @@ interface CreateForm {
   dueDate: string
 }
 
+const MONTHS = [
+  'Enero','Febrero','Marzo','Abril','Mayo','Junio',
+  'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre',
+]
+
+function todayISO() {
+  return new Date().toISOString().split('T')[0]
+}
+
 const DEFAULT_FORM: CreateForm = {
   title: '',
   description: '',
@@ -151,7 +160,7 @@ export default function Tareas() {
             {tasks?.length ?? 0} tarea{tasks?.length !== 1 ? 's' : ''}
           </p>
         </div>
-        <Button leftIcon={<Plus className="h-4 w-4" />} onClick={() => setShowModal(true)}>
+        <Button leftIcon={<Plus className="h-4 w-4" />} onClick={() => { setForm({ ...DEFAULT_FORM, dueDate: todayISO() }); setShowModal(true) }}>
           Nueva Tarea
         </Button>
       </div>
@@ -361,17 +370,45 @@ export default function Tareas() {
                 </select>
               </div>
 
-              {/* Due date */}
+              {/* Due date — solo mes y día, el año es el actual */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Fecha límite
+                  <span className="ml-1.5 text-xs font-normal text-gray-400">
+                    ({new Date().getFullYear()})
+                  </span>
                 </label>
-                <input
-                  type="date"
-                  value={form.dueDate}
-                  onChange={(e) => setForm({ ...form, dueDate: e.target.value })}
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                />
+                <div className="grid grid-cols-2 gap-2">
+                  <select
+                    value={form.dueDate ? parseInt(form.dueDate.split('-')[1]) : new Date().getMonth() + 1}
+                    onChange={(e) => {
+                      const year = new Date().getFullYear()
+                      const month = parseInt(e.target.value)
+                      const day = form.dueDate ? parseInt(form.dueDate.split('-')[2]) : new Date().getDate()
+                      const maxDay = new Date(year, month, 0).getDate()
+                      setForm({ ...form, dueDate: `${year}-${String(month).padStart(2,'0')}-${String(Math.min(day, maxDay)).padStart(2,'0')}` })
+                    }}
+                    className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  >
+                    {MONTHS.map((m, i) => (
+                      <option key={i + 1} value={i + 1}>{m}</option>
+                    ))}
+                  </select>
+                  <select
+                    value={form.dueDate ? parseInt(form.dueDate.split('-')[2]) : new Date().getDate()}
+                    onChange={(e) => {
+                      const year = new Date().getFullYear()
+                      const month = form.dueDate ? parseInt(form.dueDate.split('-')[1]) : new Date().getMonth() + 1
+                      const day = parseInt(e.target.value)
+                      setForm({ ...form, dueDate: `${year}-${String(month).padStart(2,'0')}-${String(day).padStart(2,'0')}` })
+                    }}
+                    className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  >
+                    {Array.from({ length: new Date(new Date().getFullYear(), form.dueDate ? parseInt(form.dueDate.split('-')[1]) : new Date().getMonth() + 1, 0).getDate() }, (_, i) => (
+                      <option key={i + 1} value={i + 1}>Día {i + 1}</option>
+                    ))}
+                  </select>
+                </div>
               </div>
 
               <div className="flex justify-end gap-3 pt-2">
@@ -379,7 +416,7 @@ export default function Tareas() {
                   type="button"
                   onClick={() => {
                     setShowModal(false)
-                    setForm(DEFAULT_FORM)
+                    setForm({ ...DEFAULT_FORM, dueDate: todayISO() })
                   }}
                   className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
                 >

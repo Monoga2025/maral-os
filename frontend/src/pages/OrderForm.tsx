@@ -162,7 +162,7 @@ export default function OrderForm() {
                     {clients.map((c) => (
                       <button
                         key={c.id}
-                        onClick={() => { setSelectedClient(c); setClientSearch(''); setRecipientName(c.name); setPhone(c.phone ?? '') }}
+                        onClick={() => { setSelectedClient(c); setClientSearch(''); setRecipientName(c.name); setPhone(c.phone ?? ''); setAddress(c.address ?? ''); setCity(c.city ?? '') }}
                         className="w-full text-left px-4 py-2.5 hover:bg-gray-50 text-sm border-b border-gray-50 last:border-0"
                       >
                         <span className="font-medium">{c.name}</span>

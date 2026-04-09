@@ -231,8 +231,8 @@ export default function QuotationForm() {
   const { data: clientResults } = useQuery({
     queryKey: ['clients-search', clientSearch],
     queryFn: () =>
-      clientsApi.getAll({ search: clientSearch, pageSize: 10 }).then((r) => r.data),
-    enabled: clientSearch.length > 1,
+      clientsApi.getAll({ search: clientSearch || undefined, pageSize: 8 }).then((r) => r.data),
+    enabled: clientSearch.length > 0,
   })
 
   const { data: productResults } = useQuery({

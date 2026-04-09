@@ -4,9 +4,12 @@ import { persist } from 'zustand/middleware'
 interface UIState {
   sidebarCollapsed: boolean
   commandPaletteOpen: boolean
+  notificationsOpen: boolean
   toggleSidebar: () => void
   toggleCommandPalette: () => void
   setCommandPaletteOpen: (open: boolean) => void
+  toggleNotifications: () => void
+  setNotificationsOpen: (open: boolean) => void
 }
 
 export const useUIStore = create<UIState>()(
@@ -14,6 +17,7 @@ export const useUIStore = create<UIState>()(
     (set) => ({
       sidebarCollapsed: false,
       commandPaletteOpen: false,
+      notificationsOpen: false,
 
       toggleSidebar: () =>
         set((state) => ({ sidebarCollapsed: !state.sidebarCollapsed })),
@@ -22,6 +26,11 @@ export const useUIStore = create<UIState>()(
         set((state) => ({ commandPaletteOpen: !state.commandPaletteOpen })),
 
       setCommandPaletteOpen: (open) => set({ commandPaletteOpen: open }),
+
+      toggleNotifications: () =>
+        set((state) => ({ notificationsOpen: !state.notificationsOpen })),
+
+      setNotificationsOpen: (open) => set({ notificationsOpen: open }),
     }),
     {
       name: 'maral-ui',

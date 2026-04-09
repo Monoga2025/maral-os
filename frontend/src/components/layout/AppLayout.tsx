@@ -4,6 +4,7 @@ import { Header } from './Header'
 import { ErrorBoundary } from '../ErrorBoundary'
 import ChatBot from '../ChatBot'
 import { TourOverlay } from '../tour/TourOverlay'
+import { CommandPalette } from '../CommandPalette'
 
 export default function AppLayout() {
   return (
@@ -21,6 +22,7 @@ export default function AppLayout() {
         </main>
       </div>
 
+      <CommandPalette />
       <ChatBot />
       <TourOverlay />
     </div>
