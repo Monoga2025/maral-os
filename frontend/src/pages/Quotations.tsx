@@ -289,7 +289,7 @@ export default function Quotations() {
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Cotizaciones</h1>
           <p className="mt-0.5 text-sm text-gray-500">
-            {data?.total ?? 0} cotizaciones
+            {data?.pagination?.total ?? 0} cotizaciones
           </p>
         </div>
         <div className="flex items-center gap-2">

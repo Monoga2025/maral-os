@@ -126,9 +126,18 @@ router.get('/:id', async (req: AuthRequest, res: Response) => {
       orderBy: { createdAt: 'desc' },
       select: { createdAt: true, status: true },
     });
+    const creditUsedAgg = await prisma.invoice.aggregate({
+      where: { clientId: req.params.id, status: { in: ['VIGENTE', 'VENCIDA'] } },
+      _sum: { amount: true },
+    });
+    const creditUsed = Number(creditUsedAgg._sum.amount ?? 0);
 
     res.json({
       ...client,
+      creditUsed,
+      totalPurchases: totalSpent,
+      ordersCount: totalOrders,
+      lastOrderAt: lastOrder?.createdAt || null,
       stats: {
         totalOrders,
         totalSpent,

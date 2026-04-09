@@ -756,6 +756,8 @@ export default function QuotationForm() {
               <Input
                 label="Próximo seguimiento"
                 type="date"
+                min="2024-01-01"
+                max="2035-12-31"
                 hint="Fecha en la que debes llamar al cliente para preguntar si va a aceptar la cotización"
                 {...register('followUpDate')}
               />
