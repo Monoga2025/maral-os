@@ -13,7 +13,7 @@ const taskSchema = z.object({
   assignedToId: z.string().min(1, 'Asignar a alguien es requerido'),
   clientId: z.string().optional(),
   orderId: z.string().optional(),
-  dueDate: z.string().datetime().optional(),
+  dueDate: z.string().optional(),
 });
 
 // GET /api/tasks
