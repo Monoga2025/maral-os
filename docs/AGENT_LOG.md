@@ -463,4 +463,22 @@ Continuación del estado al 2026-04-05 documentado en CLAUDE.md. El sistema corr
 3. Mejorar pipeline de cotizaciones (tiempo en estado, alertas de seguimiento)
 4. Configurar backup automático de PostgreSQL en EasyPanel
 
+## 2026-04-15 — bug-fixer — Resolución por número secuencial en Pedidos y Cotizaciones
+
+### Qué se hizo
+- Añadido `router.param('id', ...)` en `orders.ts` y `quotations.ts`: si el parámetro es un número entero (`/^\d+$/`), el backend busca por `number` (autoincrement) y sustituye `req.params.id` con el CUID real antes de que llegue al handler.
+
+### Cambios realizados
+- `backend/src/routes/orders.ts`: import `NextFunction`; `router.param` resuelve número → CUID
+- `backend/src/routes/quotations.ts`: ídem
+
+### Resultado
+- `/pedidos/7` y `/cotizaciones/8` ahora devuelven el recurso correcto en lugar de 404/formulario vacío.
+- Compatible hacia atrás: los CUIDs siguen funcionando sin cambio.
+
+### Próximos pasos
+- Push a `master` y redeploy en EasyPanel (pendiente desde QA 2026-04-01)
+- Ejecutar `prisma migrate deploy` en producción (hay 1 migración pendiente: campo `shippingAddress`)
+- Configurar variables `COMPANY_*` en EasyPanel
+
 <!-- Agregar nuevas entradas arriba de esta línea, debajo del encabezado -->

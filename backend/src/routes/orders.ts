@@ -1,4 +1,4 @@
-import { Router, Response } from 'express';
+import { Router, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import multer from 'multer';
 import path from 'path';
@@ -59,6 +59,17 @@ const orderSchema = z.object({
   type: z.enum(['PEDIDO', 'GARANTIA', 'MUESTRA']).optional().default('PEDIDO'),
   notes: z.string().optional(),
   items: z.array(orderItemSchema).min(1, 'Al menos un ítem requerido'),
+});
+
+// Resolve :id — accepts both cuid (≥20 chars) and sequential number
+router.param('id', async (req: AuthRequest, _res: Response, next: NextFunction, id: string) => {
+  if (id && /^\d+$/.test(id)) {
+    try {
+      const order = await prisma.order.findFirst({ where: { number: parseInt(id) }, select: { id: true } });
+      if (order) req.params.id = order.id;
+    } catch (_e) { /* fall through — will 404 in the handler */ }
+  }
+  next();
 });
 
 // GET /api/orders/check-duplicate (must be before /:id)

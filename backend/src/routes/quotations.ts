@@ -1,4 +1,4 @@
-import { Router, Response } from 'express';
+import { Router, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import PDFDocument from 'pdfkit';
 import prisma from '../lib/prisma';
@@ -58,6 +58,17 @@ function calculateTotals(items: z.infer<typeof quotationItemSchema>[], taxPercen
   const total = subtotal + tax;
   return { subtotal, tax, total };
 }
+
+// Resolve :id — accepts both cuid (≥20 chars) and sequential number
+router.param('id', async (req: AuthRequest, _res: Response, next: NextFunction, id: string) => {
+  if (id && /^\d+$/.test(id)) {
+    try {
+      const q = await prisma.quotation.findFirst({ where: { number: parseInt(id) }, select: { id: true } });
+      if (q) req.params.id = q.id;
+    } catch (_e) { /* fall through — will 404 in the handler */ }
+  }
+  next();
+});
 
 // GET /api/quotations
 router.get('/', async (req: AuthRequest, res: Response) => {
