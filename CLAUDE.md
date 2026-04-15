@@ -337,8 +337,8 @@ ARQUITECTURA DEFINITIVA: MARAL OS no escribe en Merlin. Merlin es solo lectura (
 - **WelcomeModal** mapea rutas para `tareas` y `gastos`.
 
 ### Bugs no corregidos (requieren cambios arquitectónicos, pendiente)
-- Navegación por número secuencial en URLs (`/pedidos/7` vs cuid) — requiere endpoint `findByNumber`.
-- Pedido #7 con total $0 — problema de seed, no de código.
+- ~~Navegación por número secuencial en URLs (`/pedidos/7` vs cuid)~~ → **CORREGIDO** en commit `cc43b7d`: `router.param('id')` resuelve enteros a CUIDs en `orders.ts` y `quotations.ts`.
+- Pedido #7 con total $0 — dato de negocio real (garantía sin cargo), no un bug de código.
 - Buscador global ⌘K / notificaciones — código parece correcto; posible estado de navegador.
 
 ### Convenciones de respuesta backend (para evitar regresiones)
