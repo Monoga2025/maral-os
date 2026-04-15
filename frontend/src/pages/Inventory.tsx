@@ -59,13 +59,13 @@ export default function Inventory() {
   const products: Product[] = data?.data.data ?? []
   const allProds: Product[] = allProducts?.data.data ?? []
 
-  const critical = products.filter((p) => p.stock < p.minStock).length
-  const atMin = products.filter((p) => p.stock === p.minStock).length
+  const critical = products.filter((p) => p.minStock > 0 && p.stock <= p.minStock).length
+  const atMin = products.filter((p) => p.minStock > 0 && p.stock === p.minStock).length
   const totalValue = products.reduce((a, p) => a + p.stock * p.cost, 0)
 
   const rowColor = (p: Product) => {
-    if (p.stock < p.minStock) return 'bg-red-50 border-l-4 border-red-400'
-    if (p.stock <= p.minStock * 1.2) return 'bg-orange-50 border-l-4 border-orange-400'
+    if (p.minStock > 0 && p.stock < p.minStock) return 'bg-red-50 border-l-4 border-red-400'
+    if (p.minStock > 0 && p.stock <= p.minStock * 1.2) return 'bg-orange-50 border-l-4 border-orange-400'
     return ''
   }
 
@@ -192,8 +192,8 @@ export default function Inventory() {
           </thead>
           <tbody className="divide-y divide-gray-100">
             {products.map((p) => {
-              const isCritical = p.stock < p.minStock
-              const isAtMin = p.stock <= p.minStock * 1.2
+              const isCritical = p.minStock > 0 && p.stock < p.minStock
+              const isAtMin = p.minStock > 0 && p.stock <= p.minStock * 1.2
               return (
                 <tr key={p.id} className={`${rowColor(p)} transition-colors`}>
                   <td className="px-4 py-3 font-mono text-xs text-gray-600">{p.reference}</td>

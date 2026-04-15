@@ -413,7 +413,7 @@ export default function Quotations() {
                             <span className="ml-1.5 text-xs text-red-500">
                               Expirada
                             </span>
-                          ) : daysLeft <= 3 ? (
+                          ) : (q.validUntil && daysLeft <= 3) ? (
                             <span className="ml-1.5 text-xs text-orange-500">
                               {daysLeft}d
                             </span>
@@ -488,7 +488,7 @@ export default function Quotations() {
                           >
                             <Copy className="h-3.5 w-3.5" />
                           </button>
-                          {q.status === 'BORRADOR' && (
+                          {(q.status === 'BORRADOR' || q.status === 'RECHAZADA') && (
                             <button
                               onClick={() => {
                                 if (confirm('¿Eliminar esta cotización?')) {

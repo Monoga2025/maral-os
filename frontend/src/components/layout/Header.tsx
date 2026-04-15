@@ -37,7 +37,7 @@ function getBreadcrumb(pathname: string): { label: string; path: string }[] {
     currentPath += '/' + part
     const label =
       routeLabels[currentPath] ??
-      (part.length === 24 || part.length === 36 ? 'Detalle' : part)
+      (part.length >= 20 ? 'Detalle' : part)
     crumbs.push({ label, path: currentPath })
   }
 

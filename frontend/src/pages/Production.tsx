@@ -191,7 +191,7 @@ export default function Production() {
                     {PHASES.find((p) => p.key === order.phase)?.label ?? order.phase}
                   </span>
                 </td>
-                <td className="px-4 py-3 text-gray-600">{order.assignedTo ?? '—'}</td>
+                <td className="px-4 py-3 text-gray-600">{ASSIGNEES.includes(order.assignedTo ?? '') ? order.assignedTo : '—'}</td>
                 <td className="px-4 py-3 text-gray-500 text-xs">
                   {order.requiredDate ? formatDate(order.requiredDate) : '—'}
                 </td>

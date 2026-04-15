@@ -304,7 +304,7 @@ export function TourOverlay() {
 
       {/* Spotlight for targeted steps */}
       {!isCenter && rect && <Spotlight rect={rect} />}
-      {!isCenter && !rect && <div className="fixed inset-0 bg-black/50 z-[9998]" />}
+      {!isCenter && !rect && <div className="fixed inset-0 bg-black/50 z-[9998] pointer-events-none" />}
 
       {/* Tooltip */}
       <Tooltip

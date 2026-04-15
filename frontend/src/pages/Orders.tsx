@@ -96,7 +96,7 @@ export default function Orders() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Pedidos</h1>
-          <p className="text-sm text-gray-500 mt-0.5">{orders.length} pedidos activos</p>
+          <p className="text-sm text-gray-500 mt-0.5">{orders.filter(o => o.status !== 'CANCELADO').length} pedidos activos</p>
         </div>
         <div className="flex items-center gap-3">
           <TourButton tourId="pedidos" />
@@ -172,7 +172,7 @@ export default function Orders() {
                       <p className="text-sm font-semibold text-gray-900 truncate">
                         {order.client?.name ?? order.client?.company ?? '—'}
                       </p>
-                      <p className="text-xs text-gray-500 mt-0.5">{order.items?.length ?? 0} items</p>
+                      <p className="text-xs text-gray-500 mt-0.5">{(order as any)._count?.items ?? order.items?.length ?? 0} items</p>
                       <p className="text-sm font-bold text-gray-900 mt-2">{formatCOP(order.total)}</p>
                       {nextStatus[key] && (
                         <div className="mt-2 flex items-center gap-1">

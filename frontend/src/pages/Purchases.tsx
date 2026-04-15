@@ -114,10 +114,10 @@ export default function Purchases() {
           <tbody className="divide-y divide-gray-100">
             {orders.map((order) => (
               <tr key={order.id} className="hover:bg-gray-50 transition-colors">
-                <td className="px-4 py-3 font-bold text-blue-600 text-xs">#{order.number}</td>
+                <td className="px-4 py-3 font-bold text-gray-700 text-xs">#{order.number}</td>
                 <td className="px-4 py-3 font-medium text-gray-900">{order.supplier?.name ?? '—'}</td>
                 <td className="px-4 py-3 text-gray-500 text-xs">{formatDate(order.createdAt)}</td>
-                <td className="px-4 py-3 text-gray-600">{order.items?.length ?? 0}</td>
+                <td className="px-4 py-3 text-gray-600">{(order as any)._count?.items ?? 0}</td>
                 <td className="px-4 py-3 font-semibold text-gray-900">{formatCOP(order.total)}</td>
                 <td className="px-4 py-3">
                   <span className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(order.status)}`}>

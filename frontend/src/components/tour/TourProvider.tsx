@@ -73,6 +73,22 @@ export function TourProvider({ children }: { children: React.ReactNode }) {
     setShowWelcome(false)
   }, [])
 
+  // Escape cierra tour o welcome modal
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return
+      if (showWelcome) {
+        dismissWelcome()
+      } else if (activeTour) {
+        if (activeTour) localStorage.setItem(`${STORAGE_PREFIX}${activeTour.id}`, '1')
+        setActiveTour(null)
+        setStepIndex(0)
+      }
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [showWelcome, activeTour, dismissWelcome])
+
   const currentStep = activeTour ? activeTour.steps[stepIndex] : null
 
   return (

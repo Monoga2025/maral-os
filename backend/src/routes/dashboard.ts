@@ -111,7 +111,13 @@ router.get('/kpis', async (req: AuthRequest, res: Response) => {
         action: a.action,
         entity: a.entityType,
         entityId: a.entityId || '',
-        description: `${a.action} en ${a.entityType}`,
+        description: (() => {
+          const actions: Record<string, string> = { CREATE: 'Creó', UPDATE: 'Actualizó', DELETE: 'Eliminó', APPROVE: 'Aprobó', REJECT: 'Rechazó', CONVERT: 'Convirtió', PAY: 'Pagó', RECEIVE: 'Recibió' };
+          const entities: Record<string, string> = { Quotation: 'cotización', Order: 'pedido', Client: 'cliente', Product: 'producto', Invoice: 'factura', PurchaseOrder: 'compra', ProductionOrder: 'producción', Expense: 'gasto' };
+          const act = actions[a.action] ?? a.action;
+          const ent = entities[a.entityType] ?? a.entityType;
+          return `${act} ${ent}`;
+        })(),
         createdAt: a.createdAt.toISOString(),
       })),
       period: {
