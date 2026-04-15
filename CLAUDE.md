@@ -316,3 +316,34 @@ CRÍTICO: Merlin maneja facturación electrónica DIAN. NUNCA escribir en VENMov
 
 ARQUITECTURA DEFINITIVA: MARAL OS no escribe en Merlin. Merlin es solo lectura (sync clientes+productos). La factura electrónica DIAN la genera el contador manualmente en Merlin. El módulo Cartera de MARAL OS es seguimiento interno, no reemplaza Merlin. Flujo: Pre-cotización → Cotización (PDF) → Pedido → Producción → Despacho → el contador factura en Merlin.
 
+## Estado al 2026-04-15 — QA exhaustivo + tours
+
+### Bugs corregidos (15, commit `6709dfe`)
+- **Header breadcrumb mostraba IDs crudos** → `Header.tsx`: detectar cuid2 (25 chars) con `length >= 20`, mostrar "Detalle".
+- **Contador de clientes en 0** → `Clients.tsx`: backend devuelve `pagination.total`, no `total`.
+- **Pedidos: `activos` incluía CANCELADO y kanban mostraba 0 ítems** → `Orders.tsx`: filtrar `!== 'CANCELADO'` y usar `_count.items`.
+- **Cotizaciones: botón eliminar faltante para RECHAZADA + "— 0d" con validUntil null** → `Quotations.tsx`: habilitar eliminar en RECHAZADA; guardia `q.validUntil && daysLeft <= 3`.
+- **Reportes: PieChart vacío (dataKey mismatch) + loading/empty para tab operaciones** → `Reports.tsx`: `dataKey="amount"`, query separada `opsData`, empty-state.
+- **Compras: kanban ítems en 0 + link azul sin destino** → `Purchases.tsx`: `_count.items`; color neutro.
+- **Producción: columna "Asignado a" mostraba ID de usuario** → `Production.tsx`: `ASSIGNEES.includes(...)` fallback `—`.
+- **Inventario: crítico=285 en dashboard vs 2 en página** → `Inventory.tsx`: alinear con backend (`minStock > 0 && stock <= minStock`).
+- **Actividad reciente en inglés ("CREATE en Quotation")** → `backend/src/routes/dashboard.ts`: maps de traducción acción+entidad.
+
+### Sistema de tours expandido (commit pendiente)
+- **Escape cierra tour/welcome** → `TourProvider.tsx`: `keydown` handler que marca el tour como visto.
+- **Overlay sin target no bloqueaba clicks** → `TourOverlay.tsx`: `pointer-events-none` en fallback.
+- **Tours nuevos**: `tareas` (4 pasos) y `gastos` (3 pasos) en `tours.ts`.
+- **TourButton + data-tour attrs** agregados en `Tareas.tsx` y `Gastos.tsx`.
+- **WelcomeModal** mapea rutas para `tareas` y `gastos`.
+
+### Bugs no corregidos (requieren cambios arquitectónicos, pendiente)
+- Navegación por número secuencial en URLs (`/pedidos/7` vs cuid) — requiere endpoint `findByNumber`.
+- Pedido #7 con total $0 — problema de seed, no de código.
+- Buscador global ⌘K / notificaciones — código parece correcto; posible estado de navegador.
+
+### Convenciones de respuesta backend (para evitar regresiones)
+- Listas paginadas: `{ data: [...], pagination: { total, page, pages, limit } }`.
+- Aggregations de hijos: `_count: { items: N }` (no preload `items`).
+- Totales agrupados (gastos): `{ data, pagination, totals: { CAJA_MENOR, TARJETA } }`.
+- Enums y status: en **español** y mayúsculas (ver tabla de enums arriba).
+

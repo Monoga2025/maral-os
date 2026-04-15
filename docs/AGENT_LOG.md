@@ -28,6 +28,49 @@
 
 ---
 
+## 2026-04-15 — QA humano + agente — 15 bugs UI corregidos + tours para Tareas y Gastos
+
+### Qué se hizo
+Usuario reportó auditoría exhaustiva con 24 bugs/mejoras (7 críticos, 11 moderados, 8 UX). Se corrigieron 15 con cambios quirúrgicos y se expandió el sistema de tours a los módulos Tareas y Gastos.
+
+### Hallazgos importantes
+- Frontend consumía respuestas del backend con shape incorrecto en varias páginas: `data.total` vs `data.pagination.total`, `items.length` vs `_count.items`, `dataKey="revenue"` vs `amount`. Patrón repetitivo que sugiere ausencia de tipos compartidos estrictos.
+- Logs de actividad se mostraban en inglés porque el backend concatenaba enum crudo (`CREATE en Quotation`).
+- Overlay del tour bloqueaba clicks cuando no encontraba el `data-tour` target (olvido de `pointer-events-none`).
+- Welcome modal no cerraba con Escape — primera queja de UX.
+
+### Cambios realizados
+**Bugs (commit `6709dfe`):**
+- `Header.tsx`: cuid2 detection `length >= 20`.
+- `Clients.tsx`: `pagination.total`.
+- `Orders.tsx`: filter CANCELADO, `_count.items`.
+- `Quotations.tsx`: eliminar RECHAZADA, guardia validUntil.
+- `Reports.tsx`: `dataKey="amount"`, query `opsData`, empty-state ops.
+- `Purchases.tsx`: `_count.items`, color neutro.
+- `Production.tsx`: `ASSIGNEES.includes(...)`.
+- `Inventory.tsx`: criterio crítico/mínimo alineado con backend.
+- `backend/src/routes/dashboard.ts`: maps español para actividad.
+
+**Tours (commit pendiente):**
+- `TourProvider.tsx`: Escape cierra tour/welcome y marca como visto.
+- `TourOverlay.tsx`: `pointer-events-none` en fallback; rutas `tareas` y `gastos`.
+- `tours.ts`: tours `tareas` (4 pasos) y `gastos` (3 pasos).
+- `Tareas.tsx` y `Gastos.tsx`: `TourButton` + `data-tour` attrs.
+
+**Docs:**
+- `CLAUDE.md`: sección "Estado al 2026-04-15" con convenciones de respuesta backend.
+
+### Riesgos identificados
+- Varios campos del API se accedían con cast `as any` para sortear tipos desactualizados. Deuda: regenerar types desde contracts o schema.
+- Seed de Producción guarda `assignedTo` como ID de usuario, pero el formulario usa nombres. El parche es defensivo (`ASSIGNEES.includes`), no reseedea.
+
+### Próximos pasos
+- Bugs arquitectónicos pendientes: `findByNumber` para URLs con número secuencial, reseed pedido #7 total $0, confirmar estado buscador ⌘K y notificaciones.
+- Ejecutar QA ciclo completo (`qa-orchestrator`) para validar no regresiones.
+- Deploy a EasyPanel con los 15 fixes.
+
+---
+
 ## 2026-04-06 (sesión 2) — Agente de producto — GAP-06 Tareas, GAP-10 Gastos, GAP-02 Auditoría, GAP-01 Disposición ítems, GAP-11 Merlin AHK
 
 ### Qué se hizo

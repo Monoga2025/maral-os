@@ -366,4 +366,65 @@ export const TOURS: Record<string, Tour> = {
       },
     ],
   },
+
+  tareas: {
+    id: 'tareas',
+    title: 'Tour de Tareas',
+    steps: [
+      {
+        target: 'center',
+        title: 'Módulo de Tareas ✅',
+        content: 'Aquí centralizas los pendientes del equipo: quién hace qué, para cuándo, y con qué prioridad. Es el tablero compartido de la operación del día.',
+        placement: 'auto',
+      },
+      {
+        target: 'tasks-new-btn',
+        title: 'Crear una tarea',
+        content: 'Pulsa "Nueva Tarea" para abrir el formulario: título, descripción, prioridad (Urgente/Normal/Después), responsable y fecha límite. Incluye chips de fecha rápida (Hoy, Mañana, 3 días).',
+        placement: 'bottom',
+        highlightPadding: 8,
+      },
+      {
+        target: 'tasks-filters',
+        title: 'Filtros por estado y prioridad',
+        content: 'Filtra por estado (Pendientes, En Progreso, Completadas) y prioridad. Útil para enfocarte en lo urgente o revisar lo que ya se cerró.',
+        placement: 'bottom',
+        highlightPadding: 8,
+      },
+      {
+        target: 'tasks-list',
+        title: 'Completar y eliminar',
+        content: 'Marca la tarea como completada con el círculo verde a la izquierda. El icono de papelera elimina la tarea (solo quien la creó o el gerente).',
+        placement: 'top',
+        highlightPadding: 8,
+      },
+    ],
+  },
+
+  gastos: {
+    id: 'gastos',
+    title: 'Tour de Gastos',
+    steps: [
+      {
+        target: 'center',
+        title: 'Módulo de Gastos 💰',
+        content: 'Aquí registras los gastos del día (caja menor y tarjeta). El gerente aprueba cada gasto; así mantenemos control real del flujo de caja.',
+        placement: 'auto',
+      },
+      {
+        target: 'expenses-new-btn',
+        title: 'Registrar un gasto',
+        content: 'Pulsa "Nuevo Gasto" y llena concepto, monto, tipo (Caja Menor / Tarjeta) y fecha. El gasto queda pendiente de aprobación del gerente.',
+        placement: 'bottom',
+        highlightPadding: 8,
+      },
+      {
+        target: 'expenses-summary',
+        title: 'Resumen rápido',
+        content: 'Las 3 tarjetas muestran el total del mes por tipo (Caja Menor, Tarjeta y Total). Te dicen en qué se está yendo la plata hoy.',
+        placement: 'bottom',
+        highlightPadding: 8,
+      },
+    ],
+  },
 }

@@ -8,6 +8,7 @@ import { useAuthStore } from '../store/auth'
 import { formatDate } from '../lib/utils'
 import { Card } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
+import { TourButton } from '../components/tour/TourButton'
 import type { Task, TaskStatus, TaskPriority, User } from '../types'
 
 const PRIORITY_LABELS: Record<TaskPriority, string> = {
@@ -160,13 +161,16 @@ export default function Tareas() {
             {tasks?.length ?? 0} tarea{tasks?.length !== 1 ? 's' : ''}
           </p>
         </div>
-        <Button leftIcon={<Plus className="h-4 w-4" />} onClick={() => { setForm({ ...DEFAULT_FORM, dueDate: todayISO() }); setShowModal(true) }}>
-          Nueva Tarea
-        </Button>
+        <div className="flex items-center gap-2">
+          <TourButton tourId="tareas" />
+          <Button data-tour="tasks-new-btn" leftIcon={<Plus className="h-4 w-4" />} onClick={() => { setForm({ ...DEFAULT_FORM, dueDate: todayISO() }); setShowModal(true) }}>
+            Nueva Tarea
+          </Button>
+        </div>
       </div>
 
       {/* Filters */}
-      <Card>
+      <Card data-tour="tasks-filters">
         <div className="flex flex-wrap items-center gap-4 p-4">
           <div className="flex items-center gap-1.5">
             <span className="text-xs font-medium text-gray-500 mr-1">Estado:</span>
@@ -217,7 +221,7 @@ export default function Tareas() {
           </div>
         </Card>
       ) : (
-        <div className="grid gap-3">
+        <div data-tour="tasks-list" className="grid gap-3">
           {tasks.map((task) => (
             <Card key={task.id} className="p-4">
               <div className="flex items-start gap-3">

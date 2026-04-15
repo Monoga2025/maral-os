@@ -255,6 +255,8 @@ function WelcomeModal({ onClose, onStartTour }: { onClose: () => void; onStartTo
                     cotizaciones: '/cotizaciones',
                     clientes: '/clientes',
                     inventario: '/inventario',
+                    tareas: '/tareas',
+                    gastos: '/gastos',
                   }
                   if (routes[tour.id] && routes[tour.id] !== window.location.pathname) {
                     navigate(routes[tour.id])

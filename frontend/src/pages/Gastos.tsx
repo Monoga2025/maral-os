@@ -6,6 +6,7 @@ import { formatCOP } from '../lib/utils'
 import { useAuthStore } from '../store/auth'
 import { toast } from 'sonner'
 import type { Expense } from '../types'
+import { TourButton } from '../components/tour/TourButton'
 
 const COP = (n: number) =>
   new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(n)
@@ -125,17 +126,21 @@ export default function Gastos() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-900">Gastos</h1>
-        <button
-          onClick={() => { setShowModal(true); setForm(defaultForm()) }}
-          className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 transition-colors"
-        >
-          <Receipt className="h-4 w-4" />
-          Registrar gasto
-        </button>
+        <div className="flex items-center gap-2">
+          <TourButton tourId="gastos" />
+          <button
+            data-tour="expenses-new-btn"
+            onClick={() => { setShowModal(true); setForm(defaultForm()) }}
+            className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 transition-colors"
+          >
+            <Receipt className="h-4 w-4" />
+            Registrar gasto
+          </button>
+        </div>
       </div>
 
       {/* Summary cards */}
-      <div className="grid grid-cols-3 gap-4">
+      <div data-tour="expenses-summary" className="grid grid-cols-3 gap-4">
         <div className="bg-white rounded-xl border border-gray-200 p-5">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-green-100 rounded-xl flex items-center justify-center">
