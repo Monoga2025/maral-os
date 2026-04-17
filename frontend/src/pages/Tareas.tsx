@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, Trash2, Check, ClipboardList, LayoutList, Columns3 } from 'lucide-react'
+import { Plus, Trash2, Check, ClipboardList, LayoutList, Columns3, Sparkles } from 'lucide-react'
 import { toast } from 'sonner'
 import { tasksApi } from '../lib/api'
 import api from '../lib/api'
@@ -85,6 +85,27 @@ export default function Tareas() {
   const [showModal, setShowModal] = useState(false)
   const [form, setForm] = useState<CreateForm>(DEFAULT_FORM)
   const [viewMode, setViewMode] = useState<'list' | 'kanban'>('kanban')
+  const [aiSuggestion, setAiSuggestion] = useState<{ priority: TaskPriority; dueDays: number } | null>(null)
+  const [aiLoading, setAiLoading] = useState(false)
+  const conceptDebounce = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => {
+    if (!showModal) { setAiSuggestion(null); return }
+    if (!form.title.trim() || form.title.trim().length < 5) { setAiSuggestion(null); return }
+    if (conceptDebounce.current) clearTimeout(conceptDebounce.current)
+    conceptDebounce.current = setTimeout(async () => {
+      try {
+        setAiLoading(true)
+        const r = await api.post<{ suggestions: { priority: TaskPriority; dueDays: number } | null }>(
+          '/ai/autofill',
+          { formType: 'task', field: 'title', value: form.title, context: '' }
+        )
+        if (r.data.suggestions) setAiSuggestion(r.data.suggestions)
+      } catch { /* silent */ } finally { setAiLoading(false) }
+    }, 900)
+    return () => { if (conceptDebounce.current) clearTimeout(conceptDebounce.current) }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form.title, showModal])
 
   const filters = {
     status: statusFilter || undefined,
@@ -111,6 +132,7 @@ export default function Tareas() {
       toast.success('Tarea creada')
       setShowModal(false)
       setForm(DEFAULT_FORM)
+      setAiSuggestion(null)
       invalidate()
     },
     onError: () => toast.error('No se pudo crear la tarea'),
@@ -412,6 +434,33 @@ export default function Tareas() {
                 placeholder="¿Qué hay que hacer?"
                 className="w-full rounded-xl border-2 border-gray-200 px-4 py-3 text-base font-medium placeholder-gray-300 focus:border-blue-500 focus:outline-none transition-colors"
               />
+
+              {/* AI suggestion chip */}
+              {(aiLoading || aiSuggestion) && (
+                <div className="flex items-center gap-2 -mt-2">
+                  {aiLoading && (
+                    <div className="flex items-center gap-1.5 text-xs text-indigo-500">
+                      <Sparkles className="h-3.5 w-3.5 animate-pulse" />
+                      <span>Analizando...</span>
+                    </div>
+                  )}
+                  {!aiLoading && aiSuggestion && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const d = new Date()
+                        d.setDate(d.getDate() + aiSuggestion.dueDays)
+                        setForm({ ...form, priority: aiSuggestion.priority, dueDate: d.toISOString().split('T')[0] })
+                        setAiSuggestion(null)
+                      }}
+                      className="flex items-center gap-1.5 rounded-full bg-indigo-50 border border-indigo-200 px-3 py-1 text-xs text-indigo-700 font-medium hover:bg-indigo-100 transition-colors"
+                    >
+                      <Sparkles className="h-3 w-3" />
+                      IA sugiere: {aiSuggestion.priority === 'URGENTE' ? '🔴 Urgente' : aiSuggestion.priority === 'NORMAL' ? '🔵 Normal' : '⚪ Después'}, vence en {aiSuggestion.dueDays}d — ✓ Aplicar
+                    </button>
+                  )}
+                </div>
+              )}
 
               {/* Description */}
               <textarea

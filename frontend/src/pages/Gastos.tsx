@@ -1,7 +1,8 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Receipt, Wallet, CreditCard, TrendingDown, ChevronLeft, ChevronRight, Camera, X, ImageIcon } from 'lucide-react'
+import { Receipt, Wallet, CreditCard, TrendingDown, ChevronLeft, ChevronRight, Camera, X, ImageIcon, Sparkles } from 'lucide-react'
 import { expensesApi } from '../lib/api'
+import api from '../lib/api'
 import { formatCOP } from '../lib/utils'
 import { useAuthStore } from '../store/auth'
 import { toast } from 'sonner'
@@ -54,6 +55,29 @@ export default function Gastos() {
   const [receiptFile, setReceiptFile] = useState<File | null>(null)
   const [receiptPreview, setReceiptPreview] = useState<string | null>(null)
   const receiptRef = useRef<HTMLInputElement>(null)
+  const [aiSuggestion, setAiSuggestion] = useState<{ type: string; notes: string | null } | null>(null)
+  const [aiLoading, setAiLoading] = useState(false)
+  const conceptDebounce = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => {
+    if (!form.concept.trim() || form.concept.length < 4) {
+      setAiSuggestion(null)
+      return
+    }
+    if (conceptDebounce.current) clearTimeout(conceptDebounce.current)
+    conceptDebounce.current = setTimeout(async () => {
+      setAiLoading(true)
+      try {
+        const res = await api.post<{ suggestions: { type: string; notes: string | null } }>('/ai/autofill', {
+          formType: 'expense',
+          field: 'type',
+          value: form.concept,
+        })
+        if (res.data.suggestions) setAiSuggestion(res.data.suggestions)
+      } catch { /* silent */ } finally { setAiLoading(false) }
+    }, 1000)
+    return () => { if (conceptDebounce.current) clearTimeout(conceptDebounce.current) }
+  }, [form.concept])
 
   const filters = {
     ...(typeFilter ? { type: typeFilter } : {}),
@@ -362,9 +386,45 @@ export default function Gastos() {
                   required
                   placeholder="Descripción del gasto"
                   value={form.concept}
-                  onChange={(e) => setForm((f) => ({ ...f, concept: e.target.value }))}
+                  onChange={(e) => {
+                    setForm((f) => ({ ...f, concept: e.target.value }))
+                    setAiSuggestion(null)
+                  }}
                   className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
+                {/* AI suggestion chip */}
+                {aiLoading && (
+                  <div className="flex items-center gap-1.5 mt-1.5 text-xs text-blue-500">
+                    <Sparkles className="h-3 w-3 animate-pulse" />
+                    Analizando...
+                  </div>
+                )}
+                {aiSuggestion && !aiLoading && (
+                  <div className="flex items-center gap-2 mt-1.5 p-2 bg-blue-50 border border-blue-200 rounded-lg">
+                    <Sparkles className="h-3.5 w-3.5 text-blue-500 shrink-0" />
+                    <span className="text-xs text-blue-700 flex-1">
+                      IA sugiere: <strong>{aiSuggestion.type === 'CAJA_MENOR' ? 'Caja Menor' : 'Tarjeta'}</strong>
+                      {aiSuggestion.notes && ` · ${aiSuggestion.notes}`}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setForm(f => ({
+                          ...f,
+                          type: aiSuggestion.type as 'CAJA_MENOR' | 'TARJETA',
+                          notes: aiSuggestion.notes || f.notes,
+                        }))
+                        setAiSuggestion(null)
+                      }}
+                      className="text-xs font-semibold text-blue-600 hover:text-blue-800 whitespace-nowrap"
+                    >
+                      ✓ Aplicar
+                    </button>
+                    <button type="button" onClick={() => setAiSuggestion(null)}>
+                      <X className="h-3 w-3 text-blue-400" />
+                    </button>
+                  </div>
+                )}
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Monto *</label>

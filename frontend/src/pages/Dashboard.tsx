@@ -37,6 +37,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card'
 import { PageSkeleton } from '../components/ui/LoadingSkeleton'
 import { useNavigate } from 'react-router-dom'
 import { TourButton } from '../components/tour/TourButton'
+import { DailyBriefing } from '../components/ui/DailyBriefing'
 
 const SALES_GOAL = 40_000_000
 
@@ -109,6 +110,9 @@ export default function Dashboard() {
           <span className="text-sm font-medium text-gray-600">Sistema operativo</span>
         </div>
       </div>
+
+      {/* AI Daily Briefing */}
+      <DailyBriefing />
 
       {/* Quick actions */}
       <div className="flex flex-wrap gap-2">

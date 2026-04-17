@@ -21,6 +21,7 @@ import syncRouter from './routes/sync';
 import userRoutes from './routes/users';
 import taskRoutes from './routes/tasks';
 import expenseRoutes from './routes/expenses';
+import aiRoutes from './routes/ai';
 
 const app = express();
 const PORT = parseInt(process.env.PORT || '3001', 10);
@@ -87,6 +88,7 @@ app.use('/api/sync', syncRouter);
 app.use('/api/users', userRoutes);
 app.use('/api/tasks', taskRoutes);
 app.use('/api/expenses', expenseRoutes);
+app.use('/api/ai', aiRoutes);
 
 // ── Serve frontend in production ────────────────────────────
 if (process.env.NODE_ENV === 'production') {
