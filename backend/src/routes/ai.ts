@@ -5,7 +5,7 @@ import { authenticate, AuthRequest } from '../middleware/auth';
 const router = Router();
 router.use(authenticate);
 
-const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent';
+const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
 
 async function callGemini(prompt: string): Promise<string> {
   const key = process.env.GOOGLE_AI_KEY;
@@ -16,7 +16,7 @@ async function callGemini(prompt: string): Promise<string> {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       contents: [{ parts: [{ text: prompt }] }],
-      generationConfig: { temperature: 0.4, maxOutputTokens: 1024 },
+      generationConfig: { temperature: 0.4, maxOutputTokens: 1024, thinkingConfig: { thinkingBudget: 0 } },
     }),
   });
 
@@ -62,7 +62,7 @@ router.post('/briefing', async (req: AuthRequest, res: Response) => {
         orderBy: [{ priority: 'asc' }, { dueDate: 'asc' }],
         take: 5,
       }),
-      prisma.product.count({ where: { stock: { lte: prisma.product.fields.minStock } } }),
+      prisma.$queryRaw<{ count: bigint }[]>`SELECT COUNT(*)::bigint as count FROM "Product" WHERE "minStock" > 0 AND "stock" <= "minStock"`.then(r => Number(r[0]?.count ?? 0)),
       prisma.quotation.findMany({
         where: {
           status: { in: ['ENVIADA', 'BORRADOR'] },
@@ -145,9 +145,11 @@ Genera máximo 5 actions. Prioriza las más urgentes. Si no hay nada urgente, di
 
     const raw = await callGemini(prompt);
 
-    // Extract JSON from response
-    const jsonMatch = raw.match(/\{[\s\S]*\}/);
+    // Strip markdown code fences if present, then extract JSON object
+    const stripped = raw.replace(/```(?:json)?\s*/gi, '').replace(/```/g, '');
+    const jsonMatch = stripped.match(/\{[\s\S]*\}/);
     if (!jsonMatch) {
+      console.error('AI briefing raw response:', raw.slice(0, 500));
       res.status(500).json({ error: 'Respuesta IA inválida' });
       return;
     }
@@ -193,7 +195,8 @@ Responde SOLO con JSON: {"priority": "URGENTE|NORMAL|DESPUES", "dueDays": númer
     }
 
     const raw = await callGemini(prompt);
-    const jsonMatch = raw.match(/\{[\s\S]*?\}/);
+    const stripped2 = raw.replace(/```(?:json)?\s*/gi, '').replace(/```/g, '');
+    const jsonMatch = stripped2.match(/\{[\s\S]*?\}/);
     if (!jsonMatch) {
       res.json({ suggestions: null });
       return;

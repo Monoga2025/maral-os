@@ -384,9 +384,11 @@ export default function Dashboard() {
       </div>
 
 
-      {/* Pending tasks widget */}
-      {pendingTasks && pendingTasks.length > 0 && (
-        <Card>
+      {/* Pending tasks + Activity side by side */}
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+
+        {/* Tasks mini-kanban */}
+        <Card data-tour="tasks-widget">
           <CardHeader>
             <CardTitle className="flex items-center justify-between">
               <span className="flex items-center gap-2">
@@ -397,71 +399,104 @@ export default function Dashboard() {
                 onClick={() => navigate('/tareas')}
                 className="flex items-center gap-1 text-xs font-normal text-blue-600 hover:text-blue-800"
               >
-                Ver todas <ChevronRight className="h-3 w-3" />
+                Ver tablero <ChevronRight className="h-3 w-3" />
               </button>
             </CardTitle>
           </CardHeader>
-          <CardContent className="pt-2">
-            <div className="space-y-1">
-              {pendingTasks.slice(0, 5).map((task) => (
-                <div
-                  key={task.id}
-                  className="flex items-center gap-3 rounded-lg px-3 py-2 hover:bg-gray-50 cursor-pointer transition-colors"
-                  onClick={() => navigate('/tareas')}
-                >
-                  <span className={`h-2 w-2 rounded-full shrink-0 ${
-                    task.priority === 'URGENTE' ? 'bg-red-500' :
-                    task.priority === 'NORMAL'  ? 'bg-blue-400' : 'bg-gray-300'
-                  }`} />
-                  <p className="flex-1 text-sm text-gray-700 truncate">{task.title}</p>
-                  {task.priority === 'URGENTE' && (
-                    <span className="text-[10px] font-semibold px-1.5 py-0.5 bg-red-100 text-red-600 rounded-full shrink-0">
-                      URGENTE
-                    </span>
-                  )}
-                  {task.assignedTo && (
-                    <span className="text-xs text-gray-400 shrink-0">{task.assignedTo.name.split(' ')[0]}</span>
-                  )}
-                </div>
-              ))}
-            </div>
+          <CardContent className="pt-0">
+            {pendingTasks && pendingTasks.length > 0 ? (
+              <div className="grid grid-cols-3 gap-2">
+                {([
+                  { p: 'URGENTE', label: '🔴 Urgente', bg: 'bg-red-50', border: 'border-red-100', text: 'text-red-700' },
+                  { p: 'NORMAL',  label: '🔵 Normal',  bg: 'bg-blue-50', border: 'border-blue-100', text: 'text-blue-700' },
+                  { p: 'DESPUES', label: '⚪ Después', bg: 'bg-gray-50', border: 'border-gray-100', text: 'text-gray-600' },
+                ] as const).map(({ p, label, bg, border, text }) => {
+                  const col = pendingTasks.filter(t => t.priority === p).slice(0, 4)
+                  return (
+                    <div key={p} className={`rounded-lg border ${border} ${bg} p-2`}>
+                      <p className={`text-[10px] font-bold uppercase tracking-wide mb-2 ${text}`}>{label} <span className="font-normal">({pendingTasks.filter(t => t.priority === p).length})</span></p>
+                      <div className="space-y-1.5">
+                        {col.length === 0 && <p className="text-[10px] text-gray-400 text-center py-2">—</p>}
+                        {col.map(t => (
+                          <div key={t.id} onClick={() => navigate('/tareas')} className="bg-white rounded border border-gray-100 px-2 py-1.5 cursor-pointer hover:border-blue-200 transition-colors">
+                            <p className="text-[11px] text-gray-800 leading-tight line-clamp-2">{t.title}</p>
+                            {t.assignedTo && <p className="text-[10px] text-gray-400 mt-0.5">{t.assignedTo.name.split(' ')[0]}</p>}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            ) : (
+              <div className="flex flex-col items-center py-8 text-center">
+                <CheckSquare className="h-8 w-8 text-green-300 mb-2" />
+                <p className="text-sm font-medium text-green-700">¡Todo al día!</p>
+                <p className="text-xs text-gray-400 mt-0.5">No hay tareas pendientes</p>
+              </div>
+            )}
           </CardContent>
         </Card>
-      )}
 
-      {/* Recent Activity */}
-      <Card data-tour="activity-log">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Activity className="h-4 w-4 text-gray-500" />
-            Actividad reciente
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="pt-2">
-          {data?.recentActivity?.length ? (
-            <div className="space-y-1">
-              {data.recentActivity.slice(0, 10).map((activity) => (
-                <div
-                  key={activity.id}
-                  className="flex items-start gap-3 rounded-lg px-3 py-2.5 hover:bg-gray-50 transition-colors"
-                >
-                  <div className="mt-0.5 h-2 w-2 rounded-full bg-blue-500 shrink-0" />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm text-gray-700">{activity.description}</p>
-                    <p className="text-xs text-gray-400 mt-0.5">
-                      {activity.user?.name} · {formatDate(activity.createdAt)}
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="text-sm text-gray-400 text-center py-8">
-              Sin actividad reciente registrada
-            </p>
-          )}
-        </CardContent>
-      </Card>
+        {/* Recent Activity - rich feed */}
+        <Card data-tour="activity-log">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Activity className="h-4 w-4 text-gray-500" />
+              Actividad reciente
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-1">
+            {data?.recentActivity?.length ? (
+              <div className="space-y-1">
+                {data.recentActivity.slice(0, 8).map((activity) => {
+                  const ACTION_CONFIG: Record<string, { emoji: string; color: string; bg: string }> = {
+                    CREATE:  { emoji: '✅', color: 'text-green-700',  bg: 'bg-green-50 border-green-100' },
+                    UPDATE:  { emoji: '✏️', color: 'text-blue-700',   bg: 'bg-blue-50 border-blue-100' },
+                    DELETE:  { emoji: '🗑️', color: 'text-red-600',    bg: 'bg-red-50 border-red-100' },
+                    APPROVE: { emoji: '👍', color: 'text-emerald-700', bg: 'bg-emerald-50 border-emerald-100' },
+                    REJECT:  { emoji: '❌', color: 'text-orange-700', bg: 'bg-orange-50 border-orange-100' },
+                    CONVERT: { emoji: '🔄', color: 'text-indigo-700', bg: 'bg-indigo-50 border-indigo-100' },
+                    PAY:     { emoji: '💰', color: 'text-purple-700', bg: 'bg-purple-50 border-purple-100' },
+                    RECEIVE: { emoji: '📦', color: 'text-teal-700',   bg: 'bg-teal-50 border-teal-100' },
+                  }
+                  const ENTITY_EMOJI: Record<string, string> = {
+                    Quotation: '📋', Order: '📦', Client: '👤', Product: '🔧',
+                    Invoice: '📄', PurchaseOrder: '🛒', ProductionOrder: '⚙️', Expense: '💵',
+                  }
+                  const cfg = ACTION_CONFIG[activity.action] ?? { emoji: '•', color: 'text-gray-600', bg: 'bg-gray-50 border-gray-100' }
+                  const entityEmoji = ENTITY_EMOJI[activity.entity] ?? '📌'
+                  const relTime = (() => {
+                    const diff = Date.now() - new Date(activity.createdAt).getTime()
+                    const mins = Math.floor(diff / 60000)
+                    if (mins < 1) return 'Ahora'
+                    if (mins < 60) return `${mins}m`
+                    const hrs = Math.floor(mins / 60)
+                    if (hrs < 24) return `${hrs}h`
+                    return `${Math.floor(hrs / 24)}d`
+                  })()
+                  return (
+                    <div key={activity.id} className={`flex items-center gap-3 rounded-lg border px-3 py-2 ${cfg.bg}`}>
+                      <span className="text-base shrink-0">{cfg.emoji}</span>
+                      <div className="flex-1 min-w-0">
+                        <p className={`text-xs font-semibold ${cfg.color}`}>
+                          {activity.description} {entityEmoji}
+                        </p>
+                        <p className="text-[11px] text-gray-400 truncate">
+                          {activity.user?.name ?? 'Sistema'}
+                        </p>
+                      </div>
+                      <span className="text-[10px] text-gray-400 shrink-0 font-medium">{relTime}</span>
+                    </div>
+                  )
+                })}
+              </div>
+            ) : (
+              <p className="text-sm text-gray-400 text-center py-8">Sin actividad reciente</p>
+            )}
+          </CardContent>
+        </Card>
+      </div>
     </div>
   )
 }

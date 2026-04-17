@@ -1,4 +1,5 @@
 import { NavLink, useNavigate } from 'react-router-dom'
+import { useState } from 'react'
 import {
   LayoutDashboard,
   Users,
@@ -13,6 +14,7 @@ import {
   Settings,
   LogOut,
   ChevronLeft,
+  ChevronDown,
   Radio,
   BookOpen,
   CheckCircle2,
@@ -178,18 +180,16 @@ const navGroups: NavGroup[] = [
   {
     label: 'Equipo',
     items: [
-      { to: '/tareas',   icon: <CheckSquare className="h-5 w-5" />, label: 'Tareas' },
-      { to: '/reportes', icon: <TrendingUp className="h-5 w-5" />,  label: 'Reportes', roles: ['GERENTE'] },
+      { to: '/tareas', icon: <CheckSquare className="h-5 w-5" />, label: 'Tareas' },
     ],
   },
-  {
-    label: 'Sistema',
-    items: [
-      { to: '/catalogo',      icon: <Grid3X3 className="h-5 w-5" />, label: 'Catálogo',      roles: ['GERENTE', 'VENTAS'] },
-      { to: '/configuracion', icon: <Settings className="h-5 w-5" />, label: 'Configuración', roles: ['GERENTE'] },
-      { to: '/manual',        icon: <BookOpen className="h-5 w-5" />, label: 'Manual de Uso' },
-    ],
-  },
+]
+
+const settingsItems: NavItem[] = [
+  { to: '/catalogo',      icon: <Grid3X3 className="h-5 w-5" />,   label: 'Catálogo de productos', roles: ['GERENTE', 'VENTAS'] },
+  { to: '/reportes',      icon: <TrendingUp className="h-5 w-5" />, label: 'Reportes',              roles: ['GERENTE'] },
+  { to: '/configuracion', icon: <Settings className="h-5 w-5" />,   label: 'Configuración',         roles: ['GERENTE'] },
+  { to: '/manual',        icon: <BookOpen className="h-5 w-5" />,   label: 'Manual de Uso' },
 ]
 
 const roleLabels: Record<string, string> = {
@@ -202,6 +202,7 @@ export function Sidebar() {
   const { user, logout } = useAuthStore()
   const { sidebarCollapsed } = useUIStore()
   const navigate = useNavigate()
+  const [settingsOpen, setSettingsOpen] = useState(false)
 
   const { data: pendingTasks } = useQuery<number>({
     queryKey: ['tasks-count'],
@@ -301,6 +302,42 @@ export function Sidebar() {
           )
         })}
       </nav>
+
+      {/* Ajustes accordion */}
+      <div className="px-2 pb-2">
+        <button
+          onClick={() => setSettingsOpen((v) => !v)}
+          className={cn(
+            'group flex w-full items-center rounded-lg px-2.5 py-2 text-sm font-medium transition-all',
+            settingsOpen ? 'bg-white/10 text-white' : 'text-slate-400 hover:bg-white/8 hover:text-white'
+          )}
+          title="Ajustes"
+        >
+          <span className={cn('shrink-0 transition-colors', settingsOpen ? 'text-slate-300' : 'text-slate-500 group-hover:text-white')}>
+            <Settings className="h-5 w-5" />
+          </span>
+          {!sidebarCollapsed && (
+            <>
+              <span className="ml-3 flex-1 truncate">Ajustes</span>
+              <ChevronDown className={cn('h-3.5 w-3.5 transition-transform', settingsOpen && 'rotate-180')} />
+            </>
+          )}
+        </button>
+        {settingsOpen && !sidebarCollapsed && (
+          <div className="mt-0.5 space-y-0.5 pl-2 border-l border-white/10 ml-4">
+            {settingsItems
+              .filter((item) => !item.roles || !user || item.roles.includes(user.role))
+              .map(renderItem)}
+          </div>
+        )}
+        {settingsOpen && sidebarCollapsed && (
+          <div className="mt-0.5 space-y-0.5">
+            {settingsItems
+              .filter((item) => !item.roles || !user || item.roles.includes(user.role))
+              .map(renderItem)}
+          </div>
+        )}
+      </div>
 
       {/* Merlin sync status */}
       <MerlinBadge collapsed={sidebarCollapsed} />
