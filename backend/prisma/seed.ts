@@ -947,11 +947,11 @@ async function main() {
       freightPayer: 'REMITENTE',
       freightPayment: 'CONTADO',
       type: 'GARANTIA',
-      total: 0,
-      notes: 'Garantía por antena G6 VHF defectuosa. Lote feb 2024.',
+      total: 360000,
+      notes: 'Garantía por antena G6 VHF defectuosa. Lote feb 2024. Reposición sin costo al cliente (costo absorbido por Maral).',
       items: {
         create: [
-          { productId: antG6Vhf.id, qty: 1, unitPrice: 0, picked: false },
+          { productId: antG6Vhf.id, qty: 1, unitPrice: 360000, picked: false },
         ],
       },
     },

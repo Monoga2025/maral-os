@@ -7,6 +7,26 @@ import { authenticate, AuthRequest } from '../middleware/auth';
 const router = Router();
 router.use(authenticate);
 
+// Resolver `:id` — acepta cuid o número secuencial (ej. /cotizaciones/12)
+router.param('id', async (req, res, next, raw: string) => {
+  if (!/^\d+$/.test(raw)) return next();
+  try {
+    const found = await prisma.quotation.findFirst({
+      where: { number: parseInt(raw, 10) },
+      select: { id: true },
+    });
+    if (!found) {
+      res.status(404).json({ error: 'Cotización no encontrada' });
+      return;
+    }
+    req.params.id = found.id;
+    next();
+  } catch (error) {
+    console.error('Resolve quotation id error:', error);
+    res.status(500).json({ error: 'Error al resolver cotización' });
+  }
+});
+
 // ─── Empresa (datos para el PDF) ───────────────────────────────
 function fmtNIT(raw: string): string {
   const d = raw.replace(/\D/g, '');

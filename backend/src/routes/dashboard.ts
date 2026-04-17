@@ -12,6 +12,7 @@ router.get('/kpis', async (req: AuthRequest, res: Response) => {
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
     const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
     const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    const fiveDaysAgo = new Date(now.getTime() - 5 * 24 * 60 * 60 * 1000);
 
     const [
       monthlySales,
@@ -22,6 +23,7 @@ router.get('/kpis', async (req: AuthRequest, res: Response) => {
       unconfirmedOrders,
       quotationsWithoutFollowup,
       recentActivity,
+      stalledOrders,
     ] = await Promise.all([
       // Monthly sales (orders dispatched or delivered this month)
       prisma.order.aggregate({
@@ -78,6 +80,13 @@ router.get('/kpis', async (req: AuthRequest, res: Response) => {
           user: { select: { id: true, name: true, role: true } },
         },
       }),
+      // Pedidos confirmados/en producción sin actualizar en 5+ días
+      prisma.order.count({
+        where: {
+          status: { in: ['CONFIRMADO', 'EN_PRODUCCION'] },
+          updatedAt: { lte: fiveDaysAgo },
+        },
+      }),
     ]);
 
     // Count orders by status
@@ -97,13 +106,15 @@ router.get('/kpis', async (req: AuthRequest, res: Response) => {
       activeOrders,
       ordersByStatus,
       pendingQuotations,
-      overdueFollowUps: 0,
+      overdueFollowUps: quotationsWithoutFollowup,
       overdueReceivables: overdueInvoices._sum.amount || 0,
       salesLast6Months: [],
       salesByLine: [],
       criticalStock: Number((criticalStockProducts[0] as { count: bigint })?.count ?? 0),
       unconfirmedOrders,
       quotationsWithoutFollowup,
+      stalledOrders,
+      overdueInvoicesCount: overdueInvoices._count,
       recentActivity: recentActivity.map((a) => ({
         id: a.id,
         userId: a.userId,

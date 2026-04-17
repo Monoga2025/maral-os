@@ -9,6 +9,26 @@ import { authenticate, AuthRequest } from '../middleware/auth';
 const router = Router();
 router.use(authenticate);
 
+// Resolver `:id` — acepta cuid o número secuencial (ej. /pedidos/7)
+router.param('id', async (req, res, next, raw: string) => {
+  if (!/^\d+$/.test(raw)) return next();
+  try {
+    const found = await prisma.order.findFirst({
+      where: { number: parseInt(raw, 10) },
+      select: { id: true },
+    });
+    if (!found) {
+      res.status(404).json({ error: 'Pedido no encontrado' });
+      return;
+    }
+    req.params.id = found.id;
+    next();
+  } catch (error) {
+    console.error('Resolve order id error:', error);
+    res.status(500).json({ error: 'Error al resolver pedido' });
+  }
+});
+
 const UPLOAD_DIR = process.env.UPLOAD_DIR || './uploads';
 
 // Ensure upload directory exists
@@ -51,11 +71,11 @@ const orderSchema = z.object({
   confirmed: z.boolean().optional().default(false),
   recipientName: z.string().min(1, 'Nombre del destinatario requerido'),
   address: z.string().min(1, 'Dirección requerida'),
-  city: z.string().min(1, 'Ciudad requerida'),
-  phone: z.string().min(1, 'Teléfono requerido'),
-  carrier: z.string().min(1, 'Transportadora requerida'),
-  freightPayer: z.string().min(1, 'Pagador del flete requerido'),
-  freightPayment: z.string().min(1, 'Forma de pago del flete requerida'),
+  city: z.string().optional().default(''),
+  phone: z.string().optional().default(''),
+  carrier: z.string().optional().default(''),
+  freightPayer: z.string().optional().default('Remitente'),
+  freightPayment: z.string().optional().default(''),
   type: z.enum(['PEDIDO', 'GARANTIA', 'MUESTRA']).optional().default('PEDIDO'),
   notes: z.string().optional(),
   items: z.array(orderItemSchema).min(1, 'Al menos un ítem requerido'),
@@ -169,7 +189,7 @@ router.get('/', async (req: AuthRequest, res: Response) => {
   }
 });
 
-// GET /api/orders/:id
+// GET /api/orders/:id  (acepta cuid o número secuencial, ver router.param)
 router.get('/:id', async (req: AuthRequest, res: Response) => {
   try {
     const order = await prisma.order.findUnique({

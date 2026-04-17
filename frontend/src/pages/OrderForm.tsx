@@ -28,9 +28,10 @@ export default function OrderForm() {
   const [phone, setPhone] = useState('')
   const [carrier, setCarrier] = useState('')
   const [freightPayer, setFreightPayer] = useState('Remitente')
-  const [freightPayment, setFreightPayment] = useState('Nequi')
+  const [freightPayment, setFreightPayment] = useState('')
   const [type, setType] = useState<'PEDIDO' | 'GARANTIA' | 'MUESTRA'>('PEDIDO')
   const [notes, setNotes] = useState('')
+  const [showAdvanced, setShowAdvanced] = useState(false)
 
   const { data: clientsData } = useQuery({
     queryKey: ['clients-search', clientSearch],
@@ -84,7 +85,7 @@ export default function OrderForm() {
     onError: () => toast.error('Error al crear el pedido'),
   })
 
-  const canSubmit = selectedClient && items.length > 0 && recipientName && address && carrier
+  const canSubmit = selectedClient && items.length > 0 && recipientName && address
 
   const submitLabel = !selectedClient
     ? 'Selecciona un cliente primero'
@@ -92,7 +93,7 @@ export default function OrderForm() {
     ? 'Agrega al menos un producto'
     : 'Crear Pedido'
 
-  const STEPS = ['1. Cliente y Productos', '2. Datos de Envío', '3. Confirmar']
+  const STEPS = ['1. Cliente y Productos', '2. Envío y Confirmar']
 
   return (
     <div className="p-6 max-w-4xl mx-auto space-y-6">
@@ -257,213 +258,168 @@ export default function OrderForm() {
         </div>
       )}
 
-      {/* STEP 2: Shipping */}
+      {/* STEP 2: Envío + Confirmar (fusionado) */}
       {step === 2 && (
         <div className="space-y-4">
+          {/* Resumen rápido */}
+          <div className="flex items-center gap-3 p-3 bg-blue-50 border border-blue-100 rounded-xl text-sm">
+            <div className="flex-1 min-w-0">
+              <span className="font-semibold text-blue-900">{selectedClient?.name}</span>
+              <span className="text-blue-500 mx-2">·</span>
+              <span className="text-blue-700">{items.length} producto{items.length !== 1 ? 's' : ''}</span>
+              <span className="text-blue-500 mx-2">·</span>
+              <span className="font-bold text-blue-900">{formatCOP(total)}</span>
+            </div>
+            <button onClick={() => setStep(1)} className="text-blue-500 hover:text-blue-700 text-xs underline shrink-0">Editar</button>
+          </div>
+
+          {/* Datos de envío */}
           <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
             <h2 className="font-semibold text-gray-900">Datos de Envío</h2>
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="text-xs text-gray-500 font-medium">Destinatario *</label>
                 <input value={recipientName} onChange={(e) => setRecipientName(e.target.value)}
-                  placeholder="Ej: Carlos Rodríguez (persona que recibe)"
+                  placeholder="Persona que recibe"
                   className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
               </div>
               <div>
-                <label className="text-xs text-gray-500 font-medium">Teléfono destino</label>
+                <label className="text-xs text-gray-500 font-medium">Teléfono</label>
                 <input value={phone} onChange={(e) => setPhone(e.target.value)}
                   placeholder="Ej: 3001234567"
                   className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
               </div>
               <div>
-                <label className="text-xs text-gray-500 font-medium">Dirección completa *</label>
+                <label className="text-xs text-gray-500 font-medium">Dirección *</label>
                 <input value={address} onChange={(e) => setAddress(e.target.value)}
-                  placeholder="Ej: Calle 45 # 23-12 Bodega 3"
+                  placeholder="Calle 45 # 23-12 Bodega 3"
                   className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
               </div>
               <div>
                 <label className="text-xs text-gray-500 font-medium">Ciudad</label>
                 <input value={city} onChange={(e) => setCity(e.target.value)}
-                  placeholder="Ej: Bogotá, Medellín, Cali"
+                  placeholder="Bogotá, Medellín, Cali..."
                   className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
               </div>
               <div className="col-span-2">
-                <div className="flex items-center gap-1 mb-2">
-                  <label className="text-xs text-gray-500 font-medium">Transportadora *</label>
-                </div>
-                <div className="flex flex-wrap gap-2">
+                <label className="text-xs text-gray-500 font-medium">Transportadora <span className="text-gray-400">(opcional, se puede completar al despachar)</span></label>
+                <div className="flex flex-wrap gap-2 mt-1">
                   {CARRIERS.map((c) => (
-                    <button
-                      key={c}
-                      type="button"
-                      onClick={() => setCarrier(c)}
+                    <button key={c} type="button" onClick={() => setCarrier(carrier === c ? '' : c)}
                       className={`rounded-full border px-3 py-1.5 text-sm font-medium transition-all ${
-                        carrier === c
-                          ? 'bg-blue-600 text-white border-transparent shadow-sm'
-                          : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
-                      }`}
-                    >
+                        carrier === c ? 'bg-blue-600 text-white border-transparent' : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
+                      }`}>
                       {c}
                     </button>
                   ))}
                 </div>
               </div>
-              <div>
-                <div className="flex items-center gap-1 mb-2">
-                  <label className="text-xs text-gray-500 font-medium">Quién paga el flete</label>
-                  <Hint text="Si el cliente lo paga se llama flete en cobro. Si Maral lo paga, es flete prepagado." side="top" />
-                </div>
-                <div className="flex gap-2">
-                  {['Remitente', 'Destinatario'].map((opt) => (
-                    <button
-                      key={opt}
-                      type="button"
-                      onClick={() => setFreightPayer(opt)}
-                      className={`flex-1 rounded-full border py-1.5 text-sm font-medium transition-all ${
-                        freightPayer === opt
-                          ? 'bg-blue-600 text-white border-transparent shadow-sm'
-                          : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
-                      }`}
-                    >
-                      {opt}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <div>
-                <div className="flex items-center gap-1 mb-2">
-                  <label className="text-xs text-gray-500 font-medium">Forma de pago flete</label>
-                  <Hint text="Cómo se le pagó a la transportadora al momento del despacho." side="top" />
-                </div>
-                <div className="flex gap-2">
-                  {['Nequi', 'Efectivo', 'Ya pagado'].map((opt) => (
-                    <button
-                      key={opt}
-                      type="button"
-                      onClick={() => setFreightPayment(opt)}
-                      className={`flex-1 rounded-full border py-1.5 text-sm font-medium transition-all ${
-                        freightPayment === opt
-                          ? 'bg-blue-600 text-white border-transparent shadow-sm'
-                          : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
-                      }`}
-                    >
-                      {opt}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <div>
-                <div className="flex items-center gap-1 mb-2">
-                  <label className="text-xs text-gray-500 font-medium">Tipo de pedido</label>
-                  <Hint text="Garantía es para reponer un producto con falla sin cobrar. Muestra es para que el cliente evalúe el producto." side="top" />
-                </div>
-                <div className="flex gap-2">
-                  {[['PEDIDO', 'Pedido'], ['GARANTIA', 'Garantía'], ['MUESTRA', 'Muestra']].map(([val, label]) => (
-                    <button
-                      key={val}
-                      type="button"
-                      onClick={() => setType(val as typeof type)}
-                      className={`flex-1 rounded-full border py-1.5 text-sm font-medium transition-all ${
-                        type === val
-                          ? 'bg-blue-600 text-white border-transparent shadow-sm'
-                          : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
-                      }`}
-                    >
-                      {label}
-                    </button>
-                  ))}
-                </div>
-              </div>
             </div>
-            <div>
-              <label className="text-xs text-gray-500 font-medium">Observaciones</label>
-              <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2}
-                className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none" />
-            </div>
-          </div>
 
-          <div className="flex items-center justify-between">
-            <button onClick={() => setStep(1)} className="flex items-center gap-2 px-5 py-2.5 border border-gray-200 rounded-lg text-sm hover:bg-gray-50 transition-colors">
-              <ArrowLeft size={16} /> Atrás
-            </button>
+            {/* Avanzado colapsable */}
             <button
-              onClick={() => setStep(3)}
-              disabled={!recipientName || !address || !carrier}
-              className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              type="button"
+              onClick={() => setShowAdvanced(!showAdvanced)}
+              className="text-xs text-gray-400 hover:text-gray-600 flex items-center gap-1"
             >
-              Continuar <ArrowRight size={16} />
+              {showAdvanced ? '▲' : '▼'} Opciones avanzadas (flete, tipo, observaciones)
             </button>
-          </div>
-        </div>
-      )}
-
-      {/* STEP 3: Confirm */}
-      {step === 3 && (
-        <div className="space-y-4">
-          {/* Summary card */}
-          <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
-            <h2 className="font-semibold text-gray-900">Resumen del pedido</h2>
-            <div className="grid grid-cols-2 gap-3 text-sm">
-              <div className="bg-gray-50 rounded-lg p-3">
-                <p className="text-xs text-gray-400 font-medium uppercase mb-1">Cliente</p>
-                <p className="font-semibold text-gray-900">{selectedClient?.name}</p>
-                <p className="text-xs text-gray-500">{selectedClient?.company}</p>
-              </div>
-              <div className="bg-gray-50 rounded-lg p-3">
-                <p className="text-xs text-gray-400 font-medium uppercase mb-1">Productos</p>
-                <p className="font-semibold text-gray-900">{items.length} ítem{items.length !== 1 ? 's' : ''}</p>
-                <p className="text-xs text-gray-500">Total: {formatCOP(total)}</p>
-              </div>
-              <div className="bg-gray-50 rounded-lg p-3">
-                <p className="text-xs text-gray-400 font-medium uppercase mb-1">Destino</p>
-                <p className="font-semibold text-gray-900">{recipientName}</p>
-                <p className="text-xs text-gray-500">{city} — {address}</p>
-              </div>
-              <div className="bg-gray-50 rounded-lg p-3">
-                <p className="text-xs text-gray-400 font-medium uppercase mb-1">Transportadora</p>
-                <p className="font-semibold text-gray-900">{carrier}</p>
-                <p className="text-xs text-gray-500">Paga: {freightPayer} · {freightPayment}</p>
-              </div>
-            </div>
-
-            {/* Items summary */}
-            <div className="border-t border-gray-100 pt-3 space-y-1">
-              {items.map((item) => (
-                <div key={item.productId} className="flex justify-between text-sm">
-                  <span className="text-gray-600">{item.qty}x {item.product?.name}</span>
-                  <span className="font-medium">{formatCOP(item.qty * item.unitPrice)}</span>
+            {showAdvanced && (
+              <div className="grid grid-cols-2 gap-4 pt-2 border-t border-gray-100">
+                <div>
+                  <div className="flex items-center gap-1 mb-2">
+                    <label className="text-xs text-gray-500 font-medium">Quién paga el flete</label>
+                    <Hint text="Si el cliente lo paga se llama flete en cobro. Si Maral lo paga, es flete prepagado." side="top" />
+                  </div>
+                  <div className="flex gap-2">
+                    {['Remitente', 'Destinatario'].map((opt) => (
+                      <button key={opt} type="button" onClick={() => setFreightPayer(opt)}
+                        className={`flex-1 rounded-full border py-1.5 text-sm font-medium transition-all ${
+                          freightPayer === opt ? 'bg-blue-600 text-white border-transparent' : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
+                        }`}>
+                        {opt}
+                      </button>
+                    ))}
+                  </div>
                 </div>
-              ))}
-              <div className="flex justify-between font-bold text-gray-900 text-base pt-2 border-t border-gray-100">
-                <span>Total</span>
-                <span className="text-blue-700">{formatCOP(total)}</span>
+                <div>
+                  <div className="flex items-center gap-1 mb-2">
+                    <label className="text-xs text-gray-500 font-medium">Forma de pago flete</label>
+                    <Hint text="Cómo se pagó a la transportadora." side="top" />
+                  </div>
+                  <div className="flex gap-2">
+                    {['Nequi', 'Efectivo', 'Ya pagado'].map((opt) => (
+                      <button key={opt} type="button" onClick={() => setFreightPayment(freightPayment === opt ? '' : opt)}
+                        className={`flex-1 rounded-full border py-1.5 text-sm font-medium transition-all ${
+                          freightPayment === opt ? 'bg-blue-600 text-white border-transparent' : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
+                        }`}>
+                        {opt}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <div className="flex items-center gap-1 mb-2">
+                    <label className="text-xs text-gray-500 font-medium">Tipo de pedido</label>
+                    <Hint text="Garantía: reponer sin cobrar. Muestra: el cliente evalúa." side="top" />
+                  </div>
+                  <div className="flex gap-2">
+                    {[['PEDIDO', 'Pedido'], ['GARANTIA', 'Garantía'], ['MUESTRA', 'Muestra']].map(([val, label]) => (
+                      <button key={val} type="button" onClick={() => setType(val as typeof type)}
+                        className={`flex-1 rounded-full border py-1.5 text-sm font-medium transition-all ${
+                          type === val ? 'bg-blue-600 text-white border-transparent' : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
+                        }`}>
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <label className="text-xs text-gray-500 font-medium">Observaciones</label>
+                  <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2}
+                    className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none" />
+                </div>
               </div>
-            </div>
+            )}
           </div>
 
-          {/* Confirmed toggle */}
-          <div className="flex items-center gap-3 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+          {/* Confirmación de pago */}
+          <div className="flex items-center gap-3 p-4 bg-blue-50 border border-blue-200 rounded-xl">
             <button
               onClick={() => setConfirmed(!confirmed)}
-              className={`w-12 h-6 rounded-full transition-colors ${confirmed ? 'bg-blue-600' : 'bg-gray-300'}`}
+              className={`w-12 h-6 rounded-full transition-colors shrink-0 ${confirmed ? 'bg-blue-600' : 'bg-gray-300'}`}
             >
               <div className={`w-5 h-5 bg-white rounded-full shadow transition-transform ${confirmed ? 'translate-x-6' : 'translate-x-0.5'}`} />
             </button>
             <div>
-              <p className="text-sm font-semibold text-gray-900">Pedido Confirmado</p>
-              <p className="text-xs text-gray-500">El cliente ya consignó. Solo se puede procesar cuando está confirmado.</p>
+              <p className="text-sm font-semibold text-gray-900">El cliente ya confirmó / consignó</p>
+              <p className="text-xs text-gray-500">Sin confirmar, el pedido queda en espera hasta recibir el pago.</p>
             </div>
           </div>
 
           {!confirmed && (
             <div className="flex items-center gap-2 text-orange-700 text-sm bg-orange-50 border border-orange-200 rounded-lg p-3">
               <AlertTriangle size={15} />
-              El pedido se guardará pero no pasará a producción hasta confirmar.
+              Se guardará como pendiente — podrás confirmarlo después desde el detalle del pedido.
             </div>
           )}
 
+          {/* Resumen de ítems compacto */}
+          <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-1">
+            {items.map((item) => (
+              <div key={item.productId} className="flex justify-between text-sm">
+                <span className="text-gray-600">{item.qty}× {item.product?.name}</span>
+                <span className="font-medium">{formatCOP(item.qty * item.unitPrice)}</span>
+              </div>
+            ))}
+            <div className="flex justify-between font-bold text-gray-900 pt-2 border-t border-gray-100">
+              <span>Total</span>
+              <span className="text-blue-700">{formatCOP(total)}</span>
+            </div>
+          </div>
+
           <div className="flex items-center justify-between">
-            <button onClick={() => setStep(2)} className="flex items-center gap-2 px-5 py-2.5 border border-gray-200 rounded-lg text-sm hover:bg-gray-50 transition-colors">
+            <button onClick={() => setStep(1)} className="flex items-center gap-2 px-5 py-2.5 border border-gray-200 rounded-lg text-sm hover:bg-gray-50 transition-colors">
               <ArrowLeft size={16} /> Atrás
             </button>
             <div className="flex gap-3">

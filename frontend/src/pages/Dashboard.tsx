@@ -185,6 +185,91 @@ export default function Dashboard() {
         </div>
       )}
 
+      {/* ⚡ Requieren atención — ARRIBA DEL FOLD */}
+      {data &&
+        (data.criticalStock > 0 ||
+          data.unconfirmedOrders > 0 ||
+          data.quotationsWithoutFollowup > 0 ||
+          (data as any).stalledOrders > 0 ||
+          (data as any).overdueInvoicesCount > 0) && (
+          <div className="rounded-xl border border-red-100 bg-red-50/60 p-4 space-y-2">
+            <h2 className="text-sm font-bold text-red-700 flex items-center gap-2">
+              <AlertCircle className="h-4 w-4" />
+              Requieren tu atención ahora
+            </h2>
+            {(data as any).stalledOrders > 0 && (
+              <div
+                className="flex items-center justify-between gap-3 rounded-lg border border-red-200 bg-white px-4 py-2.5 cursor-pointer hover:bg-red-50 transition-colors"
+                onClick={() => navigate('/pedidos')}
+              >
+                <div className="flex items-center gap-2">
+                  <Clock className="h-4 w-4 text-red-500 shrink-0" />
+                  <p className="text-sm font-medium text-red-800">
+                    {(data as any).stalledOrders} pedido{(data as any).stalledOrders !== 1 ? 's' : ''} sin movimiento hace 5+ días
+                  </p>
+                </div>
+                <ChevronRight className="h-4 w-4 text-red-400 shrink-0" />
+              </div>
+            )}
+            {(data as any).overdueInvoicesCount > 0 && (
+              <div
+                className="flex items-center justify-between gap-3 rounded-lg border border-orange-200 bg-white px-4 py-2.5 cursor-pointer hover:bg-orange-50 transition-colors"
+                onClick={() => navigate('/credito')}
+              >
+                <div className="flex items-center gap-2">
+                  <AlertTriangle className="h-4 w-4 text-orange-500 shrink-0" />
+                  <p className="text-sm font-medium text-orange-800">
+                    {(data as any).overdueInvoicesCount} factura{(data as any).overdueInvoicesCount !== 1 ? 's' : ''} vencida{(data as any).overdueInvoicesCount !== 1 ? 's' : ''} — {formatCOP(data.overdueReceivables ?? 0)} en mora
+                  </p>
+                </div>
+                <ChevronRight className="h-4 w-4 text-orange-400 shrink-0" />
+              </div>
+            )}
+            {data.criticalStock > 0 && (
+              <div
+                className="flex items-center justify-between gap-3 rounded-lg border border-yellow-200 bg-white px-4 py-2.5 cursor-pointer hover:bg-yellow-50 transition-colors"
+                onClick={() => navigate('/inventario')}
+              >
+                <div className="flex items-center gap-2">
+                  <Package className="h-4 w-4 text-yellow-600 shrink-0" />
+                  <p className="text-sm font-medium text-yellow-800">
+                    {data.criticalStock} producto{data.criticalStock !== 1 ? 's' : ''} con stock crítico
+                  </p>
+                </div>
+                <ChevronRight className="h-4 w-4 text-yellow-400 shrink-0" />
+              </div>
+            )}
+            {data.unconfirmedOrders > 0 && (
+              <div
+                className="flex items-center justify-between gap-3 rounded-lg border border-gray-200 bg-white px-4 py-2.5 cursor-pointer hover:bg-gray-50 transition-colors"
+                onClick={() => navigate('/pedidos')}
+              >
+                <div className="flex items-center gap-2">
+                  <AlertCircle className="h-4 w-4 text-gray-500 shrink-0" />
+                  <p className="text-sm font-medium text-gray-700">
+                    {data.unconfirmedOrders} pedido{data.unconfirmedOrders !== 1 ? 's' : ''} sin confirmar hace 3+ días
+                  </p>
+                </div>
+                <ChevronRight className="h-4 w-4 text-gray-400 shrink-0" />
+              </div>
+            )}
+            {data.quotationsWithoutFollowup > 0 && (
+              <div
+                className="flex items-center justify-between gap-3 rounded-lg border border-gray-200 bg-white px-4 py-2.5 cursor-pointer hover:bg-gray-50 transition-colors"
+                onClick={() => navigate('/cotizaciones')}
+              >
+                <div className="flex items-center gap-2">
+                  <FileText className="h-4 w-4 text-gray-500 shrink-0" />
+                  <p className="text-sm font-medium text-gray-700">
+                    {data.quotationsWithoutFollowup} cotización{data.quotationsWithoutFollowup !== 1 ? 'es' : ''} sin seguimiento
+                  </p>
+                </div>
+                <ChevronRight className="h-4 w-4 text-gray-400 shrink-0" />
+              </div>
+            )}
+          </div>
+        )}
+
       {/* Charts */}
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
         {/* Line chart: sales trend */}
@@ -272,50 +357,6 @@ export default function Dashboard() {
         </Card>
       </div>
 
-      {/* Alerts */}
-      {data &&
-        (data.criticalStock > 0 ||
-          data.unconfirmedOrders > 0 ||
-          data.quotationsWithoutFollowup > 0) && (
-          <div data-tour="alerts-section" className="space-y-2">
-            <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">
-              Alertas del sistema
-            </h2>
-            {data.criticalStock > 0 && (
-              <div
-                className="flex items-center gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 cursor-pointer hover:bg-red-100 transition-colors"
-                onClick={() => navigate('/inventario')}
-              >
-                <AlertCircle className="h-5 w-5 text-red-600 shrink-0" />
-                <p className="text-sm font-medium text-red-800">
-                  {data.criticalStock} productos en stock crítico requieren atención inmediata
-                </p>
-              </div>
-            )}
-            {data.unconfirmedOrders > 0 && (
-              <div
-                className="flex items-center gap-3 rounded-xl border border-orange-200 bg-orange-50 px-4 py-3 cursor-pointer hover:bg-orange-100 transition-colors"
-                onClick={() => navigate('/pedidos')}
-              >
-                <Clock className="h-5 w-5 text-orange-600 shrink-0" />
-                <p className="text-sm font-medium text-orange-800">
-                  {data.unconfirmedOrders} pedidos sin confirmar hace más de 3 días
-                </p>
-              </div>
-            )}
-            {data.quotationsWithoutFollowup > 0 && (
-              <div
-                className="flex items-center gap-3 rounded-xl border border-yellow-200 bg-yellow-50 px-4 py-3 cursor-pointer hover:bg-yellow-100 transition-colors"
-                onClick={() => navigate('/cotizaciones')}
-              >
-                <AlertTriangle className="h-5 w-5 text-yellow-600 shrink-0" />
-                <p className="text-sm font-medium text-yellow-800">
-                  {data.quotationsWithoutFollowup} cotizaciones sin seguimiento programado
-                </p>
-              </div>
-            )}
-          </div>
-        )}
 
       {/* Pending tasks widget */}
       {pendingTasks && pendingTasks.length > 0 && (
