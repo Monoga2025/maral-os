@@ -62,7 +62,8 @@ router.post('/briefing', async (req: AuthRequest, res: Response) => {
         orderBy: [{ priority: 'asc' }, { dueDate: 'asc' }],
         take: 5,
       }),
-      prisma.$queryRaw<{ count: bigint }[]>`SELECT COUNT(*)::bigint as count FROM "Product" WHERE "minStock" > 0 AND "stock" <= "minStock"`.then(r => Number(r[0]?.count ?? 0)),
+      prisma.product.findMany({ where: { minStock: { gt: 0 } }, select: { stock: true, minStock: true } })
+        .then(prods => prods.filter(p => p.stock <= p.minStock).length),
       prisma.quotation.findMany({
         where: {
           status: { in: ['ENVIADA', 'BORRADOR'] },
@@ -103,45 +104,61 @@ router.post('/briefing', async (req: AuthRequest, res: Response) => {
       LOGISTICA: 'Eres del equipo de logística. Te enfocas en producción, empaque y despacho.',
     };
 
-    const prompt = `Eres el asistente inteligente de MARAL OS, el sistema de gestión de Maral Tecnología y Comunicaciones S.A.S., empresa colombiana de electrónica B2B.
+    const VALID_ROUTES = `
+RUTAS VÁLIDAS (usa SOLO estas, exactas):
+- /pedidos         → lista de pedidos
+- /cotizaciones    → lista de cotizaciones
+- /clientes        → lista de clientes
+- /credito         → facturas y cartera
+- /inventario      → stock y productos
+- /produccion      → órdenes de producción
+- /compras         → órdenes de compra
+- /tareas          → tareas del equipo
+- /gastos          → registro de gastos
+`;
+
+    const prompt = `Eres el asistente inteligente de MARAL OS, sistema de gestión de Maral Tecnología y Comunicaciones S.A.S., empresa colombiana de electrónica B2B.
 
 Hoy es ${todayStr}.
 Contexto del usuario: ${roleContext[user.role] ?? 'Empleado de la empresa.'}
-Nombre del usuario: Se desconoce, saluda genéricamente.
 
-ESTADO ACTUAL DEL NEGOCIO:
-- Ventas este mes: $${(salesThisMonth._sum.total ?? 0).toLocaleString('es-CO')} COP
+ESTADO DEL NEGOCIO HOY:
+- Ventas del mes: $${(salesThisMonth._sum.total ?? 0).toLocaleString('es-CO')} COP
 - Pedidos sin confirmar: ${unconfirmedOrders}
-- Pedidos estancados (+5 días sin movimiento): ${stalledOrders}
-- Cotizaciones pendientes (últimos 30 días): ${expiringQuotations.length} — Clientes: ${expiringQuotations.map(q => q.client?.name || q.client?.company || 'desconocido').join(', ')}
+- Pedidos sin movimiento (+5 días): ${stalledOrders}
+- Cotizaciones pendientes: ${expiringQuotations.length}${expiringQuotations.length > 0 ? ` (clientes: ${expiringQuotations.map(q => q.client?.name || q.client?.company || '?').slice(0,3).join(', ')})` : ''}
 - Facturas vencidas: ${overdueInvoices}
 - Productos en stock crítico: ${criticalStock}
-- Órdenes de producción activas: ${pendingProductionOrders.length} — Productos: ${pendingProductionOrders.map(p => `${p.product?.reference} para ${(p.order as any)?.client?.name ?? 'sin pedido'}`).join(', ')}
-- Tareas pendientes del usuario: ${pendingTasks.map(t => `"${t.title}" (${t.priority})`).join(', ') || 'ninguna'}
+- Órdenes de producción activas: ${pendingProductionOrders.length}
+- Tareas pendientes propias: ${pendingTasks.length > 0 ? pendingTasks.map(t => `"${t.title}"`).slice(0,3).join(', ') : 'ninguna'}
+
+${VALID_ROUTES}
 
 INSTRUCCIONES:
-Genera un briefing conversacional, empático y ACCIONABLE en español colombiano.
-NO uses lenguaje robótico ni tecnicismos.
-Sé específico: menciona nombres de clientes y números de pedido cuando sean relevantes.
-El objetivo es que el usuario sepa EXACTAMENTE qué hacer en los próximos 60 minutos.
+- Saluda de forma breve y amigable (máx 15 palabras, tono colombiano cercano).
+- Genera acciones MUY concretas: dile al usuario exactamente qué hacer ahora.
+- Cada "text" debe sonar como: "Llamar a [cliente] para confirmar cotización" o "Cobrar factura vencida de [X]".
+- El campo "cta" es el texto del micro-botón de acción (2-3 palabras máx: "Ver pedidos", "Cobrar ahora", "Revisar stock").
+- SOLO usa las rutas de la lista de arriba.
+- Si no hay nada urgente, el array "actions" puede estar vacío y "mood" debe ser "BIEN".
 
-Responde ÚNICAMENTE con un JSON válido con esta estructura exacta:
+Responde ÚNICAMENTE con JSON válido, sin texto extra, sin markdown:
 {
-  "greeting": "Saludo personalizado con el día y un tono amigable (1 línea)",
-  "summary": "Resumen de 1 línea sobre cómo está el negocio hoy",
+  "greeting": "string corto y cercano",
   "actions": [
     {
       "priority": "URGENTE|NORMAL|INFO",
-      "emoji": "un emoji relevante",
-      "text": "Acción específica en lenguaje natural (máx 80 caracteres)",
-      "link": "/ruta-del-modulo"
+      "emoji": "emoji",
+      "text": "descripción accionable (máx 90 chars)",
+      "link": "/ruta-valida",
+      "cta": "texto botón (máx 3 palabras)"
     }
   ],
-  "insight": "Un insight breve de IA sobre el negocio (1-2 oraciones, opcional)",
+  "insight": "tip breve opcional o null",
   "mood": "BIEN|ATENCION|CRITICO"
 }
 
-Genera máximo 5 actions. Prioriza las más urgentes. Si no hay nada urgente, dilo positivamente.`;
+Máximo 5 acciones. Prioriza por impacto en caja y operación.`;
 
     const raw = await callGemini(prompt);
 
@@ -157,8 +174,10 @@ Genera máximo 5 actions. Prioriza las más urgentes. Si no hay nada urgente, di
     const briefing = JSON.parse(jsonMatch[0]);
     res.json(briefing);
   } catch (error) {
-    console.error('AI briefing error:', error);
-    res.status(500).json({ error: 'Error al generar briefing' });
+    const msg = (error as Error).message ?? '';
+    console.error('AI briefing error:', msg.slice(0, 200));
+    const isQuota = msg.includes('429') || msg.includes('RESOURCE_EXHAUSTED');
+    res.status(500).json({ error: isQuota ? 'QUOTA_EXCEEDED' : 'Error al generar briefing' });
   }
 });
 
