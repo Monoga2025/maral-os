@@ -26,6 +26,8 @@ import {
   Sparkles,
   CheckSquare,
   ChevronRight,
+  Plus,
+  Receipt,
 } from 'lucide-react'
 import type { Task } from '../types'
 import { dashboardApi, tasksApi } from '../lib/api'
@@ -106,6 +108,26 @@ export default function Dashboard() {
           )}
           <span className="text-sm font-medium text-gray-600">Sistema operativo</span>
         </div>
+      </div>
+
+      {/* Quick actions */}
+      <div className="flex flex-wrap gap-2">
+        {[
+          { label: 'Nueva Cotización', icon: <FileText className="h-4 w-4" />, path: '/cotizaciones/nueva', color: 'bg-blue-600 hover:bg-blue-700 text-white' },
+          { label: 'Nuevo Pedido',     icon: <Package className="h-4 w-4" />,  path: '/pedidos/nuevo',      color: 'bg-orange-500 hover:bg-orange-600 text-white' },
+          { label: 'Nueva Tarea',      icon: <CheckSquare className="h-4 w-4" />, path: '/tareas',          color: 'bg-purple-600 hover:bg-purple-700 text-white' },
+          { label: 'Registrar Gasto',  icon: <Receipt className="h-4 w-4" />,  path: '/gastos',             color: 'bg-green-600 hover:bg-green-700 text-white' },
+        ].map((action) => (
+          <button
+            key={action.path}
+            onClick={() => navigate(action.path)}
+            className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${action.color}`}
+          >
+            <Plus className="h-3.5 w-3.5" />
+            {action.icon}
+            {action.label}
+          </button>
+        ))}
       </div>
 
       {/* KPI Cards */}

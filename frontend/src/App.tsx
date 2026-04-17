@@ -29,6 +29,8 @@ import MobileDashboard from './pages/mobile/MobileDashboard'
 import MobileOrders from './pages/mobile/MobileOrders'
 import MobileClients from './pages/mobile/MobileClients'
 import MobileQuotations from './pages/mobile/MobileQuotations'
+import MobileGastos from './pages/mobile/MobileGastos'
+import MobileTareas from './pages/mobile/MobileTareas'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated)
@@ -71,8 +73,8 @@ export default function App() {
         <Route path="produccion" element={<Production />} />
         <Route path="compras" element={<Purchases />} />
         <Route path="credito" element={<Credit />} />
-        <Route path="tareas" element={<Tareas />} />
-        <Route path="gastos" element={<Gastos />} />
+        <Route path="tareas" element={isMobile ? <MobileTareas /> : <Tareas />} />
+        <Route path="gastos" element={isMobile ? <MobileGastos /> : <Gastos />} />
         <Route path="catalogo" element={<Catalog />} />
         <Route path="catalogo/nuevo" element={<ProductForm />} />
         <Route path="catalogo/:id/editar" element={<ProductForm />} />

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, Trash2, Check, ClipboardList } from 'lucide-react'
+import { Plus, Trash2, Check, ClipboardList, LayoutList, Columns3 } from 'lucide-react'
 import { toast } from 'sonner'
 import { tasksApi } from '../lib/api'
 import api from '../lib/api'
@@ -84,6 +84,7 @@ export default function Tareas() {
   const [priorityFilter, setPriorityFilter] = useState('')
   const [showModal, setShowModal] = useState(false)
   const [form, setForm] = useState<CreateForm>(DEFAULT_FORM)
+  const [viewMode, setViewMode] = useState<'list' | 'kanban'>('kanban')
 
   const filters = {
     status: statusFilter || undefined,
@@ -163,6 +164,23 @@ export default function Tareas() {
         </div>
         <div className="flex items-center gap-2">
           <TourButton tourId="tareas" />
+          {/* View toggle */}
+          <div className="flex items-center rounded-lg border border-gray-200 bg-white overflow-hidden">
+            <button
+              onClick={() => setViewMode('kanban')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium transition-colors ${viewMode === 'kanban' ? 'bg-blue-600 text-white' : 'text-gray-500 hover:bg-gray-50'}`}
+            >
+              <Columns3 className="h-3.5 w-3.5" />
+              Tablero
+            </button>
+            <button
+              onClick={() => setViewMode('list')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium transition-colors ${viewMode === 'list' ? 'bg-blue-600 text-white' : 'text-gray-500 hover:bg-gray-50'}`}
+            >
+              <LayoutList className="h-3.5 w-3.5" />
+              Lista
+            </button>
+          </div>
           <Button data-tour="tasks-new-btn" leftIcon={<Plus className="h-4 w-4" />} onClick={() => { setForm({ ...DEFAULT_FORM, dueDate: todayISO() }); setShowModal(true) }}>
             Nueva Tarea
           </Button>
@@ -207,12 +225,88 @@ export default function Tareas() {
         </div>
       </Card>
 
-      {/* Task list */}
-      {isLoading ? (
+      {/* Kanban view */}
+      {viewMode === 'kanban' && (
+        isLoading ? (
+          <div className="flex items-center justify-center py-16">
+            <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-t-transparent" />
+          </div>
+        ) : (
+          <div className="grid grid-cols-3 gap-4">
+            {([
+              { priority: 'URGENTE', label: '🔴 Urgente', bg: 'bg-red-50', border: 'border-red-200', badge: 'bg-red-100 text-red-700' },
+              { priority: 'NORMAL',  label: '🔵 Normal',  bg: 'bg-blue-50', border: 'border-blue-200', badge: 'bg-blue-100 text-blue-700' },
+              { priority: 'DESPUES', label: '⚪ Después', bg: 'bg-gray-50',  border: 'border-gray-200',  badge: 'bg-gray-100 text-gray-600' },
+            ] as const).map(({ priority, label, bg, border, badge }) => {
+              const col = (tasks ?? []).filter(t => t.priority === priority && t.status !== 'COMPLETADA' && t.status !== 'CANCELADA')
+              return (
+                <div key={priority} className={`rounded-xl border ${border} ${bg} p-3 min-h-[200px]`}>
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-sm font-semibold text-gray-700">{label}</h3>
+                    <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${badge}`}>{col.length}</span>
+                  </div>
+                  <div className="space-y-2">
+                    {col.length === 0 && (
+                      <p className="text-xs text-gray-400 text-center py-6">Sin tareas</p>
+                    )}
+                    {col.map((task) => {
+                      const isOverdue = task.dueDate && new Date(task.dueDate) < new Date()
+                      return (
+                        <div key={task.id} className="bg-white rounded-lg border border-gray-200 p-3 shadow-sm">
+                          <div className="flex items-start gap-2">
+                            <button
+                              onClick={() => { if (task.status !== 'COMPLETADA') completeMutation.mutate(task.id) }}
+                              disabled={task.status === 'COMPLETADA'}
+                              className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 border-gray-300 hover:border-green-500 hover:bg-green-50 transition-colors"
+                            >
+                              {completeMutation.variables === task.id && completeMutation.isPending
+                                ? <div className="h-2.5 w-2.5 border border-gray-400 rounded-full border-t-transparent animate-spin" />
+                                : null}
+                            </button>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium text-gray-900 leading-snug">{task.title}</p>
+                              <div className="flex flex-wrap gap-x-3 mt-1.5 text-xs text-gray-400">
+                                {task.assignedTo && <span>{task.assignedTo.name.split(' ')[0]}</span>}
+                                {task.dueDate && (
+                                  <span className={isOverdue ? 'text-red-500 font-medium' : ''}>
+                                    {isOverdue ? '⚠ ' : ''}{formatDate(task.dueDate)}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                            {canDelete(task) && (
+                              <button
+                                onClick={() => deleteMutation.mutate(task.id)}
+                                className="text-gray-300 hover:text-red-400 transition-colors shrink-0"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                  <button
+                    onClick={() => { setForm({ ...DEFAULT_FORM, priority, dueDate: todayISO() }); setShowModal(true) }}
+                    className="mt-2 w-full flex items-center justify-center gap-1 text-xs text-gray-400 hover:text-gray-600 py-2 rounded-lg border border-dashed border-gray-300 hover:border-gray-400 transition-colors"
+                  >
+                    <Plus className="h-3 w-3" />
+                    Añadir
+                  </button>
+                </div>
+              )
+            })}
+          </div>
+        )
+      )}
+
+      {/* Task list (lista mode) */}
+      {viewMode === 'list' && isLoading ? (
         <div className="flex items-center justify-center py-16">
           <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-t-transparent" />
         </div>
-      ) : !tasks?.length ? (
+      ) : viewMode === 'list' && !tasks?.length ? (
         <Card>
           <div className="flex flex-col items-center justify-center py-16 text-center">
             <ClipboardList className="h-10 w-10 text-gray-300 mb-3" />
@@ -220,9 +314,9 @@ export default function Tareas() {
             <p className="text-sm text-gray-400 mt-1">Crea una nueva tarea con el botón superior</p>
           </div>
         </Card>
-      ) : (
+      ) : viewMode === 'list' ? (
         <div data-tour="tasks-list" className="grid gap-3">
-          {tasks.map((task) => (
+          {tasks!.map((task) => (
             <Card key={task.id} className="p-4">
               <div className="flex items-start gap-3">
                 {/* Complete button */}
@@ -292,7 +386,7 @@ export default function Tareas() {
             </Card>
           ))}
         </div>
-      )}
+      ) : null}
 
       {/* Create modal */}
       {showModal && (

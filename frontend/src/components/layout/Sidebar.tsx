@@ -137,88 +137,58 @@ interface NavItem {
   icon: React.ReactNode
   label: string
   roles?: string[]
+  badge?: string
 }
 
-const navItems: NavItem[] = [
+interface NavGroup {
+  label: string
+  items: NavItem[]
+}
+
+const navGroups: NavGroup[] = [
   {
-    to: '/',
-    icon: <LayoutDashboard className="h-5 w-5" />,
-    label: 'Dashboard',
+    label: '',
+    items: [
+      { to: '/', icon: <LayoutDashboard className="h-5 w-5" />, label: 'Dashboard' },
+    ],
   },
   {
-    to: '/clientes',
-    icon: <Users className="h-5 w-5" />,
-    label: 'Clientes',
-    roles: ['GERENTE', 'VENTAS'],
+    label: 'Comercial',
+    items: [
+      { to: '/clientes',     icon: <Users className="h-5 w-5" />,    label: 'Clientes',     roles: ['GERENTE', 'VENTAS'] },
+      { to: '/cotizaciones', icon: <FileText className="h-5 w-5" />, label: 'Cotizaciones', roles: ['GERENTE', 'VENTAS'] },
+      { to: '/pedidos',      icon: <Package className="h-5 w-5" />,  label: 'Pedidos',      roles: ['GERENTE', 'VENTAS', 'LOGISTICA'] },
+    ],
   },
   {
-    to: '/cotizaciones',
-    icon: <FileText className="h-5 w-5" />,
-    label: 'Cotizaciones',
-    roles: ['GERENTE', 'VENTAS'],
+    label: 'Operaciones',
+    items: [
+      { to: '/produccion', icon: <Factory className="h-5 w-5" />,    label: 'Producción', roles: ['GERENTE', 'LOGISTICA'] },
+      { to: '/inventario', icon: <BarChart3 className="h-5 w-5" />,  label: 'Inventario', roles: ['GERENTE', 'LOGISTICA'] },
+      { to: '/compras',    icon: <ShoppingCart className="h-5 w-5" />, label: 'Compras',  roles: ['GERENTE', 'LOGISTICA'] },
+    ],
   },
   {
-    to: '/pedidos',
-    icon: <Package className="h-5 w-5" />,
-    label: 'Pedidos',
-    roles: ['GERENTE', 'VENTAS', 'LOGISTICA'],
+    label: 'Finanzas',
+    items: [
+      { to: '/credito', icon: <CreditCard className="h-5 w-5" />, label: 'Crédito', roles: ['GERENTE', 'VENTAS'] },
+      { to: '/gastos',  icon: <Receipt className="h-5 w-5" />,    label: 'Gastos' },
+    ],
   },
   {
-    to: '/produccion',
-    icon: <Factory className="h-5 w-5" />,
-    label: 'Producción',
-    roles: ['GERENTE', 'LOGISTICA'],
+    label: 'Equipo',
+    items: [
+      { to: '/tareas',   icon: <CheckSquare className="h-5 w-5" />, label: 'Tareas' },
+      { to: '/reportes', icon: <TrendingUp className="h-5 w-5" />,  label: 'Reportes', roles: ['GERENTE'] },
+    ],
   },
   {
-    to: '/inventario',
-    icon: <BarChart3 className="h-5 w-5" />,
-    label: 'Inventario',
-    roles: ['GERENTE', 'LOGISTICA'],
-  },
-  {
-    to: '/compras',
-    icon: <ShoppingCart className="h-5 w-5" />,
-    label: 'Compras',
-    roles: ['GERENTE', 'LOGISTICA'],
-  },
-  {
-    to: '/credito',
-    icon: <CreditCard className="h-5 w-5" />,
-    label: 'Crédito',
-    roles: ['GERENTE', 'VENTAS'],
-  },
-  {
-    to: '/tareas',
-    icon: <CheckSquare className="h-5 w-5" />,
-    label: 'Tareas',
-  },
-  {
-    to: '/gastos',
-    icon: <Receipt className="h-5 w-5" />,
-    label: 'Gastos',
-  },
-  {
-    to: '/catalogo',
-    icon: <Grid3X3 className="h-5 w-5" />,
-    label: 'Catálogo',
-    roles: ['GERENTE', 'VENTAS'],
-  },
-  {
-    to: '/reportes',
-    icon: <TrendingUp className="h-5 w-5" />,
-    label: 'Reportes',
-    roles: ['GERENTE'],
-  },
-  {
-    to: '/configuracion',
-    icon: <Settings className="h-5 w-5" />,
-    label: 'Configuración',
-    roles: ['GERENTE'],
-  },
-  {
-    to: '/manual',
-    icon: <BookOpen className="h-5 w-5" />,
-    label: 'Manual de Uso',
+    label: 'Sistema',
+    items: [
+      { to: '/catalogo',      icon: <Grid3X3 className="h-5 w-5" />, label: 'Catálogo',      roles: ['GERENTE', 'VENTAS'] },
+      { to: '/configuracion', icon: <Settings className="h-5 w-5" />, label: 'Configuración', roles: ['GERENTE'] },
+      { to: '/manual',        icon: <BookOpen className="h-5 w-5" />, label: 'Manual de Uso' },
+    ],
   },
 ]
 
@@ -233,14 +203,57 @@ export function Sidebar() {
   const { sidebarCollapsed } = useUIStore()
   const navigate = useNavigate()
 
-  const visibleItems = navItems.filter(
-    (item) => !item.roles || !user || item.roles.includes(user.role)
-  )
+  const { data: pendingTasks } = useQuery<number>({
+    queryKey: ['tasks-count'],
+    queryFn: () =>
+      api.get<{ data: unknown[] }>('/tasks', { params: { status: 'PENDIENTE', limit: 50 } })
+        .then((r) => r.data.data.length),
+    staleTime: 60_000,
+    retry: false,
+  })
 
   const handleLogout = () => {
     logout()
     navigate('/login')
   }
+
+  const renderItem = (item: NavItem) => (
+    <NavLink
+      key={item.to}
+      to={item.to}
+      end={item.to === '/'}
+      className={({ isActive }) =>
+        cn(
+          'group relative flex items-center gap-3 rounded-lg px-2.5 py-2 text-sm font-medium transition-all',
+          isActive
+            ? 'bg-blue-600/20 text-white ring-1 ring-blue-500/40'
+            : 'text-slate-400 hover:bg-white/8 hover:text-white'
+        )
+      }
+    >
+      {({ isActive }) => (
+        <>
+          {isActive && (
+            <span className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 bg-blue-400 rounded-r-full" />
+          )}
+          <span className={cn('shrink-0 transition-colors', isActive ? 'text-blue-300' : 'text-slate-400 group-hover:text-white')}>
+            {item.icon}
+          </span>
+          {!sidebarCollapsed && (
+            <span className={cn('truncate flex-1', isActive && 'font-semibold')}>{item.label}</span>
+          )}
+          {!sidebarCollapsed && item.to === '/tareas' && pendingTasks && pendingTasks > 0 && (
+            <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 text-[10px] font-bold text-white">
+              {pendingTasks > 99 ? '99+' : pendingTasks}
+            </span>
+          )}
+          {sidebarCollapsed && item.to === '/tareas' && pendingTasks && pendingTasks > 0 && (
+            <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-red-500" />
+          )}
+        </>
+      )}
+    </NavLink>
+  )
 
   return (
     <aside
@@ -257,53 +270,36 @@ export function Sidebar() {
           </div>
           {!sidebarCollapsed && (
             <div className="overflow-hidden">
-              <span className="block text-sm font-bold text-white tracking-wide">
-                MARAL
-              </span>
-              <span className="block text-[10px] font-medium text-blue-400 uppercase tracking-widest -mt-0.5">
-                OS
-              </span>
+              <span className="block text-sm font-bold text-white tracking-wide">MARAL</span>
+              <span className="block text-[10px] font-medium text-blue-400 uppercase tracking-widest -mt-0.5">OS</span>
             </div>
           )}
         </div>
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 overflow-y-auto py-4 px-2 space-y-0.5">
-        {visibleItems.map((item) => (
-          <NavLink
-            key={item.to}
-            to={item.to}
-            end={item.to === '/'}
-            className={({ isActive }) =>
-              cn(
-                'group relative flex items-center gap-3 rounded-lg px-2.5 py-2 text-sm font-medium transition-all',
-                isActive
-                  ? 'bg-blue-600/20 text-white ring-1 ring-blue-500/40'
-                  : 'text-slate-400 hover:bg-white/8 hover:text-white'
-              )
-            }
-          >
-            {({ isActive }) => (
-              <>
-                {isActive && (
-                  <span className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 bg-blue-400 rounded-r-full" />
-                )}
-                <span
-                  className={cn(
-                    'shrink-0 transition-colors',
-                    isActive ? 'text-blue-300' : 'text-slate-400 group-hover:text-white'
-                  )}
-                >
-                  {item.icon}
-                </span>
-                {!sidebarCollapsed && (
-                  <span className={cn('truncate', isActive && 'font-semibold')}>{item.label}</span>
-                )}
-              </>
-            )}
-          </NavLink>
-        ))}
+      <nav className="flex-1 overflow-y-auto py-3 px-2">
+        {navGroups.map((group) => {
+          const visible = group.items.filter(
+            (item) => !item.roles || !user || item.roles.includes(user.role)
+          )
+          if (visible.length === 0) return null
+          return (
+            <div key={group.label} className="mb-3">
+              {group.label && !sidebarCollapsed && (
+                <p className="px-2.5 pb-1 text-[10px] font-semibold uppercase tracking-widest text-slate-600">
+                  {group.label}
+                </p>
+              )}
+              {group.label && sidebarCollapsed && (
+                <div className="my-1 mx-3 h-px bg-white/10" />
+              )}
+              <div className="space-y-0.5">
+                {visible.map(renderItem)}
+              </div>
+            </div>
+          )
+        })}
       </nav>
 
       {/* Merlin sync status */}
