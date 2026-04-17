@@ -325,4 +325,8 @@ export const expensesApi = {
     notes?: string
   }) => api.post<Expense>('/expenses', data),
   approve: (id: string) => api.patch<Expense>(`/expenses/${id}/approve`),
+  uploadReceipt: (id: string, formData: FormData) =>
+    api.post<Expense>(`/expenses/${id}/receipt`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    }),
 }

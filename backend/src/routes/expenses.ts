@@ -1,7 +1,29 @@
 import { Router, Response } from 'express';
 import { z } from 'zod';
+import multer from 'multer';
+import path from 'path';
+import fs from 'fs';
 import prisma from '../lib/prisma';
 import { authenticate, AuthRequest } from '../middleware/auth';
+
+const UPLOAD_DIR = process.env.UPLOAD_DIR || './uploads';
+if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+
+const receiptUpload = multer({
+  storage: multer.diskStorage({
+    destination: (_req, _file, cb) => cb(null, UPLOAD_DIR),
+    filename: (_req, file, cb) => {
+      const unique = `receipt-${Date.now()}-${Math.round(Math.random() * 1e9)}`;
+      cb(null, `${unique}${path.extname(file.originalname)}`);
+    },
+  }),
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    const ok = /jpeg|jpg|png|webp/.test(path.extname(file.originalname).toLowerCase()) &&
+               /jpeg|jpg|png|webp/.test(file.mimetype);
+    ok ? cb(null, true) : cb(new Error('Solo se permiten imágenes'));
+  },
+});
 
 const router = Router();
 router.use(authenticate);
@@ -185,6 +207,38 @@ router.patch('/:id/approve', async (req: AuthRequest, res: Response) => {
   } catch (error) {
     console.error('Approve expense error:', error);
     res.status(500).json({ error: 'Error al aprobar gasto' });
+  }
+});
+
+// POST /api/expenses/:id/receipt — sube foto del comprobante
+router.post('/:id/receipt', receiptUpload.single('receipt'), async (req: AuthRequest, res: Response) => {
+  try {
+    const existing = await prisma.expense.findUnique({ where: { id: req.params.id } });
+    if (!existing) {
+      res.status(404).json({ error: 'Gasto no encontrado' });
+      return;
+    }
+    if (req.user!.role === 'LOGISTICA' && existing.createdById !== req.user!.userId) {
+      res.status(403).json({ error: 'No tienes permiso para editar este gasto' });
+      return;
+    }
+    if (!req.file) {
+      res.status(400).json({ error: 'No se recibió ningún archivo' });
+      return;
+    }
+    const receiptUrl = `/uploads/${req.file.filename}`;
+    const expense = await prisma.expense.update({
+      where: { id: req.params.id },
+      data: { receiptUrl },
+      include: {
+        createdBy: { select: { id: true, name: true } },
+        approvedBy: { select: { id: true, name: true } },
+      },
+    });
+    res.json(expense);
+  } catch (error) {
+    console.error('Upload expense receipt error:', error);
+    res.status(500).json({ error: 'Error al subir comprobante' });
   }
 });
 

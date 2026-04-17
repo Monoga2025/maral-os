@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Receipt, Wallet, CreditCard, TrendingDown, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Receipt, Wallet, CreditCard, TrendingDown, ChevronLeft, ChevronRight, Camera, X, ImageIcon } from 'lucide-react'
 import { expensesApi } from '../lib/api'
 import { formatCOP } from '../lib/utils'
 import { useAuthStore } from '../store/auth'
@@ -51,6 +51,9 @@ export default function Gastos() {
   const [showModal, setShowModal] = useState(false)
   const [form, setForm] = useState<CreateForm>(defaultForm())
   const [submitting, setSubmitting] = useState(false)
+  const [receiptFile, setReceiptFile] = useState<File | null>(null)
+  const [receiptPreview, setReceiptPreview] = useState<string | null>(null)
+  const receiptRef = useRef<HTMLInputElement>(null)
 
   const filters = {
     ...(typeFilter ? { type: typeFilter } : {}),
@@ -66,13 +69,22 @@ export default function Gastos() {
   })
 
   const createMutation = useMutation({
-    mutationFn: (payload: Parameters<typeof expensesApi.create>[0]) =>
-      expensesApi.create(payload),
+    mutationFn: async (payload: Parameters<typeof expensesApi.create>[0]) => {
+      const res = await expensesApi.create(payload)
+      if (receiptFile) {
+        const fd = new FormData()
+        fd.append('receipt', receiptFile)
+        await expensesApi.uploadReceipt(res.data.id, fd)
+      }
+      return res
+    },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['expenses'] })
       toast.success('Gasto registrado')
       setShowModal(false)
       setForm(defaultForm())
+      setReceiptFile(null)
+      setReceiptPreview(null)
     },
     onError: () => toast.error('Error al registrar el gasto'),
     onSettled: () => setSubmitting(false),
@@ -272,6 +284,18 @@ export default function Gastos() {
                     )}
                   </td>
                   <td className="px-4 py-3">
+                    <div className="flex items-center gap-2">
+                    {expense.receiptUrl && (
+                      <a
+                        href={expense.receiptUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs text-gray-500 border border-gray-200 rounded px-2 py-1 hover:bg-gray-50 transition-colors inline-flex items-center gap-1"
+                      >
+                        <ImageIcon size={11} />
+                        Ver
+                      </a>
+                    )}
                     {user?.role === 'GERENTE' && !expense.approvedAt && (
                       <button
                         onClick={() => approveMutation.mutate(expense.id)}
@@ -281,6 +305,7 @@ export default function Gastos() {
                         Aprobar
                       </button>
                     )}
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -366,9 +391,50 @@ export default function Gastos() {
                 </select>
               </div>
               <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Foto del comprobante
+                  <span className="ml-1 text-xs text-gray-400 font-normal">(factura / remisión)</span>
+                </label>
+                <input
+                  ref={receiptRef}
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0]
+                    if (file) {
+                      setReceiptFile(file)
+                      setReceiptPreview(URL.createObjectURL(file))
+                    }
+                  }}
+                />
+                {receiptPreview ? (
+                  <div className="relative inline-block mt-1">
+                    <img src={receiptPreview} alt="Comprobante" className="h-28 w-auto rounded-lg border border-gray-200 object-cover" />
+                    <button
+                      type="button"
+                      onClick={() => { setReceiptFile(null); setReceiptPreview(null) }}
+                      className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center"
+                    >
+                      <X size={12} />
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => receiptRef.current?.click()}
+                    className="mt-1 w-full flex items-center justify-center gap-2 border-2 border-dashed border-gray-300 rounded-lg py-4 text-sm text-gray-500 hover:border-blue-400 hover:text-blue-600 transition-colors"
+                  >
+                    <Camera size={18} />
+                    Tomar foto o seleccionar imagen
+                  </button>
+                )}
+              </div>
+              <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Notas</label>
                 <textarea
-                  rows={3}
+                  rows={2}
                   placeholder="Observaciones opcionales"
                   value={form.notes}
                   onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}

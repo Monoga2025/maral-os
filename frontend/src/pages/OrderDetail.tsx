@@ -4,11 +4,32 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   ArrowLeft, Circle, Upload, Printer, Package,
   MapPin, AlertTriangle, Check, Save, Copy, X, FileText,
+  Factory, Plus, ChevronRight, Calendar,
 } from 'lucide-react'
-import { ordersApi } from '../lib/api'
+import { ordersApi, productionApi, productsApi } from '../lib/api'
 import { formatCOP, formatDate, getStatusColor } from '../lib/utils'
-import type { Order, OrderStatus, ItemDisposition } from '../types'
+import type { Order, OrderStatus, ItemDisposition, ProductionStatus } from '../types'
 import { toast } from 'sonner'
+
+const PHASES = [
+  { key: 'BASICO', label: 'Procesos Básicos' },
+  { key: 'PREENSAMBLE', label: 'Preensamble' },
+  { key: 'ENSAMBLE_FINAL', label: 'Ensamble Final' },
+]
+const ASSIGNEES = ['Angelo', 'Iván', 'Sin asignar']
+
+const PROD_STATUS_COLORS: Record<ProductionStatus, string> = {
+  PENDIENTE: 'bg-yellow-100 text-yellow-700',
+  EN_PROCESO: 'bg-blue-100 text-blue-700',
+  TERMINADO: 'bg-purple-100 text-purple-700',
+  EMPACADO: 'bg-green-100 text-green-700',
+}
+const PROD_STATUS_LABELS: Record<ProductionStatus, string> = {
+  PENDIENTE: 'Pendiente',
+  EN_PROCESO: 'En Proceso',
+  TERMINADO: 'Terminado',
+  EMPACADO: 'Empacado',
+}
 
 const STEPS: { status: OrderStatus; label: string }[] = [
   { status: 'CONFIRMADO',    label: 'Confirmado' },
@@ -195,8 +216,15 @@ export default function OrderDetail() {
   const qc = useQueryClient()
   const fileRef = useRef<HTMLInputElement>(null)
   const [guideNumber, setGuideNumber] = useState('')
+  const [dispatchDateDraft, setDispatchDateDraft] = useState('')
   const [noteDraft, setNoteDraft] = useState('')
   const [showMerlinModal, setShowMerlinModal] = useState(false)
+  const [showCreateOP, setShowCreateOP] = useState(false)
+  const [opProductId, setOpProductId] = useState('')
+  const [opQty, setOpQty] = useState(1)
+  const [opPhase, setOpPhase] = useState('BASICO')
+  const [opAssignee, setOpAssignee] = useState('Angelo')
+  const [opRequired, setOpRequired] = useState('')
 
   const { data, isLoading } = useQuery({
     queryKey: ['order', id],
@@ -231,6 +259,32 @@ export default function OrderDetail() {
       ordersApi.updateItemDisposition(id!, itemId, disposition),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['order', id] }),
     onError: () => toast.error('Error al actualizar disposición'),
+  })
+
+  const createOP = useMutation({
+    mutationFn: () => productionApi.create({
+      orderId: order?.id,
+      productId: opProductId,
+      qty: opQty,
+      phase: opPhase as never,
+      assignedTo: opAssignee,
+      requiredDate: opRequired ? new Date(opRequired).toISOString() : undefined,
+    }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['order', id] })
+      qc.invalidateQueries({ queryKey: ['production'] })
+      toast.success('Orden de producción creada')
+      setShowCreateOP(false)
+      setOpProductId('')
+      setOpQty(1)
+    },
+    onError: () => toast.error('Error al crear orden de producción'),
+  })
+
+  const { data: productsData } = useQuery({
+    queryKey: ['products-all'],
+    queryFn: () => productsApi.getAll({ pageSize: 200 }),
+    enabled: showCreateOP,
   })
 
   const order = data?.data
@@ -416,23 +470,47 @@ export default function OrderDetail() {
               <span className="font-medium">{order.freightPayment ?? '—'}</span>
             </div>
           </div>
-          {/* Guide number */}
-          <div className="pt-2 border-t border-gray-100">
-            <label className="text-xs text-gray-500 font-medium">Número de Guía</label>
-            <div className="flex gap-2 mt-1">
-              <input
-                type="text"
-                value={order.guideNumber ?? guideNumber}
-                onChange={(e) => setGuideNumber(e.target.value)}
-                placeholder="Ingrese número de guía"
-                className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-              <button
-                onClick={() => updateOrder.mutate({ guideNumber })}
-                className="px-3 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm transition-colors"
-              >
-                <Check size={14} />
-              </button>
+          {/* Dispatch date + Guide number */}
+          <div className="pt-2 border-t border-gray-100 space-y-3">
+            <div>
+              <label className="text-xs text-gray-500 font-medium flex items-center gap-1">
+                <Calendar size={11} />
+                Fecha de Despacho Comprometida
+              </label>
+              <div className="flex gap-2 mt-1">
+                <input
+                  type="date"
+                  value={dispatchDateDraft || (order.dispatchDate ? order.dispatchDate.slice(0, 10) : '')}
+                  onChange={(e) => setDispatchDateDraft(e.target.value)}
+                  className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                {dispatchDateDraft && dispatchDateDraft !== order.dispatchDate?.slice(0, 10) && (
+                  <button
+                    onClick={() => updateOrder.mutate({ dispatchDate: new Date(dispatchDateDraft).toISOString() })}
+                    className="px-3 py-2 bg-blue-600 text-white hover:bg-blue-700 rounded-lg text-sm transition-colors"
+                  >
+                    <Check size={14} />
+                  </button>
+                )}
+              </div>
+            </div>
+            <div>
+              <label className="text-xs text-gray-500 font-medium">Número de Guía</label>
+              <div className="flex gap-2 mt-1">
+                <input
+                  type="text"
+                  value={order.guideNumber ?? guideNumber}
+                  onChange={(e) => setGuideNumber(e.target.value)}
+                  placeholder="Ingrese número de guía"
+                  className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                <button
+                  onClick={() => updateOrder.mutate({ guideNumber })}
+                  className="px-3 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm transition-colors"
+                >
+                  <Check size={14} />
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -498,6 +576,7 @@ export default function OrderDetail() {
             ref={fileRef}
             type="file"
             accept="image/*"
+            capture="environment"
             className="hidden"
             onChange={(e) => {
               const file = e.target.files?.[0]
@@ -542,6 +621,161 @@ export default function OrderDetail() {
           </div>
         )}
       </div>
+
+      {/* Production orders */}
+      <div className="bg-white rounded-xl border border-gray-200 p-5">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="font-semibold text-gray-900 flex items-center gap-2">
+            <Factory size={16} className="text-blue-600" />
+            Órdenes de Producción
+            {(order.productionOrders?.length ?? 0) > 0 && (
+              <span className="ml-1 text-xs bg-blue-100 text-blue-700 font-semibold px-2 py-0.5 rounded-full">
+                {order.productionOrders!.length}
+              </span>
+            )}
+          </h2>
+          <button
+            onClick={() => {
+              const itemsForProd = (order.items ?? []).filter(i => i.disposition === 'PRODUCCION')
+              if (itemsForProd.length === 1) {
+                setOpProductId(itemsForProd[0].productId)
+                setOpQty(itemsForProd[0].qty)
+              }
+              setOpRequired(order.dispatchDate ? order.dispatchDate.slice(0, 10) : '')
+              setShowCreateOP(true)
+            }}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-medium hover:bg-blue-700 transition-colors"
+          >
+            <Plus size={13} />
+            Nueva OP
+          </button>
+        </div>
+
+        {(order.productionOrders ?? []).length === 0 ? (
+          <div className="border-2 border-dashed border-gray-200 rounded-xl p-6 text-center text-gray-400 text-sm">
+            <Factory size={28} className="mx-auto mb-2 opacity-30" />
+            Sin órdenes de producción vinculadas
+            {(order.items ?? []).some(i => i.disposition === 'PRODUCCION') && (
+              <p className="mt-1 text-xs text-orange-500 font-medium">
+                Hay productos marcados como "Producción" — crea una OP para cada uno
+              </p>
+            )}
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {(order.productionOrders ?? []).map((op) => (
+              <div key={op.id} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold text-blue-600">#{op.number}</span>
+                    <p className="text-sm font-medium text-gray-900 truncate">{op.product?.name ?? '—'}</p>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    x{op.qty} · {op.assignedTo ?? 'Sin asignar'}
+                    {op.requiredDate && <span className="ml-2 text-orange-600">· Req: {formatDate(op.requiredDate)}</span>}
+                  </p>
+                </div>
+                <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${PROD_STATUS_COLORS[op.status as ProductionStatus] ?? 'bg-gray-100 text-gray-600'}`}>
+                  {PROD_STATUS_LABELS[op.status as ProductionStatus] ?? op.status}
+                </span>
+                <ChevronRight size={14} className="text-gray-400 shrink-0" />
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Create Production Order Modal */}
+      {showCreateOP && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md">
+            <div className="flex items-center justify-between p-5 border-b border-gray-100">
+              <div>
+                <h3 className="text-base font-semibold text-gray-900">Nueva Orden de Producción</h3>
+                <p className="text-xs text-gray-400 mt-0.5">Vinculada a Pedido #{order.number}</p>
+              </div>
+              <button onClick={() => setShowCreateOP(false)} className="text-gray-400 hover:text-gray-600">
+                <X size={20} />
+              </button>
+            </div>
+            <div className="p-5 space-y-4">
+              <div>
+                <label className="text-xs text-gray-500 font-medium">Producto a fabricar</label>
+                <select
+                  value={opProductId}
+                  onChange={(e) => setOpProductId(e.target.value)}
+                  className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">Seleccionar...</option>
+                  {/* Primero mostrar los items del pedido con disposición PRODUCCION */}
+                  {(order.items ?? []).filter(i => i.disposition === 'PRODUCCION').length > 0 && (
+                    <optgroup label="— Para producción (este pedido)">
+                      {(order.items ?? []).filter(i => i.disposition === 'PRODUCCION').map(i => (
+                        <option key={i.productId} value={i.productId}>
+                          {i.product?.reference} — {i.product?.name} (x{i.qty})
+                        </option>
+                      ))}
+                    </optgroup>
+                  )}
+                  <optgroup label="— Todos los productos">
+                    {(productsData?.data.data ?? []).map(p => (
+                      <option key={p.id} value={p.id}>{p.reference} — {p.name}</option>
+                    ))}
+                  </optgroup>
+                </select>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs text-gray-500 font-medium">Cantidad</label>
+                  <input
+                    type="number" min={1} value={opQty}
+                    onChange={(e) => setOpQty(Number(e.target.value))}
+                    className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-gray-500 font-medium">Fase inicial</label>
+                  <select value={opPhase} onChange={(e) => setOpPhase(e.target.value)}
+                    className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    {PHASES.map(p => <option key={p.key} value={p.key}>{p.label}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs text-gray-500 font-medium">Asignar a</label>
+                  <select value={opAssignee} onChange={(e) => setOpAssignee(e.target.value)}
+                    className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    {ASSIGNEES.map(a => <option key={a}>{a}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs text-gray-500 font-medium">
+                    Fecha requerida
+                    {order.dispatchDate && <span className="text-blue-500 ml-1">(desde despacho)</span>}
+                  </label>
+                  <input
+                    type="date" value={opRequired}
+                    onChange={(e) => setOpRequired(e.target.value)}
+                    className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+              </div>
+            </div>
+            <div className="flex justify-end gap-3 p-5 border-t border-gray-100">
+              <button onClick={() => setShowCreateOP(false)}
+                className="px-4 py-2 border border-gray-200 rounded-lg text-sm hover:bg-gray-50">
+                Cancelar
+              </button>
+              <button
+                onClick={() => createOP.mutate()}
+                disabled={!opProductId || createOP.isPending}
+                className="px-5 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
+              >
+                {createOP.isPending ? 'Creando...' : 'Crear Orden'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

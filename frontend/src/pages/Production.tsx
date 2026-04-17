@@ -172,7 +172,7 @@ export default function Production() {
         <table className="w-full text-sm">
           <thead className="bg-gray-50 border-b border-gray-200">
             <tr>
-              {['#', 'Producto', 'Cantidad', 'Fase', 'Asignado', 'Fecha Req.', 'Estado', 'Acción'].map((h) => (
+              {['#', 'Producto', 'Pedido / Cliente', 'Cantidad', 'Fase', 'Asignado', 'Fecha Req.', 'Estado', 'Acción'].map((h) => (
                 <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">{h}</th>
               ))}
             </tr>
@@ -184,6 +184,16 @@ export default function Production() {
                 <td className="px-4 py-3">
                   <p className="font-medium text-gray-900">{order.product?.name ?? '—'}</p>
                   <p className="text-xs text-gray-400">{order.product?.reference}</p>
+                </td>
+                <td className="px-4 py-3">
+                  {order.order ? (
+                    <div>
+                      <p className="text-xs font-bold text-blue-600">Pedido #{order.order.number}</p>
+                      <p className="text-xs text-gray-500">{(order.order as any).client?.name ?? '—'}</p>
+                    </div>
+                  ) : (
+                    <span className="text-xs text-gray-400">—</span>
+                  )}
                 </td>
                 <td className="px-4 py-3 font-semibold text-gray-900">{order.qty}</td>
                 <td className="px-4 py-3">

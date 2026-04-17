@@ -216,6 +216,7 @@ export interface Order {
   notes?: string
   total: number
   items: OrderItem[]
+  productionOrders?: ProductionOrder[]
   updatedBy?: Pick<User, 'id' | 'name'>
   createdAt: string
   updatedAt: string
