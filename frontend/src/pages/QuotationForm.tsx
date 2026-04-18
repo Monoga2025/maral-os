@@ -326,7 +326,9 @@ export default function QuotationForm() {
   const buildPayload = (formData: FormValues) => ({
     validityDays: Number(formData.validityDays),
     paymentTerms: formData.paymentTerms,
-    followUpDate: formData.followUpDate || undefined,
+    followUpDate: formData.followUpDate
+      ? new Date(formData.followUpDate + 'T12:00:00').toISOString()
+      : undefined,
     notes: formData.notes || undefined,
     shippingAddress: formData.shippingAddress || undefined,
     taxPercent: applyTax ? TAX_RATE * 100 : 0,
