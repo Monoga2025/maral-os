@@ -33,6 +33,10 @@ async function callGemini(prompt: string): Promise<string> {
 
 // POST /api/ai/briefing — briefing diario personalizado por rol
 router.post('/briefing', async (req: AuthRequest, res: Response) => {
+  if (!process.env.GOOGLE_AI_KEY) {
+    res.json(null);
+    return;
+  }
   try {
     const user = req.user!;
     const today = new Date();
