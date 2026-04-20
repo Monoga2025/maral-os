@@ -22,6 +22,7 @@ export type QuotationStatus =
 export type OrderStatus =
   | 'CONFIRMADO'
   | 'EN_PRODUCCION'
+  | 'LISTO'
   | 'EMPACADO'
   | 'DESPACHADO'
   | 'ENTREGADO'

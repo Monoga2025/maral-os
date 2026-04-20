@@ -38,6 +38,7 @@ const orderStatusMap: Record<
 > = {
   CONFIRMADO: { label: 'Confirmado', variant: 'blue' },
   EN_PRODUCCION: { label: 'En Producción', variant: 'orange' },
+  LISTO: { label: 'Listo', variant: 'green' },
   EMPACADO: { label: 'Empacado', variant: 'purple' },
   DESPACHADO: { label: 'Despachado', variant: 'indigo' },
   ENTREGADO: { label: 'Entregado', variant: 'green' },

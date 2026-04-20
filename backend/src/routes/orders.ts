@@ -133,7 +133,7 @@ router.get('/', async (req: AuthRequest, res: Response) => {
 
     if (kanban) {
       // Return grouped by status for kanban view
-      const statuses = ['CONFIRMADO', 'EN_PRODUCCION', 'EMPACADO', 'DESPACHADO', 'ENTREGADO', 'CANCELADO'];
+      const statuses = ['CONFIRMADO', 'EN_PRODUCCION', 'LISTO', 'EMPACADO', 'DESPACHADO', 'ENTREGADO', 'CANCELADO'];
       const grouped: Record<string, unknown[]> = {};
 
       await Promise.all(
@@ -271,7 +271,7 @@ router.put('/:id', async (req: AuthRequest, res: Response) => {
     }
 
     const updateSchema = z.object({
-      status: z.enum(['CONFIRMADO', 'EN_PRODUCCION', 'EMPACADO', 'DESPACHADO', 'ENTREGADO', 'CANCELADO']).optional(),
+      status: z.enum(['CONFIRMADO', 'EN_PRODUCCION', 'LISTO', 'EMPACADO', 'DESPACHADO', 'ENTREGADO', 'CANCELADO']).optional(),
       confirmed: z.boolean().optional(),
       guideNumber: z.string().optional(),
       dispatchDate: z.string().datetime().optional(),
@@ -322,7 +322,7 @@ router.put('/:id', async (req: AuthRequest, res: Response) => {
 router.patch('/:id/status', async (req: AuthRequest, res: Response) => {
   try {
     const { status } = req.body;
-    const validStatuses = ['CONFIRMADO', 'EN_PRODUCCION', 'EMPACADO', 'DESPACHADO', 'ENTREGADO', 'CANCELADO'];
+    const validStatuses = ['CONFIRMADO', 'EN_PRODUCCION', 'LISTO', 'EMPACADO', 'DESPACHADO', 'ENTREGADO', 'CANCELADO'];
     if (!status || !validStatuses.includes(status)) {
       res.status(400).json({ error: 'Estado inválido' });
       return;
@@ -347,6 +347,21 @@ router.patch('/:id/status', async (req: AuthRequest, res: Response) => {
   } catch (error) {
     console.error('Update order status error:', error);
     res.status(500).json({ error: 'Error al actualizar estado' });
+  }
+});
+
+// PATCH /api/orders/:id/items/:itemId/pick
+router.patch('/:id/items/:itemId/pick', async (req: AuthRequest, res: Response) => {
+  try {
+    const { picked } = req.body as { picked: boolean };
+    const item = await prisma.orderItem.update({
+      where: { id: req.params.itemId },
+      data: { picked: Boolean(picked) },
+    });
+    res.json(item);
+  } catch (error) {
+    console.error('Pick item error:', error);
+    res.status(500).json({ error: 'Error al actualizar' });
   }
 });
 

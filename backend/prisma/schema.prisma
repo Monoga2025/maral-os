@@ -239,6 +239,7 @@ model Order {
 enum OrderStatus {
   CONFIRMADO
   EN_PRODUCCION
+  LISTO
   EMPACADO
   DESPACHADO
   ENTREGADO

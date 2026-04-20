@@ -165,6 +165,8 @@ export const ordersApi = {
     api.patch<Order>(`/orders/${id}/status`, { status }),
   updateItemDisposition: (orderId: string, itemId: string, disposition: string) =>
     api.patch(`/orders/${orderId}/items/${itemId}/disposition`, { disposition }),
+  pickItem: (orderId: string, itemId: string, picked: boolean) =>
+    api.patch(`/orders/${orderId}/items/${itemId}/pick`, { picked }),
   uploadPhoto: (id: string, formData: FormData) =>
     api.post(`/orders/${id}/photos`, formData, {
       headers: { 'Content-Type': 'multipart/form-data' },

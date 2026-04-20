@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
@@ -34,13 +34,14 @@ const PROD_STATUS_LABELS: Record<ProductionStatus, string> = {
 const STEPS: { status: OrderStatus; label: string }[] = [
   { status: 'CONFIRMADO',    label: 'Confirmado' },
   { status: 'EN_PRODUCCION', label: 'En Producción' },
+  { status: 'LISTO',         label: 'Listo' },
   { status: 'EMPACADO',      label: 'Empacado' },
   { status: 'DESPACHADO',    label: 'Despachado' },
   { status: 'ENTREGADO',     label: 'Entregado' },
 ]
 
 const ORDER_INDEX: Record<string, number> = {
-  CONFIRMADO: 0, EN_PRODUCCION: 1, EMPACADO: 2, DESPACHADO: 3, ENTREGADO: 4,
+  CONFIRMADO: 0, EN_PRODUCCION: 1, LISTO: 2, EMPACADO: 3, DESPACHADO: 4, ENTREGADO: 5,
 }
 
 function CopyButton({ text, label }: { text: string; label?: string }) {
@@ -215,7 +216,8 @@ export default function OrderDetail() {
   const navigate = useNavigate()
   const qc = useQueryClient()
   const fileRef = useRef<HTMLInputElement>(null)
-  const [guideNumber, setGuideNumber] = useState('')
+  const remiteRef = useRef<HTMLInputElement>(null)
+  const [guideNumberDraft, setGuideNumberDraft] = useState('')
   const [dispatchDateDraft, setDispatchDateDraft] = useState('')
   const [noteDraft, setNoteDraft] = useState('')
   const [showMerlinModal, setShowMerlinModal] = useState(false)
@@ -232,6 +234,12 @@ export default function OrderDetail() {
     enabled: !!id,
   })
 
+  const order = data?.data
+
+  useEffect(() => {
+    if (order?.guideNumber) setGuideNumberDraft(order.guideNumber)
+  }, [order?.guideNumber])
+
   const updateStatus = useMutation({
     mutationFn: (status: string) => ordersApi.updateStatus(id!, status),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['order', id] }); toast.success('Estado actualizado') },
@@ -239,9 +247,10 @@ export default function OrderDetail() {
   })
 
   const uploadPhoto = useMutation({
-    mutationFn: (file: File) => {
+    mutationFn: ({ file, phase }: { file: File; phase: string }) => {
       const fd = new FormData()
       fd.append('photo', file)
+      fd.append('phase', phase)
       return ordersApi.uploadPhoto(id!, fd)
     },
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['order', id] }); toast.success('Foto subida') },
@@ -259,6 +268,13 @@ export default function OrderDetail() {
       ordersApi.updateItemDisposition(id!, itemId, disposition),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['order', id] }),
     onError: () => toast.error('Error al actualizar disposición'),
+  })
+
+  const markPicked = useMutation({
+    mutationFn: ({ itemId, picked }: { itemId: string; picked: boolean }) =>
+      ordersApi.pickItem(id!, itemId, picked),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['order', id] }),
+    onError: () => toast.error('Error al actualizar'),
   })
 
   const createOP = useMutation({
@@ -286,8 +302,6 @@ export default function OrderDetail() {
     queryFn: () => productsApi.getAll({ pageSize: 200 }),
     enabled: showCreateOP,
   })
-
-  const order = data?.data
 
   const DISPOSITION_LABELS: Record<ItemDisposition, string> = {
     PENDIENTE: 'Pendiente',
@@ -499,13 +513,13 @@ export default function OrderDetail() {
               <div className="flex gap-2 mt-1">
                 <input
                   type="text"
-                  value={order.guideNumber ?? guideNumber}
-                  onChange={(e) => setGuideNumber(e.target.value)}
+                  value={guideNumberDraft}
+                  onChange={(e) => setGuideNumberDraft(e.target.value)}
                   placeholder="Ingrese número de guía"
                   className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
                 <button
-                  onClick={() => updateOrder.mutate({ guideNumber })}
+                  onClick={() => updateOrder.mutate({ guideNumber: guideNumberDraft })}
                   className="px-3 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm transition-colors"
                 >
                   <Check size={14} />
@@ -521,15 +535,41 @@ export default function OrderDetail() {
             <Package size={16} className="text-blue-600" />
             Productos ({order.items?.length ?? 0})
           </h2>
+          {/* Bypass banner: todos los ítems en STOCK */}
+          {order.status === 'CONFIRMADO' &&
+            (order.items ?? []).length > 0 &&
+            (order.items ?? []).every(i => i.disposition === 'STOCK') && (
+            <div className="mb-3 flex items-center justify-between gap-3 p-3 bg-green-50 border border-green-200 rounded-xl">
+              <div className="flex items-center gap-2">
+                <span className="text-lg">🟢</span>
+                <div>
+                  <p className="text-sm font-semibold text-green-800">Todos los productos están en stock</p>
+                  <p className="text-xs text-green-600">No requiere producción — puede avanzar directo a Empacado</p>
+                </div>
+              </div>
+              <button
+                onClick={() => updateStatus.mutate('EMPACADO')}
+                disabled={updateStatus.isPending}
+                className="shrink-0 px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-semibold rounded-lg transition-colors disabled:opacity-50"
+              >
+                → Empacar ahora
+              </button>
+            </div>
+          )}
           <div className="space-y-2">
             {(order.items ?? []).map((item) => {
               const disp: ItemDisposition = item.disposition ?? 'PENDIENTE'
               return (
                 <div key={item.id} className="p-3 bg-gray-50 rounded-lg space-y-2">
                   <div className="flex items-center gap-3">
-                    <div className={`w-5 h-5 rounded flex items-center justify-center shrink-0 ${item.picked ? 'bg-green-500' : 'bg-gray-200'}`}>
-                      {item.picked && <Check size={12} className="text-white" />}
-                    </div>
+                    <button
+                      onClick={() => markPicked.mutate({ itemId: item.id, picked: !item.picked })}
+                      disabled={markPicked.isPending}
+                      title={item.picked ? 'Marcar como pendiente' : 'Marcar como recolectado'}
+                      className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 transition-colors border-2 ${item.picked ? 'bg-green-500 border-green-500 text-white' : 'bg-white border-gray-300 hover:border-green-400 text-transparent hover:text-green-400'}`}
+                    >
+                      <Check size={12} />
+                    </button>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-gray-900 truncate">{item.product?.name}</p>
                       <p className="text-xs text-gray-500">{item.product?.reference} · x{item.qty} · Stock: {item.product?.stock ?? '—'}</p>
@@ -564,37 +604,50 @@ export default function OrderDetail() {
       {/* Photo upload */}
       <div className="bg-white rounded-xl border border-gray-200 p-5">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="font-semibold text-gray-900">Evidencia de Empaque</h2>
-          <button
-            onClick={() => fileRef.current?.click()}
-            className="flex items-center gap-2 px-3 py-1.5 border border-gray-200 rounded-lg text-sm hover:bg-gray-50 transition-colors"
-          >
-            <Upload size={14} />
-            Subir Foto
-          </button>
-          <input
-            ref={fileRef}
-            type="file"
-            accept="image/*"
-            capture="environment"
-            className="hidden"
-            onChange={(e) => {
-              const file = e.target.files?.[0]
-              if (file) uploadPhoto.mutate(file)
-            }}
-          />
+          <h2 className="font-semibold text-gray-900">Fotos del Pedido</h2>
+          <div className="flex gap-2">
+            <button
+              onClick={() => fileRef.current?.click()}
+              className="flex items-center gap-1.5 px-3 py-1.5 border border-gray-200 rounded-lg text-xs hover:bg-gray-50 transition-colors"
+            >
+              <Upload size={12} />📦 Empaque
+            </button>
+            <button
+              onClick={() => remiteRef.current?.click()}
+              className="flex items-center gap-1.5 px-3 py-1.5 border border-blue-200 bg-blue-50 rounded-lg text-xs hover:bg-blue-100 transition-colors text-blue-700"
+            >
+              <Upload size={12} />🏷️ Remite
+            </button>
+          </div>
+          <input ref={fileRef} type="file" accept="image/*" capture="environment" className="hidden"
+            onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadPhoto.mutate({ file: f, phase: 'EMPAQUE' }) }} />
+          <input ref={remiteRef} type="file" accept="image/*" capture="environment" className="hidden"
+            onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadPhoto.mutate({ file: f, phase: 'REMITE' }) }} />
         </div>
         {(order.photos ?? []).length > 0 ? (
-          <div className="grid grid-cols-5 gap-3">
-            {(order.photos ?? []).map((photo: { id?: string; url: string }, i: number) => (
-              <img key={photo.id ?? i} src={typeof photo === 'string' ? photo : photo.url} alt={`Foto ${i + 1}`}
-                className="w-full aspect-square object-cover rounded-lg border border-gray-200" />
-            ))}
+          <div className="space-y-3">
+            {(['EMPAQUE', 'REMITE', ''] as const).map((phase) => {
+              const label = phase === 'EMPAQUE' ? '📦 Empaque' : phase === 'REMITE' ? '🏷️ Remite/Destino' : '📷 Sin categoría'
+              const photos = (order.photos ?? []).filter((p: { phase?: string }) => (p.phase ?? '') === phase)
+              if (photos.length === 0) return null
+              return (
+                <div key={phase || 'none'}>
+                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1.5">{label}</p>
+                  <div className="grid grid-cols-4 gap-2">
+                    {photos.map((photo: { id?: string; url: string }, i: number) => (
+                      <img key={photo.id ?? i} src={photo.url} alt={`${label} ${i + 1}`}
+                        className="w-full aspect-square object-cover rounded-lg border border-gray-200 cursor-pointer hover:opacity-90"
+                        onClick={() => window.open(photo.url, '_blank')} />
+                    ))}
+                  </div>
+                </div>
+              )
+            })}
           </div>
         ) : (
           <div className="border-2 border-dashed border-gray-200 rounded-xl p-8 text-center text-gray-400 text-sm">
             <Upload size={28} className="mx-auto mb-2 opacity-40" />
-            Sin fotos aún
+            Sin fotos — usa los botones arriba para registrar el empaque y el remite
           </div>
         )}
       </div>

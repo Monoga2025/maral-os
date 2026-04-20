@@ -130,6 +130,25 @@ router.post('/movement', async (req: AuthRequest, res: Response) => {
       },
     });
 
+    // Check if stock hit critical level after movement
+    if (updatedProduct.stock <= updatedProduct.minStock && updatedProduct.minStock > 0) {
+      const waKey = process.env.EVOLUTION_API_KEY ?? '';
+      const waUrl = process.env.EVOLUTION_API_URL ?? '';
+      const adminPhone = process.env.ADMIN_WHATSAPP_NUMBER ?? '';
+      if (waKey && waUrl && adminPhone) {
+        try {
+          await fetch(`${waUrl}/message/sendText/maral-info`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'apikey': waKey },
+            body: JSON.stringify({
+              number: adminPhone,
+              text: `🚨 *MARAL OS — Stock Crítico*\n\nProducto: *${updatedProduct.name}* (${updatedProduct.reference})\nStock actual: *${updatedProduct.stock}* ${updatedProduct.unit}\nStock mínimo: ${updatedProduct.minStock}\n\nSe recomienda reabastecer.`,
+            }),
+          });
+        } catch { /* silent — no bloquear la operación */ }
+      }
+    }
+
     res.status(201).json({
       movement,
       product: { id: updatedProduct.id, reference: updatedProduct.reference, stock: updatedProduct.stock },
