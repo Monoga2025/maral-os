@@ -8,7 +8,7 @@ import { CommandPalette } from '../CommandPalette'
 
 export default function AppLayout() {
   return (
-    <div className="flex h-screen overflow-hidden bg-[#F8FAFC]">
+    <div className="flex bg-[#F8FAFC]" style={{ height: '100dvh' }}>
       <div className="relative shrink-0">
         <Sidebar />
       </div>

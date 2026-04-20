@@ -1,5 +1,4 @@
-import { useEffect } from 'react'
-import { useMutation } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { Sparkles, RefreshCw, AlertTriangle, CheckCircle2, ArrowRight, Zap } from 'lucide-react'
 import api from '../../lib/api'
@@ -62,18 +61,18 @@ function SkeletonRow({ w }: { w: string }) {
 
 export function DailyBriefing() {
   const navigate = useNavigate()
+  const qc = useQueryClient()
 
-  const mutation = useMutation({
-    mutationFn: () => api.post<Briefing>('/ai/briefing', {}).then((r) => r.data),
+  const query = useQuery<Briefing | null>({
+    queryKey: ['ai-briefing'],
+    queryFn: () => api.post<Briefing | null>('/ai/briefing', {}).then((r) => r.data),
+    staleTime: 15 * 60 * 1000,   // no re-fetch por 15 min aunque navegues
+    gcTime:    30 * 60 * 1000,   // mantiene en caché 30 min
+    retry: 2,
+    refetchOnWindowFocus: false,
   })
 
-  // Auto-load once on mount
-  useEffect(() => {
-    mutation.mutate()
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-
-  const briefing = mutation.data
+  const briefing = query.data ?? null
   const moodCfg = briefing ? MOOD_BAR[briefing.mood] : null
   const urgentes = briefing?.actions.filter(a => a.priority === 'URGENTE') ?? []
   const normales = briefing?.actions.filter(a => a.priority !== 'URGENTE') ?? []
@@ -91,7 +90,7 @@ export function DailyBriefing() {
             {briefing && moodCfg && (
               <p className="text-slate-300 text-[11px]">{moodCfg.label}</p>
             )}
-            {mutation.isPending && (
+            {query.isFetching && (
               <div className="flex items-center gap-1.5 mt-0.5">
                 <PulseDot />
                 <p className="text-slate-400 text-[11px]">Analizando el negocio...</p>
@@ -101,19 +100,19 @@ export function DailyBriefing() {
         </div>
         {briefing && (
           <button
-            onClick={() => mutation.mutate()}
-            disabled={mutation.isPending}
+            onClick={() => qc.invalidateQueries({ queryKey: ['ai-briefing'] })}
+            disabled={query.isFetching}
             title="Actualizar análisis"
             className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white text-xs font-medium transition-colors disabled:opacity-40"
           >
-            <RefreshCw className={`h-3.5 w-3.5 ${mutation.isPending ? 'animate-spin' : ''}`} />
-            {!mutation.isPending && 'Actualizar'}
+            <RefreshCw className={`h-3.5 w-3.5 ${query.isFetching ? 'animate-spin' : ''}`} />
+            {!query.isFetching && 'Actualizar'}
           </button>
         )}
       </div>
 
       {/* Mood progress bar */}
-      {moodCfg && !mutation.isPending && (
+      {moodCfg && !query.isFetching && (
         <div className="h-0.5 w-full bg-gray-100">
           <div className={`h-full w-full ${moodCfg.bg} transition-all`} />
         </div>
@@ -123,7 +122,7 @@ export function DailyBriefing() {
       <div className="p-4 space-y-3">
 
         {/* Loading skeletons */}
-        {mutation.isPending && (
+        {query.isFetching && (
           <div className="space-y-2.5">
             <SkeletonRow w="w-full" />
             <SkeletonRow w="w-5/6" />
@@ -132,9 +131,9 @@ export function DailyBriefing() {
         )}
 
         {/* Error */}
-        {mutation.isError && !mutation.isPending && (() => {
-          const errMsg = axios.isAxiosError(mutation.error)
-            ? (mutation.error.response?.data as { error?: string })?.error
+        {query.isError && !query.isFetching && (() => {
+          const errMsg = axios.isAxiosError(query.error)
+            ? (query.error.response?.data as { error?: string })?.error
             : ''
           const isQuota = errMsg === 'QUOTA_EXCEEDED'
           return (
@@ -152,7 +151,7 @@ export function DailyBriefing() {
               </div>
               {!isQuota && (
                 <button
-                  onClick={() => mutation.mutate()}
+                  onClick={() => qc.invalidateQueries({ queryKey: ['ai-briefing'] })}
                   className="shrink-0 text-xs font-semibold text-amber-700 hover:text-amber-900 bg-amber-100 hover:bg-amber-200 px-3 py-1.5 rounded-lg transition-colors"
                 >
                   Reintentar
@@ -163,12 +162,12 @@ export function DailyBriefing() {
         })()}
 
         {/* Greeting */}
-        {briefing && !mutation.isPending && (
+        {briefing && !query.isFetching && (
           <p className="text-sm font-medium text-gray-700 px-0.5">{briefing.greeting}</p>
         )}
 
         {/* All good state */}
-        {briefing && briefing.actions.length === 0 && !mutation.isPending && (
+        {briefing && briefing.actions.length === 0 && !query.isFetching && (
           <div className="flex items-center gap-3 p-4 bg-green-50 border border-green-100 rounded-xl">
             <CheckCircle2 className="h-6 w-6 text-green-500 shrink-0" />
             <div>
@@ -179,7 +178,7 @@ export function DailyBriefing() {
         )}
 
         {/* URGENTE actions */}
-        {urgentes.length > 0 && !mutation.isPending && (
+        {urgentes.length > 0 && !query.isFetching && (
           <div className="space-y-2">
             {urgentes.map((action, i) => {
               const cfg = PRIORITY_CONFIG[action.priority]
@@ -205,7 +204,7 @@ export function DailyBriefing() {
         )}
 
         {/* NORMAL / INFO actions */}
-        {normales.length > 0 && !mutation.isPending && (
+        {normales.length > 0 && !query.isFetching && (
           <div className="space-y-1.5">
             {normales.map((action, i) => {
               const cfg = PRIORITY_CONFIG[action.priority]
@@ -226,7 +225,7 @@ export function DailyBriefing() {
         )}
 
         {/* Insight */}
-        {briefing?.insight && !mutation.isPending && (
+        {briefing?.insight && !query.isFetching && (
           <div className="flex items-start gap-2 px-3 py-2.5 bg-indigo-50/70 border border-indigo-100 rounded-xl">
             <Sparkles className="h-3.5 w-3.5 text-indigo-400 shrink-0 mt-0.5" />
             <p className="text-xs text-indigo-700 leading-relaxed">{briefing.insight}</p>
