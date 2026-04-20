@@ -54,7 +54,7 @@ export default function Production() {
       qty: newQty,
       phase: newPhase as never,
       assignedTo: newAssignee,
-      requiredDate: newRequired || undefined,
+      requiredDate: newRequired ? new Date(newRequired + 'T12:00:00').toISOString() : undefined,
     } as never),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['production'] })
