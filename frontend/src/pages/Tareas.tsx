@@ -11,6 +11,23 @@ import { Button } from '../components/ui/Button'
 import { TourButton } from '../components/tour/TourButton'
 import type { Task, TaskStatus, TaskPriority, User } from '../types'
 
+// Colores de avatar determinísticos por inicial
+const AVATAR_PALETTE = [
+  'bg-blue-600', 'bg-violet-600', 'bg-emerald-600', 'bg-orange-500',
+  'bg-pink-600',  'bg-teal-600',  'bg-red-600',    'bg-indigo-600',
+]
+function avatarColor(name: string) {
+  return AVATAR_PALETTE[(name.charCodeAt(0) || 0) % AVATAR_PALETTE.length]
+}
+function UserAvatar({ name, size = 'sm' }: { name: string; size?: 'xs' | 'sm' | 'md' }) {
+  const dim = size === 'xs' ? 'h-5 w-5 text-[10px]' : size === 'sm' ? 'h-6 w-6 text-xs' : 'h-8 w-8 text-sm'
+  return (
+    <div className={`flex shrink-0 items-center justify-center rounded-full font-bold text-white ${dim} ${avatarColor(name)}`}>
+      {name[0].toUpperCase()}
+    </div>
+  )
+}
+
 const PRIORITY_LABELS: Record<TaskPriority, string> = {
   URGENTE: 'Urgente',
   NORMAL: 'Normal',
@@ -119,8 +136,8 @@ export default function Tareas() {
   })
 
   const { data: users } = useQuery<User[]>({
-    queryKey: ['users'],
-    queryFn: () => api.get<User[]>('/users').then((r) => r.data),
+    queryKey: ['users-assignable'],
+    queryFn: () => api.get<User[]>('/users/assignable').then((r) => r.data),
     staleTime: 60_000,
   })
 
@@ -156,6 +173,7 @@ export default function Tareas() {
     onError: () => toast.error('No se pudo eliminar la tarea'),
   })
 
+  const canCreate = user?.role !== 'LOGISTICA'
   const canDelete = (task: Task) =>
     user?.role === 'GERENTE' || task.createdById === user?.id
 
@@ -203,9 +221,11 @@ export default function Tareas() {
               Lista
             </button>
           </div>
-          <Button data-tour="tasks-new-btn" leftIcon={<Plus className="h-4 w-4" />} onClick={() => { setForm({ ...DEFAULT_FORM, dueDate: todayISO() }); setShowModal(true) }}>
-            Nueva Tarea
-          </Button>
+          {canCreate && (
+            <Button data-tour="tasks-new-btn" leftIcon={<Plus className="h-4 w-4" />} onClick={() => { setForm({ ...DEFAULT_FORM, dueDate: todayISO() }); setShowModal(true) }}>
+              Nueva Tarea
+            </Button>
+          )}
         </div>
       </div>
 
@@ -260,37 +280,47 @@ export default function Tareas() {
               { priority: 'NORMAL',  label: '🔵 Normal',  bg: 'bg-blue-50', border: 'border-blue-200', badge: 'bg-blue-100 text-blue-700' },
               { priority: 'DESPUES', label: '⚪ Después', bg: 'bg-gray-50',  border: 'border-gray-200',  badge: 'bg-gray-100 text-gray-600' },
             ] as const).map(({ priority, label, bg, border, badge }) => {
-              const col = (tasks ?? []).filter(t => t.priority === priority && t.status !== 'COMPLETADA' && t.status !== 'CANCELADA')
+              const active = (tasks ?? []).filter(t => t.priority === priority && t.status !== 'COMPLETADA' && t.status !== 'CANCELADA')
+              const done   = (tasks ?? []).filter(t => t.priority === priority && (t.status === 'COMPLETADA' || t.status === 'CANCELADA'))
+              const col = [...active, ...done]
               return (
                 <div key={priority} className={`rounded-xl border ${border} ${bg} p-3 min-h-[200px]`}>
                   <div className="flex items-center justify-between mb-3">
                     <h3 className="text-sm font-semibold text-gray-700">{label}</h3>
-                    <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${badge}`}>{col.length}</span>
+                    <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${badge}`}>{active.length}</span>
                   </div>
                   <div className="space-y-2">
                     {col.length === 0 && (
                       <p className="text-xs text-gray-400 text-center py-6">Sin tareas</p>
                     )}
                     {col.map((task) => {
-                      const isOverdue = task.dueDate && new Date(task.dueDate) < new Date()
+                      const isDone = task.status === 'COMPLETADA' || task.status === 'CANCELADA'
+                      const isOverdue = !isDone && task.dueDate && new Date(task.dueDate) < new Date()
                       return (
-                        <div key={task.id} className="bg-white rounded-lg border border-gray-200 p-3 shadow-sm">
+                        <div key={task.id} className={`rounded-lg border p-3 shadow-sm transition-all ${isDone ? 'bg-gray-50 border-gray-100 opacity-60' : 'bg-white border-gray-200'}`}>
                           <div className="flex items-start gap-2">
                             <button
-                              onClick={() => { if (task.status !== 'COMPLETADA') completeMutation.mutate(task.id) }}
-                              disabled={task.status === 'COMPLETADA'}
-                              className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 border-gray-300 hover:border-green-500 hover:bg-green-50 transition-colors"
+                              onClick={() => { if (!isDone) completeMutation.mutate(task.id) }}
+                              disabled={isDone}
+                              className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition-colors ${isDone ? 'border-green-400 bg-green-400' : 'border-gray-300 hover:border-green-500 hover:bg-green-50'}`}
                             >
-                              {completeMutation.variables === task.id && completeMutation.isPending
+                              {isDone
+                                ? <Check className="h-3 w-3 text-white" />
+                                : completeMutation.variables === task.id && completeMutation.isPending
                                 ? <div className="h-2.5 w-2.5 border border-gray-400 rounded-full border-t-transparent animate-spin" />
                                 : null}
                             </button>
                             <div className="flex-1 min-w-0">
-                              <p className="text-sm font-medium text-gray-900 leading-snug">{task.title}</p>
-                              <div className="flex flex-wrap gap-x-3 mt-1.5 text-xs text-gray-400">
-                                {task.assignedTo && <span>{task.assignedTo.name.split(' ')[0]}</span>}
-                                {task.dueDate && (
-                                  <span className={isOverdue ? 'text-red-500 font-medium' : ''}>
+                              <p className={`text-sm font-medium leading-snug ${isDone ? 'line-through text-gray-400' : 'text-gray-900'}`}>{task.title}</p>
+                              <div className="flex items-center justify-between mt-2">
+                                {task.assignedTo && (
+                                  <div className="flex items-center gap-1.5">
+                                    <UserAvatar name={task.assignedTo.name} size="xs" />
+                                    <span className="text-xs text-gray-500">{task.assignedTo.name.split(' ')[0]}</span>
+                                  </div>
+                                )}
+                                {task.dueDate && !isDone && (
+                                  <span className={`text-[10px] font-medium ${isOverdue ? 'text-red-500' : 'text-gray-400'}`}>
                                     {isOverdue ? '⚠ ' : ''}{formatDate(task.dueDate)}
                                   </span>
                                 )}
@@ -309,13 +339,15 @@ export default function Tareas() {
                       )
                     })}
                   </div>
-                  <button
-                    onClick={() => { setForm({ ...DEFAULT_FORM, priority, dueDate: todayISO() }); setShowModal(true) }}
-                    className="mt-2 w-full flex items-center justify-center gap-1 text-xs text-gray-400 hover:text-gray-600 py-2 rounded-lg border border-dashed border-gray-300 hover:border-gray-400 transition-colors"
-                  >
-                    <Plus className="h-3 w-3" />
-                    Añadir
-                  </button>
+                  {canCreate && (
+                    <button
+                      onClick={() => { setForm({ ...DEFAULT_FORM, priority, dueDate: todayISO() }); setShowModal(true) }}
+                      className="mt-2 w-full flex items-center justify-center gap-1 text-xs text-gray-400 hover:text-gray-600 py-2 rounded-lg border border-dashed border-gray-300 hover:border-gray-400 transition-colors"
+                    >
+                      <Plus className="h-3 w-3" />
+                      Añadir
+                    </button>
+                  )}
                 </div>
               )
             })}
@@ -381,9 +413,12 @@ export default function Tareas() {
                   {task.description && (
                     <p className="text-sm text-gray-500 mt-0.5 line-clamp-2">{task.description}</p>
                   )}
-                  <div className="flex flex-wrap gap-x-4 mt-2 text-xs text-gray-400">
+                  <div className="flex flex-wrap items-center gap-x-4 mt-2 text-xs text-gray-400">
                     {task.assignedTo && (
-                      <span>Asignada a: <span className="text-gray-600 font-medium">{task.assignedTo.name}</span></span>
+                      <span className="flex items-center gap-1.5">
+                        <UserAvatar name={task.assignedTo.name} size="xs" />
+                        <span className="text-gray-600 font-medium">{task.assignedTo.name.split(' ')[0]}</span>
+                      </span>
                     )}
                     {task.dueDate && (
                       <span>Vence: <span className="text-gray-600">{formatDate(task.dueDate)}</span></span>
@@ -410,8 +445,8 @@ export default function Tareas() {
         </div>
       ) : null}
 
-      {/* Create modal */}
-      {showModal && (
+      {/* Create modal — solo GERENTE y VENTAS */}
+      {showModal && canCreate && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
           <div className="w-full max-w-lg rounded-2xl bg-white shadow-2xl">
             <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4">
@@ -496,31 +531,33 @@ export default function Tareas() {
               <div>
                 <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Asignar a</p>
                 <div className="flex flex-wrap gap-2">
+                  {/* Yo */}
                   <button
                     type="button"
-                    onClick={() => setForm({ ...form, assignedToId: '' })}
-                    className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-medium transition-all ${
-                      !form.assignedToId ? 'bg-blue-600 text-white border-transparent shadow-sm' : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
+                    onClick={() => setForm({ ...form, assignedToId: user!.id })}
+                    className={`flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm font-medium transition-all ${
+                      form.assignedToId === user?.id || !form.assignedToId
+                        ? 'border-transparent shadow-sm ring-2 ring-blue-200 bg-white'
+                        : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
                     }`}
                   >
-                    <span className="flex h-5 w-5 items-center justify-center rounded-full bg-white/20 text-xs font-bold">
-                      {user?.name?.[0] ?? 'Y'}
-                    </span>
-                    Yo
+                    <UserAvatar name={user?.name ?? 'Y'} size="xs" />
+                    <span className="text-gray-700">Yo ({user?.name?.split(' ')[0]})</span>
                   </button>
+                  {/* Otros usuarios */}
                   {users?.filter((u) => u.id !== user?.id).map((u) => (
                     <button
                       key={u.id}
                       type="button"
                       onClick={() => setForm({ ...form, assignedToId: u.id })}
-                      className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-medium transition-all ${
-                        form.assignedToId === u.id ? 'bg-blue-600 text-white border-transparent shadow-sm' : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
+                      className={`flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm font-medium transition-all ${
+                        form.assignedToId === u.id
+                          ? 'border-transparent shadow-sm ring-2 ring-blue-200 bg-white'
+                          : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
                       }`}
                     >
-                      <span className={`flex h-5 w-5 items-center justify-center rounded-full text-xs font-bold ${form.assignedToId === u.id ? 'bg-white/20 text-white' : 'bg-blue-100 text-blue-700'}`}>
-                        {u.name[0]}
-                      </span>
-                      {u.name.split(' ')[0]}
+                      <UserAvatar name={u.name} size="xs" />
+                      <span className="text-gray-700">{u.name.split(' ')[0]}</span>
                     </button>
                   ))}
                 </div>

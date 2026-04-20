@@ -34,11 +34,16 @@ router.get('/', async (req: AuthRequest, res: Response) => {
     if (clientId) where.clientId = clientId;
     if (orderId) where.orderId = orderId;
 
-    // Cada usuario solo ve sus tareas (asignadas o creadas), excepto GERENTE
-    if (req.user!.role !== 'GERENTE') {
+    // Visibilidad: GERENTE ve todo; VENTAS ve GERENTE+VENTAS; LOGISTICA solo las suyas
+    if (req.user!.role === 'LOGISTICA') {
       where.OR = [
         { assignedToId: req.user!.userId },
         { createdById: req.user!.userId },
+      ];
+    } else if (req.user!.role === 'VENTAS') {
+      where.OR = [
+        { assignedTo: { role: { in: ['GERENTE', 'VENTAS'] } } },
+        { createdBy: { role: { in: ['GERENTE', 'VENTAS'] } } },
       ];
     }
 
@@ -65,6 +70,10 @@ router.get('/', async (req: AuthRequest, res: Response) => {
 
 // POST /api/tasks
 router.post('/', async (req: AuthRequest, res: Response) => {
+  if (req.user!.role === 'LOGISTICA') {
+    res.status(403).json({ error: 'Solo GERENTE y VENTAS pueden crear y asignar tareas' });
+    return;
+  }
   try {
     const validation = taskSchema.safeParse(req.body);
     if (!validation.success) {
@@ -132,6 +141,10 @@ router.get('/:id', async (req: AuthRequest, res: Response) => {
 
 // PUT /api/tasks/:id
 router.put('/:id', async (req: AuthRequest, res: Response) => {
+  if (req.user!.role === 'LOGISTICA') {
+    res.status(403).json({ error: 'Solo GERENTE y VENTAS pueden modificar tareas' });
+    return;
+  }
   try {
     const existing = await prisma.task.findUnique({ where: { id: req.params.id } });
     if (!existing) {

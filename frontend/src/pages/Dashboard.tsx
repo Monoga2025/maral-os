@@ -36,6 +36,7 @@ import { KPICard } from '../components/ui/KPICard'
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card'
 import { PageSkeleton } from '../components/ui/LoadingSkeleton'
 import { useNavigate } from 'react-router-dom'
+import { useAuthStore } from '../store/auth'
 import { TourButton } from '../components/tour/TourButton'
 import { DailyBriefing } from '../components/ui/DailyBriefing'
 
@@ -48,6 +49,7 @@ const lineLabels: Record<string, string> = {
 
 export default function Dashboard() {
   const navigate = useNavigate()
+  const user = useAuthStore((s) => s.user)
   const { data, isLoading, isFetching } = useQuery({
     queryKey: ['dashboard'],
     queryFn: () => dashboardApi.getSummary().then((r) => r.data),
@@ -110,6 +112,46 @@ export default function Dashboard() {
           <span className="text-sm font-medium text-gray-600">Sistema operativo</span>
         </div>
       </div>
+
+      {/* Panel de inicio rápido para VENTAS */}
+      {user?.role === 'VENTAS' && (
+        <div className="rounded-2xl bg-gradient-to-r from-blue-600 to-blue-700 p-5 text-white shadow-md">
+          <p className="text-xs font-semibold uppercase tracking-widest text-blue-200 mb-1">¿Qué vas a hacer hoy?</p>
+          <p className="text-lg font-bold mb-4">Hola, {user.name?.split(' ')[0]} 👋 — elige una tarea para empezar</p>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <button
+              onClick={() => navigate('/cotizaciones/nueva')}
+              className="flex items-center gap-3 bg-white/15 hover:bg-white/25 transition-colors rounded-xl p-4 text-left"
+            >
+              <span className="text-3xl">📝</span>
+              <div>
+                <p className="font-semibold text-white">Nueva cotización</p>
+                <p className="text-xs text-blue-100 mt-0.5">4 pasos, tarda 2 minutos</p>
+              </div>
+            </button>
+            <button
+              onClick={() => navigate('/cotizaciones?status=ENVIADA')}
+              className="flex items-center gap-3 bg-white/15 hover:bg-white/25 transition-colors rounded-xl p-4 text-left"
+            >
+              <span className="text-3xl">📞</span>
+              <div>
+                <p className="font-semibold text-white">Hacer seguimiento</p>
+                <p className="text-xs text-blue-100 mt-0.5">Ver cotizaciones enviadas</p>
+              </div>
+            </button>
+            <button
+              onClick={() => navigate('/cotizaciones?status=APROBADA')}
+              className="flex items-center gap-3 bg-white/15 hover:bg-white/25 transition-colors rounded-xl p-4 text-left"
+            >
+              <span className="text-3xl">✅</span>
+              <div>
+                <p className="font-semibold text-white">Convertir a pedido</p>
+                <p className="text-xs text-blue-100 mt-0.5">Cotizaciones aprobadas</p>
+              </div>
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* AI Daily Briefing */}
       <DailyBriefing />

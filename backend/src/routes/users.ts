@@ -46,6 +46,21 @@ router.get('/', requireRole('GERENTE'), async (_req: AuthRequest, res: Response)
   }
 });
 
+// GET /api/users/assignable — lista mínima para asignar tareas (todos los autenticados)
+router.get('/assignable', async (_req: AuthRequest, res: Response) => {
+  try {
+    const users = await prisma.user.findMany({
+      where: { active: true },
+      select: { id: true, name: true, role: true },
+      orderBy: { name: 'asc' },
+    });
+    res.json(users);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Error al obtener usuarios' });
+  }
+});
+
 // GET /api/users/:id
 router.get('/:id', requireRole('GERENTE'), async (req: AuthRequest, res: Response) => {
   try {

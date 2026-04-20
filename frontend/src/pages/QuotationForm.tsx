@@ -8,10 +8,11 @@ import {
   Search,
   Trash2,
   Plus,
+  Minus,
   Check,
-  Send,
   FileText,
   Package,
+  Pencil,
   X,
 } from 'lucide-react'
 import { toast } from 'sonner'
@@ -168,6 +169,9 @@ export default function QuotationForm() {
   const [items, setItems] = useState<LineItem[]>([])
   const [applyTax, setApplyTax] = useState(true)
   const [initialized, setInitialized] = useState(false)
+
+  const [editingPriceId, setEditingPriceId] = useState<string | null>(null)
+  const [finalPriceInputs, setFinalPriceInputs] = useState<Record<string, string>>({})
 
   const [kitEditorProduct, setKitEditorProduct] = useState<Product | null>(null)
   const [kitEditorComponents, setKitEditorComponents] = useState<ProductComponent[]>([])
@@ -419,35 +423,58 @@ export default function QuotationForm() {
       </div>
 
       {/* Step indicator */}
-      <div className="flex items-center gap-2">
-        {['Cliente', 'Productos', 'Condiciones'].map((label, i) => {
-          const stepNum = i + 1
-          const isActive = step === stepNum
-          const isDone = step > stepNum
-          return (
-            <div key={label} className="flex items-center gap-2">
-              <div
-                className={`flex h-8 w-8 items-center justify-center rounded-full text-sm font-semibold transition-all ${
-                  isDone
-                    ? 'bg-green-500 text-white'
-                    : isActive
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-gray-100 text-gray-400'
-                }`}
-              >
-                {isDone ? <Check className="h-4 w-4" /> : stepNum}
-              </div>
-              <span className={`text-sm font-medium ${isActive ? 'text-gray-900' : 'text-gray-400'}`}>
-                {label}
-              </span>
-              {i < 2 && <div className="mx-2 h-px w-12 bg-gray-200" />}
+      {(() => {
+        const STEPS_CONFIG = [
+          { emoji: '👤', label: 'Cliente', desc: '¿Para quién?' },
+          { emoji: '📦', label: 'Productos', desc: '¿Qué va a comprar?' },
+          { emoji: '⚙️', label: 'Pago', desc: '¿Cómo paga?' },
+          { emoji: '✅', label: 'Confirmar', desc: 'Revisa y listo' },
+        ]
+        return (
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
+            <div className="flex items-center justify-between">
+              {STEPS_CONFIG.map((s, i) => {
+                const stepNum = i + 1
+                const isActive = step === stepNum
+                const isDone = step > stepNum
+                return (
+                  <div key={s.label} className="flex items-center flex-1">
+                    <div className="flex flex-col items-center flex-1">
+                      <div className={`flex h-9 w-9 sm:h-11 sm:w-11 items-center justify-center rounded-full text-base sm:text-lg font-semibold transition-all mb-1 ${
+                        isDone ? 'bg-green-500 text-white shadow-sm' :
+                        isActive ? 'bg-blue-600 text-white shadow-md ring-4 ring-blue-100' :
+                        'bg-gray-100 text-gray-400'
+                      }`}>
+                        {isDone ? <Check className="h-4 w-4 sm:h-5 sm:w-5" /> : s.emoji}
+                      </div>
+                      <p className={`text-[10px] sm:text-xs font-semibold text-center ${isActive ? 'text-blue-700' : isDone ? 'text-green-600' : 'text-gray-400'}`}>{s.label}</p>
+                      <p className={`hidden sm:block text-[10px] ${isActive ? 'text-gray-500' : 'text-gray-300'}`}>{s.desc}</p>
+                    </div>
+                    {i < 3 && (
+                      <div className={`h-0.5 mx-1 mb-4 flex-shrink-0 ${step > stepNum ? 'bg-green-400' : 'bg-gray-100'}`} style={{width: 16}} />
+                    )}
+                  </div>
+                )
+              })}
             </div>
-          )
-        })}
-      </div>
+            <div className="mt-2 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+              <div className="h-full bg-blue-500 rounded-full transition-all duration-500" style={{width: `${((step - 1) / 3) * 100}%`}} />
+            </div>
+            <p className="text-center text-xs text-gray-400 mt-1">Paso {step} de 4</p>
+          </div>
+        )
+      })()}
 
       {/* ── Step 1: Client ──────────────────────────────────────── */}
       {step === 1 && (
+        <>
+        <div className="bg-blue-50 border border-blue-100 rounded-xl px-4 py-3 flex items-center gap-3">
+          <span className="text-2xl">👤</span>
+          <div>
+            <p className="text-sm font-semibold text-blue-800">Paso 1 — Selecciona el cliente</p>
+            <p className="text-xs text-blue-600">Escribe el nombre o empresa del cliente en el buscador de abajo</p>
+          </div>
+        </div>
         <Card>
           <CardHeader>
             <CardTitle>Seleccionar cliente</CardTitle>
@@ -530,11 +557,19 @@ export default function QuotationForm() {
             </div>
           </CardContent>
         </Card>
+        </>
       )}
 
       {/* ── Step 2: Products ────────────────────────────────────── */}
       {step === 2 && (
         <div className="space-y-4">
+          <div className="bg-green-50 border border-green-100 rounded-xl px-4 py-3 flex items-center gap-3">
+            <span className="text-2xl">📦</span>
+            <div>
+              <p className="text-sm font-semibold text-green-800">Paso 2 — Agrega los productos</p>
+              <p className="text-xs text-green-600">Escribe el nombre del producto y haz clic en él para agregarlo. Puedes cambiar cantidades después.</p>
+            </div>
+          </div>
           <Card>
             <CardHeader>
               <CardTitle>Agregar productos</CardTitle>
@@ -600,12 +635,12 @@ export default function QuotationForm() {
                     <tr>
                       <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Ref</th>
                       <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Producto</th>
-                      <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase w-24">Cant.</th>
-                      <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase w-32">Precio</th>
-                      <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase w-20">
+                      <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase w-32">Cant.</th>
+                      <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase w-36">Precio</th>
+                      <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase w-56">
                         <span className="inline-flex items-center gap-1">
-                          Desc. %{' '}
-                          <Hint text="Porcentaje de descuento sobre el precio. Escribe 0 si no hay descuento." side="top" />
+                          Descuento{' '}
+                          <Hint text="Escribe el % de descuento o el precio final que quieres cobrar — el otro campo se calcula solo." side="top" />
                         </span>
                       </th>
                       <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase w-32">Subtotal</th>
@@ -627,33 +662,120 @@ export default function QuotationForm() {
                               {item.product.name}
                             </div>
                           </td>
-                          <td className="px-4 py-2">
-                            <input
-                              type="number"
-                              min="1"
-                              value={item.quantity}
-                              onChange={(e) => updateItem(item.productId, 'quantity', Number(e.target.value))}
-                              className="w-full text-center rounded border border-gray-200 px-2 py-1 text-sm focus:border-blue-500 focus:outline-none"
-                            />
+                          {/* Cantidad con flechas */}
+                          <td className="px-2 py-2">
+                            <div className="flex items-center justify-center gap-1">
+                              <button
+                                type="button"
+                                onClick={() => updateItem(item.productId, 'quantity', Math.max(1, item.quantity - 1))}
+                                className="flex h-7 w-7 items-center justify-center rounded-lg border border-gray-200 text-gray-500 hover:border-blue-400 hover:text-blue-600 transition-colors"
+                              >
+                                <Minus className="h-3 w-3" />
+                              </button>
+                              <input
+                                type="number"
+                                min="1"
+                                value={item.quantity}
+                                onChange={(e) => updateItem(item.productId, 'quantity', Math.max(1, Number(e.target.value)))}
+                                className="w-10 text-center rounded border border-gray-200 px-1 py-1 text-sm focus:border-blue-500 focus:outline-none"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => updateItem(item.productId, 'quantity', item.quantity + 1)}
+                                className="flex h-7 w-7 items-center justify-center rounded-lg border border-gray-200 text-gray-500 hover:border-blue-400 hover:text-blue-600 transition-colors"
+                              >
+                                <Plus className="h-3 w-3" />
+                              </button>
+                            </div>
                           </td>
+                          {/* Precio fijo con lápiz para editar */}
                           <td className="px-4 py-2">
-                            <input
-                              type="number"
-                              min="0"
-                              value={item.unitPrice}
-                              onChange={(e) => updateItem(item.productId, 'unitPrice', Number(e.target.value))}
-                              className="w-full text-right rounded border border-gray-200 px-2 py-1 text-sm focus:border-blue-500 focus:outline-none"
-                            />
+                            {editingPriceId === item.productId ? (
+                              <input
+                                type="number"
+                                min="0"
+                                autoFocus
+                                value={item.unitPrice}
+                                onChange={(e) => updateItem(item.productId, 'unitPrice', Number(e.target.value))}
+                                onBlur={() => setEditingPriceId(null)}
+                                onKeyDown={(e) => e.key === 'Enter' && setEditingPriceId(null)}
+                                className="w-28 text-right rounded border border-blue-400 px-2 py-1 text-sm focus:outline-none"
+                              />
+                            ) : (
+                              <div className="flex items-center justify-end gap-1.5 group">
+                                <span className="font-medium text-gray-900">{formatCOP(item.unitPrice)}</span>
+                                <button
+                                  type="button"
+                                  onClick={() => setEditingPriceId(item.productId)}
+                                  className="opacity-0 group-hover:opacity-100 transition-opacity text-gray-400 hover:text-blue-500"
+                                >
+                                  <Pencil className="h-3.5 w-3.5" />
+                                </button>
+                              </div>
+                            )}
                           </td>
-                          <td className="px-4 py-2">
-                            <input
-                              type="number"
-                              min="0"
-                              max="100"
-                              value={item.discount}
-                              onChange={(e) => updateItem(item.productId, 'discount', Number(e.target.value))}
-                              className="w-full text-center rounded border border-gray-200 px-2 py-1 text-sm focus:border-blue-500 focus:outline-none"
-                            />
+                          {/* Descuento: % y precio final vinculados */}
+                          <td className="px-2 py-2">
+                            <div className="flex items-center gap-1.5">
+                              <div className="flex items-center gap-0.5">
+                                <input
+                                  type="number"
+                                  min="0"
+                                  max="100"
+                                  step="0.5"
+                                  value={item.discount === 0 ? '' : item.discount}
+                                  placeholder="0"
+                                  onChange={(e) => {
+                                    const pct = Number(e.target.value)
+                                    const newFinal = Math.round(item.unitPrice * (1 - pct / 100))
+                                    updateItem(item.productId, 'discount', pct)
+                                    setFinalPriceInputs((prev) => ({ ...prev, [item.productId]: String(newFinal) }))
+                                  }}
+                                  className="w-14 text-center rounded border border-gray-200 px-1.5 py-1 text-sm text-gray-400 focus:border-blue-400 focus:text-gray-900 focus:outline-none placeholder-gray-300"
+                                />
+                                <span className="text-xs text-gray-400">%</span>
+                              </div>
+                              <span className="text-gray-300 text-xs">·</span>
+                              <div className="flex items-center gap-0.5">
+                                <span className="text-xs text-gray-400">$</span>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  value={
+                                    finalPriceInputs[item.productId] !== undefined
+                                      ? finalPriceInputs[item.productId]
+                                      : item.discount === 0
+                                      ? ''
+                                      : Math.round(item.unitPrice * (1 - item.discount / 100))
+                                  }
+                                  placeholder={formatCOP(item.unitPrice).replace('$\u00a0', '').replace(/\./g, '')}
+                                  onFocus={() =>
+                                    setFinalPriceInputs((prev) => ({
+                                      ...prev,
+                                      [item.productId]: String(Math.round(item.unitPrice * (1 - item.discount / 100))),
+                                    }))
+                                  }
+                                  onChange={(e) => {
+                                    setFinalPriceInputs((prev) => ({ ...prev, [item.productId]: e.target.value }))
+                                  }}
+                                  onBlur={(e) => {
+                                    const finalPrice = Number(e.target.value)
+                                    if (finalPrice > 0 && item.unitPrice > 0) {
+                                      const pct = Math.round(((item.unitPrice - finalPrice) / item.unitPrice) * 10000) / 100
+                                      updateItem(item.productId, 'discount', Math.max(0, Math.min(100, pct)))
+                                    } else if (finalPrice === 0 || e.target.value === '') {
+                                      updateItem(item.productId, 'discount', 0)
+                                    }
+                                    setFinalPriceInputs((prev) => {
+                                      const next = { ...prev }
+                                      delete next[item.productId]
+                                      return next
+                                    })
+                                  }}
+                                  className="w-24 text-right rounded border border-gray-200 px-1.5 py-1 text-sm text-gray-400 focus:border-blue-400 focus:text-gray-900 focus:outline-none placeholder-gray-300"
+                                />
+                              </div>
+                            </div>
                           </td>
                           <td className="px-4 py-2 text-right font-semibold">
                             {formatCOP(item.subtotal)}
@@ -741,6 +863,13 @@ export default function QuotationForm() {
       {/* ── Step 3: Conditions + Shipping ───────────────────────── */}
       {step === 3 && (
         <div className="space-y-4">
+          <div className="bg-purple-50 border border-purple-100 rounded-xl px-4 py-3 flex items-center gap-3">
+            <span className="text-2xl">⚙️</span>
+            <div>
+              <p className="text-sm font-semibold text-purple-800">Paso 3 — Condiciones</p>
+              <p className="text-xs text-purple-600">¿Cuánto tiempo tiene para decidir? ¿Cómo va a pagar? Solo haz clic en las opciones.</p>
+            </div>
+          </div>
           <Card>
             <CardHeader>
               <CardTitle>Condiciones de la cotización</CardTitle>
@@ -924,36 +1053,133 @@ export default function QuotationForm() {
             <Button variant="outline" onClick={() => setStep(2)} leftIcon={<ArrowLeft className="h-4 w-4" />}>
               Atrás
             </Button>
+            <Button
+              onClick={() => setStep(4)}
+              rightIcon={<ArrowRight className="h-4 w-4" />}
+            >
+              Continuar — Revisar cotización
+            </Button>
+          </div>
+        </div>
+      )}
 
-            {isEditMode ? (
-              /* Edit mode: single save button */
-              <Button
-                loading={isSaving}
-                leftIcon={<Check className="h-4 w-4" />}
-                onClick={() => updateMutation.mutate(formData)}
-              >
-                Guardar cambios
-              </Button>
-            ) : (
-              /* Create mode: borrador + enviada */
-              <div className="flex gap-3">
-                <Button
-                  variant="outline"
-                  loading={isSaving}
-                  onClick={() => createMutation.mutate({ status: 'BORRADOR', formData })}
-                >
-                  Guardar borrador
-                </Button>
-                <Button
-                  loading={isSaving}
-                  leftIcon={<Send className="h-4 w-4" />}
-                  title="Se guardará con estado ENVIADA. Úsalo cuando ya la enviaste al cliente por WhatsApp o email"
-                  onClick={() => createMutation.mutate({ status: 'ENVIADA', formData })}
-                >
-                  Guardar y registrar como Enviada
-                </Button>
+      {/* ── Step 4: Confirm & Send ──────────────────────────────── */}
+      {step === 4 && (
+        <div className="space-y-4">
+          {/* Banner */}
+          <div className="bg-emerald-50 border border-emerald-100 rounded-xl px-4 py-3 flex items-center gap-3">
+            <span className="text-2xl">✅</span>
+            <div>
+              <p className="text-sm font-semibold text-emerald-800">Paso 4 — Todo listo</p>
+              <p className="text-xs text-emerald-600">Revisa que todo esté correcto y elige qué hacer con la cotización.</p>
+            </div>
+          </div>
+
+          {/* Preview */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <FileText className="h-4 w-4 text-blue-600" />
+                Resumen de la cotización
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="rounded-xl border border-gray-200 p-5 space-y-4">
+                <div className="flex justify-between">
+                  <div>
+                    <p className="text-xs text-gray-500">Cliente</p>
+                    <p className="font-semibold text-gray-900">{selectedClient?.name}</p>
+                    <p className="text-sm text-gray-600">{selectedClient?.company}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-xs text-gray-500">Válida por</p>
+                    <p className="font-semibold text-gray-900">{formData.validityDays} días</p>
+                    <p className="text-xs text-gray-500 mt-1">{formData.paymentTerms}</p>
+                  </div>
+                </div>
+                <div className="border-t border-gray-100 pt-3">
+                  {items.slice(0, 4).map((item) => (
+                    <div key={item.productId} className="flex justify-between text-sm py-1">
+                      <span className="text-gray-600 flex items-center gap-1">
+                        {item.product.isKit && <Package className="h-3 w-3 text-blue-400" />}
+                        {item.quantity}x {item.product.name}
+                      </span>
+                      <span className="font-medium">{formatCOP(item.subtotal)}</span>
+                    </div>
+                  ))}
+                  {items.length > 4 && (
+                    <p className="text-xs text-gray-400">+{items.length - 4} más</p>
+                  )}
+                </div>
+                <div className="border-t border-gray-100 pt-3 space-y-1 text-sm">
+                  {applyTax && (
+                    <div className="flex justify-between text-gray-500">
+                      <span>IVA (19%)</span>
+                      <span>{formatCOP(taxAmount)}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between font-bold text-gray-900 text-lg pt-1">
+                    <span>Total cotización</span>
+                    <span className="text-blue-700">{formatCOP(total)}</span>
+                  </div>
+                </div>
               </div>
-            )}
+            </CardContent>
+          </Card>
+
+          {/* Save options - crystal clear */}
+          {isEditMode ? (
+            <div>
+              <p className="text-sm font-semibold text-gray-700 mb-3">¿Qué quieres hacer?</p>
+              <button
+                disabled={isSaving}
+                onClick={() => updateMutation.mutate(formData)}
+                className="w-full flex items-start gap-4 p-4 rounded-xl border-2 border-blue-200 bg-blue-50 hover:bg-blue-100 transition-colors text-left"
+              >
+                <span className="text-3xl mt-0.5">💾</span>
+                <div>
+                  <p className="font-semibold text-blue-900">Guardar cambios</p>
+                  <p className="text-sm text-blue-700 mt-0.5">Se actualiza la cotización con los nuevos datos.</p>
+                </div>
+              </button>
+            </div>
+          ) : (
+            <div>
+              <p className="text-sm font-semibold text-gray-700 mb-3">¿Qué quieres hacer con la cotización?</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <button
+                  disabled={isSaving}
+                  onClick={() => createMutation.mutate({ status: 'BORRADOR', formData })}
+                  className="flex items-start gap-4 p-4 rounded-xl border-2 border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50 transition-colors text-left"
+                >
+                  <span className="text-3xl mt-0.5">💾</span>
+                  <div>
+                    <p className="font-semibold text-gray-900">Solo guardar</p>
+                    <p className="text-sm text-gray-500 mt-0.5">La cotización queda guardada. <strong>No se envía al cliente todavía.</strong> Puedes editarla después.</p>
+                  </div>
+                </button>
+                <button
+                  disabled={isSaving}
+                  onClick={() => createMutation.mutate({ status: 'ENVIADA', formData })}
+                  className="flex items-start gap-4 p-4 rounded-xl border-2 border-blue-400 bg-blue-50 hover:bg-blue-100 transition-colors text-left ring-2 ring-blue-100"
+                >
+                  <span className="text-3xl mt-0.5">📤</span>
+                  <div>
+                    <p className="font-semibold text-blue-900">Ya la envié al cliente</p>
+                    <p className="text-sm text-blue-700 mt-0.5">Marca que ya se la enviaste por WhatsApp o correo. Queda registrada como enviada.</p>
+                  </div>
+                </button>
+              </div>
+              {isSaving && (
+                <p className="text-center text-sm text-blue-600 mt-3 animate-pulse">Guardando cotización...</p>
+              )}
+            </div>
+          )}
+
+          <div className="flex items-center justify-start">
+            <Button variant="outline" onClick={() => setStep(3)} leftIcon={<ArrowLeft className="h-4 w-4" />}>
+              Atrás
+            </Button>
           </div>
         </div>
       )}
