@@ -9,8 +9,13 @@ export type ClientCategory =
   | 'FUNDADOR_MARAL'
   | 'ALIADO'
   | 'PROSPECTO'
+  | 'IMPORTADOR'
+  | 'DISTRIBUIDOR'
+  | 'CLIENTE_FINAL'
 
 export type FactoringStatus = 'APROBADO' | 'EN_ESTUDIO' | 'RECHAZADO' | 'NO_APLICA'
+
+export type PurchaseFrequency = 'FRECUENTE' | 'INTERMITENTE' | 'ESPORADICA' | 'NINGUNA'
 
 export type QuotationStatus =
   | 'BORRADOR'
@@ -88,12 +93,15 @@ export interface Client {
   creditUsed: number
   paymentDays: number
   factoringStatus: FactoringStatus
+  purchaseFrequency?: PurchaseFrequency
+  isProvider?: boolean
   active: boolean
   notes?: string
   merlinCode?: string
   createdAt: string
   updatedAt: string
   lastOrderAt?: string
+  lastOrders?: string[]
   totalPurchases?: number
   ordersCount?: number
   /** @deprecated alias for active */

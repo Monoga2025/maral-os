@@ -28,21 +28,59 @@ import { Pagination } from '../components/ui/Pagination'
 import { EmptyState } from '../components/ui/EmptyState'
 import { TableSkeleton } from '../components/ui/LoadingSkeleton'
 import { Card } from '../components/ui/Card'
-import type { ClientCategory } from '../types'
+import type { ClientCategory, PurchaseFrequency } from '../types'
+
+const FREQ_LABELS: Record<PurchaseFrequency, string> = {
+  FRECUENTE: 'Frecuente',
+  INTERMITENTE: 'Intermitente',
+  ESPORADICA: 'Esporádica',
+  NINGUNA: '—',
+}
+
+const FREQ_COLORS: Record<PurchaseFrequency, string> = {
+  FRECUENTE: 'bg-green-100 text-green-700',
+  INTERMITENTE: 'bg-yellow-100 text-yellow-700',
+  ESPORADICA: 'bg-orange-100 text-orange-700',
+  NINGUNA: 'text-gray-400',
+}
+
+function LastOrdersDots({ dates }: { dates?: string[] }) {
+  if (!dates || dates.length === 0) return <span className="text-gray-400 text-xs">Sin pedidos</span>
+  return (
+    <div className="space-y-0.5">
+      {dates.map((d, i) => {
+        const days = Math.floor((Date.now() - new Date(d).getTime()) / 86400000)
+        const color = days <= 30 ? 'text-green-600' : days <= 90 ? 'text-amber-600' : 'text-red-500'
+        return (
+          <p key={i} className={`text-xs ${color}`}>
+            {formatDate(d)}
+          </p>
+        )
+      })}
+    </div>
+  )
+}
 
 export default function Clients() {
   const navigate = useNavigate()
   const [search, setSearch] = useState('')
   const [category, setCategory] = useState('')
+  const [city, setCity] = useState('')
   const [page, setPage] = useState(1)
 
   const { data, isLoading } = useQuery({
-    queryKey: ['clients', { search, category, page }],
+    queryKey: ['clients', { search, category, city, page }],
     queryFn: () =>
       clientsApi
-        .getAll({ search: search || undefined, category: category || undefined, page, pageSize: 20 })
+        .getAll({ search: search || undefined, category: category || undefined, city: city || undefined, page, pageSize: 20 })
         .then((r) => r.data),
     staleTime: 30_000,
+  })
+
+  const { data: cities } = useQuery({
+    queryKey: ['client-cities'],
+    queryFn: () => clientsApi.getCities().then((r) => r.data as string[]),
+    staleTime: 300_000,
   })
 
   const handleWhatsApp = (phone: string, e: React.MouseEvent) => {
@@ -98,10 +136,26 @@ export default function Clients() {
             className="w-48"
           >
             <option value="">Todas las categorías</option>
+            <option value="IMPORTADOR">Importador (IM)</option>
+            <option value="DISTRIBUIDOR">Distribuidor (DS)</option>
+            <option value="CLIENTE_FINAL">Cliente Final (CF)</option>
+            <option value="PROSPECTO">Prospecto</option>
+            <option value="ALIADO">Aliado</option>
             <option value="FUNDADOR_HISTORICO">Fundador Histórico</option>
             <option value="FUNDADOR_MARAL">Fundador Maral</option>
-            <option value="ALIADO">Aliado</option>
-            <option value="PROSPECTO">Prospecto</option>
+          </Select>
+          <Select
+            value={city}
+            onChange={(e) => {
+              setCity(e.target.value)
+              setPage(1)
+            }}
+            className="w-40"
+          >
+            <option value="">Todas las ciudades</option>
+            {(cities ?? []).map((c) => (
+              <option key={c} value={c}>{c}</option>
+            ))}
           </Select>
         </div>
       </Card>
@@ -125,87 +179,93 @@ export default function Clients() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Nombre / Empresa</TableHead>
+                  <TableHead>Contacto</TableHead>
+                  <TableHead>Empresa</TableHead>
                   <TableHead>Ciudad</TableHead>
                   <TableHead>Categoría</TableHead>
-                  <TableHead>Último pedido</TableHead>
+                  <TableHead>Frecuencia</TableHead>
+                  <TableHead>Últimos pedidos</TableHead>
                   <TableHead>Crédito</TableHead>
                   <TableHead className="text-right">Acciones</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {data.data.map((client) => (
-                  <TableRow
-                    key={client.id}
-                    className="cursor-pointer"
-                    onClick={() => navigate(`/clientes/${client.id}`)}
-                  >
-                    <TableCell>
-                      <div>
-                        <p className="font-semibold text-gray-900">
-                          {client.name}
-                        </p>
-                        {client.company && (
-                          <p className="text-xs text-gray-500">{client.company}</p>
+                {data.data.map((client) => {
+                  const freq = (client.purchaseFrequency ?? 'NINGUNA') as PurchaseFrequency
+                  return (
+                    <TableRow
+                      key={client.id}
+                      className="cursor-pointer"
+                      onClick={() => navigate(`/clientes/${client.id}`)}
+                    >
+                      <TableCell>
+                        <div>
+                          <p className="font-semibold text-gray-900">{client.name}</p>
+                          {client.rut && (
+                            <p className="text-xs text-gray-400">NIT: {client.rut}</p>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <span className="text-gray-600">{client.company ?? '—'}</span>
+                      </TableCell>
+                      <TableCell>
+                        <span className="text-gray-600">{client.city ?? '—'}</span>
+                      </TableCell>
+                      <TableCell>
+                        <ClientCategoryBadge category={client.category as ClientCategory} />
+                      </TableCell>
+                      <TableCell>
+                        {freq !== 'NINGUNA' ? (
+                          <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${FREQ_COLORS[freq]}`}>
+                            {FREQ_LABELS[freq]}
+                          </span>
+                        ) : (
+                          <span className="text-gray-400 text-xs">—</span>
                         )}
-                        {client.rut && (
-                          <p className="text-xs text-gray-400">RUT: {client.rut}</p>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <span className="text-gray-600">{client.city ?? '—'}</span>
-                    </TableCell>
-                    <TableCell>
-                      <ClientCategoryBadge category={client.category as ClientCategory} />
-                    </TableCell>
-                    <TableCell>
-                      {client.lastOrderAt ? (
-                        <span className="text-gray-600">
-                          {formatDate(client.lastOrderAt)}
-                        </span>
-                      ) : (
-                        <span className="text-gray-400">Sin pedidos</span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <div>
-                        <FactoringStatusBadge status={client.factoringStatus} />
-                        <p className="text-xs text-gray-400 mt-0.5">
-                          Cupo: {formatCOP(client.creditLimit)}
-                        </p>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center justify-end gap-1.5">
-                        {(client.whatsapp ?? client.phone) && (
+                      </TableCell>
+                      <TableCell>
+                        <LastOrdersDots dates={client.lastOrders} />
+                      </TableCell>
+                      <TableCell>
+                        <div>
+                          <FactoringStatusBadge status={client.factoringStatus} />
+                          <p className="text-xs text-gray-400 mt-0.5">
+                            Cupo: {formatCOP(client.creditLimit)}
+                          </p>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center justify-end gap-1.5">
+                          {(client.whatsapp ?? client.phone) && (
+                            <button
+                              onClick={(e) =>
+                                handleWhatsApp(
+                                  client.whatsapp ?? client.phone ?? '',
+                                  e
+                                )
+                              }
+                              className="flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200 text-green-600 hover:bg-green-50 hover:border-green-200 transition-colors"
+                              title="WhatsApp"
+                            >
+                              <MessageCircle className="h-4 w-4" />
+                            </button>
+                          )}
                           <button
-                            onClick={(e) =>
-                              handleWhatsApp(
-                                client.whatsapp ?? client.phone ?? '',
-                                e
-                              )
-                            }
-                            className="flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200 text-green-600 hover:bg-green-50 hover:border-green-200 transition-colors"
-                            title="WhatsApp"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              navigate(`/clientes/${client.id}`)
+                            }}
+                            className="flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200 text-blue-600 hover:bg-blue-50 hover:border-blue-200 transition-colors"
+                            title="Ver detalle"
                           >
-                            <MessageCircle className="h-4 w-4" />
+                            <Eye className="h-4 w-4" />
                           </button>
-                        )}
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            navigate(`/clientes/${client.id}`)
-                          }}
-                          className="flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200 text-blue-600 hover:bg-blue-50 hover:border-blue-200 transition-colors"
-                          title="Ver detalle"
-                        >
-                          <Eye className="h-4 w-4" />
-                        </button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  )
+                })}
               </TableBody>
             </Table>
             <Pagination

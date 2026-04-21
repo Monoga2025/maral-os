@@ -347,3 +347,44 @@ ARQUITECTURA DEFINITIVA: MARAL OS no escribe en Merlin. Merlin es solo lectura (
 - Totales agrupados (gastos): `{ data, pagination, totals: { CAJA_MENOR, TARJETA } }`.
 - Enums y status: en **español** y mayúsculas (ver tabla de enums arriba).
 
+---
+
+## Cambios solicitados por John — 2026-04-20 (PENDIENTES DE IMPLEMENTAR)
+
+John revisó la plataforma y solicitó los siguientes cambios. **No implementar hasta recibir orden explícita.**
+
+### Cotizaciones
+
+1. **Remitente** organizado como guía con campos separados: Nombre, NIT, dirección, teléfono, correo, ciudad.
+2. **Destinatario** con el mismo formato de guía que el remitente.
+3. **Flujo**: primero crear la cotización en la contabilidad de Janet (Merlin), luego subir PDF/imagen a la app.
+4. **Numeración**: la cotización debe arrancar en un número alto (~4585), no en 0010.
+5. **Columna de precio con descuento ya aplicado** visible en la tabla de productos.
+6. **Teléfono dinámico en el PDF**: mostrar 3167760692 (Lady) cuando envía Lady, 3177606126 (John) cuando envía John.
+7. **Observaciones** resaltadas en color dorado/atención.
+8. **Datos de ventas de John**: 3177606126, ingenieria@industriasmaral.com.
+9. **Bug**: nombres de productos largos se solapan visualmente — corregir layout del PDF.
+10. **Eliminar columna de numeración** a la izquierda; la cantidad debe ir primera.
+11. **Mostrar nombre del contacto** dentro del bloque de información del cliente.
+12. **Cambiar logo MARAL** (reemplazar placeholder).
+13. **Bug**: nombres de clientes largos se solapan — corregir layout.
+14. **Datos oficiales de MARAL** (actualizar en PDF y sistema):
+    - NIT: 901.889.479-8
+    - Dirección: Calle 3 # 6 A - 22 (Bodega 101)
+    - Teléfono: 3167760692
+    - Correo: ventas@industriasmaral.com
+    - Ciudad: Curití - Santander, Colombia
+15. **Categorías de cliente con descuento automático + popup recordatorio** al seleccionar:
+    - Importador (IM) — 36%
+    - Distribuidor (DS) — 26%
+    - Cliente Final (CF) — 10%
+16. **Código de categoría (IM / DS / CF)** visible en el PDF final.
+17. **Firma/pie del PDF**:
+    > John Mónoga
+    > Gerente de Proyectos
+    > MARAL TECNOLOGIA Y COMUNICACIONES S.A.S.
+    > "Apoyando el mercado de las telecomunicaciones desde 2003"
+
+### Pedidos
+_(El usuario no alcanzó a pegar esta sección — pendiente de recibir la lista completa antes de implementar.)_
+

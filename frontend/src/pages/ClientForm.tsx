@@ -22,10 +22,12 @@ const schema = z.object({
   whatsapp: z.string().optional(),
   city: z.string().optional(),
   address: z.string().optional(),
-  category: z.enum(['FUNDADOR_HISTORICO', 'FUNDADOR_MARAL', 'ALIADO', 'PROSPECTO']),
+  category: z.enum(['FUNDADOR_HISTORICO', 'FUNDADOR_MARAL', 'ALIADO', 'PROSPECTO', 'IMPORTADOR', 'DISTRIBUIDOR', 'CLIENTE_FINAL']),
   creditLimit: z.coerce.number().min(0),
   paymentDays: z.coerce.number().min(0),
   factoringStatus: z.enum(['APROBADO', 'EN_ESTUDIO', 'RECHAZADO', 'NO_APLICA']),
+  purchaseFrequency: z.enum(['FRECUENTE', 'INTERMITENTE', 'ESPORADICA', 'NINGUNA']),
+  isProvider: z.boolean().optional(),
   notes: z.string().optional(),
 })
 
@@ -53,8 +55,10 @@ export default function ClientForm() {
     defaultValues: {
       category: 'PROSPECTO',
       factoringStatus: 'NO_APLICA',
+      purchaseFrequency: 'NINGUNA',
       creditLimit: 0,
       paymentDays: 30,
+      isProvider: false,
     },
   })
 
@@ -73,6 +77,8 @@ export default function ClientForm() {
         creditLimit: client.creditLimit,
         paymentDays: client.paymentDays,
         factoringStatus: client.factoringStatus,
+        purchaseFrequency: (client.purchaseFrequency as any) ?? 'NINGUNA',
+        isProvider: client.isProvider ?? false,
         notes: client.notes ?? '',
       })
     }
@@ -180,12 +186,27 @@ export default function ClientForm() {
                 className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 h-9"
                 {...register('category')}
               >
+                <option value="IMPORTADOR">Importador (IM) — 36%</option>
+                <option value="DISTRIBUIDOR">Distribuidor (DS) — 26%</option>
+                <option value="CLIENTE_FINAL">Cliente Final (CF) — 10%</option>
+                <option value="PROSPECTO">Prospecto</option>
+                <option value="ALIADO">Aliado</option>
                 <option value="FUNDADOR_HISTORICO">Fundador Histórico</option>
                 <option value="FUNDADOR_MARAL">Fundador Maral</option>
-                <option value="ALIADO">Aliado</option>
-                <option value="PROSPECTO">Prospecto</option>
               </select>
               {errors.category && <p className="text-xs text-red-500 mt-1">{errors.category.message}</p>}
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-700 block mb-1">Frecuencia de compra</label>
+              <select
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 h-9"
+                {...register('purchaseFrequency')}
+              >
+                <option value="NINGUNA">Sin historial</option>
+                <option value="FRECUENTE">Frecuente (≥1 pedido/mes)</option>
+                <option value="INTERMITENTE">Intermitente (cada 2-3 meses)</option>
+                <option value="ESPORADICA">Esporádica (menos de 1 vez al año)</option>
+              </select>
             </div>
             <div>
               <div className="flex items-center gap-1 mb-1">

@@ -146,6 +146,24 @@ export const quotationsApi = {
     a.click()
     URL.revokeObjectURL(url)
   },
+  viewPDF: async (id: string): Promise<void> => {
+    const token = localStorage.getItem('token')
+    const response = await fetch(`/api/quotations/${id}/pdf`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    if (!response.ok) throw new Error('Error al generar PDF')
+    const blob = await response.blob()
+    const url = URL.createObjectURL(blob)
+    window.open(url, '_blank')
+    // revoke after short delay to let the new tab load
+    setTimeout(() => URL.revokeObjectURL(url), 10000)
+  },
+  parseQuotationImage: (imageBase64: string, mimeType: string) =>
+    api.post<{
+      clientName: string | null
+      notes: string | null
+      items: { productName: string; productReference: string | null; qty: number; unitPrice: number; discount: number }[]
+    }>('/ai/parse-quotation-image', { imageBase64, mimeType }),
 }
 
 // Orders

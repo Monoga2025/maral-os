@@ -14,6 +14,8 @@ import {
   Package,
   Pencil,
   X,
+  Upload,
+  Sparkles,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { clientsApi, productsApi, quotationsApi } from '../lib/api'
@@ -53,6 +55,12 @@ type FormValues = {
 }
 
 const TAX_RATE = 0.19
+
+const CATEGORY_DISCOUNTS: Partial<Record<string, { code: string; pct: number; label: string }>> = {
+  IMPORTADOR:    { code: 'IM', pct: 36, label: 'Importador' },
+  DISTRIBUIDOR:  { code: 'DS', pct: 26, label: 'Distribuidor' },
+  CLIENTE_FINAL: { code: 'CF', pct: 10, label: 'Cliente Final' },
+}
 
 // ── Kit Component Editor Modal ────────────────────────────────
 
@@ -175,6 +183,8 @@ export default function QuotationForm() {
 
   const [kitEditorProduct, setKitEditorProduct] = useState<Product | null>(null)
   const [kitEditorComponents, setKitEditorComponents] = useState<ProductComponent[]>([])
+  const [parsingImage, setParsingImage] = useState(false)
+  const [parsedPreview, setParsedPreview] = useState<string | null>(null)
 
   const { register, watch, setValue, reset } = useForm<FormValues>({
     defaultValues: {
@@ -304,6 +314,65 @@ export default function QuotationForm() {
     if (kitEditorProduct) addItem(kitEditorProduct, components)
     setKitEditorProduct(null)
     setKitEditorComponents([])
+  }
+
+  const handleMerlinImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    e.target.value = ''
+
+    setParsingImage(true)
+    setParsedPreview(null)
+    try {
+      const buffer = await file.arrayBuffer()
+      const base64 = btoa(String.fromCharCode(...new Uint8Array(buffer)))
+      const res = await quotationsApi.parseQuotationImage(base64, file.type || 'image/jpeg')
+      const parsed = res.data
+
+      // Pre-fill client search with detected name
+      if (parsed.clientName) {
+        setClientSearch(parsed.clientName)
+        setParsedPreview(
+          `IA detectó: "${parsed.clientName}" · ${parsed.items.length} producto(s). ` +
+          `Selecciona el cliente de la lista y continúa al paso 2 — los productos ya estarán listos.`
+        )
+      }
+
+      // Pre-fill notes
+      if (parsed.notes) {
+        setValue('notes', parsed.notes)
+      }
+
+      // Pre-populate items (best-effort: match by name/reference)
+      if (parsed.items.length > 0) {
+        const searchedItems = await Promise.allSettled(
+          parsed.items.map(async (pi) => {
+            const query = pi.productReference || pi.productName
+            const r = await productsApi.getAll({ search: query, pageSize: 3 }).then((x) => x.data)
+            const match = r.data?.[0]
+            if (!match) return null
+            return {
+              productId: match.id,
+              product: match,
+              quantity: pi.qty || 1,
+              unitPrice: pi.unitPrice || (match.priceList ?? match.price ?? 0),
+              discount: pi.discount || 0,
+              subtotal: (pi.unitPrice || (match.priceList ?? match.price ?? 0)) * (pi.qty || 1) * (1 - (pi.discount || 0) / 100),
+            } as LineItem
+          })
+        )
+        const matched = searchedItems
+          .filter((r): r is PromiseFulfilledResult<LineItem | null> => r.status === 'fulfilled' && r.value !== null)
+          .map((r) => r.value!)
+        if (matched.length > 0) setItems(matched)
+      }
+
+      toast.success(`IA procesó la imagen — ${parsed.items.length} producto(s) detectado(s)`)
+    } catch {
+      toast.error('No se pudo procesar la imagen. Intenta con una foto más clara.')
+    } finally {
+      setParsingImage(false)
+    }
   }
 
   const updateItem = (id: string, field: 'quantity' | 'unitPrice' | 'discount', value: number) => {
@@ -475,6 +544,30 @@ export default function QuotationForm() {
             <p className="text-xs text-blue-600">Escribe el nombre o empresa del cliente en el buscador de abajo</p>
           </div>
         </div>
+
+        {/* Importar desde Merlin con IA */}
+        <div className="rounded-xl border border-dashed border-amber-300 bg-amber-50 px-4 py-3">
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <div className="flex items-center gap-2">
+              <Sparkles className="h-4 w-4 text-amber-600" />
+              <div>
+                <p className="text-sm font-semibold text-amber-800">Importar cotización de Merlin</p>
+                <p className="text-xs text-amber-600">Toma una captura de pantalla en Merlin y súbela — la IA extrae el cliente y los productos automáticamente.</p>
+              </div>
+            </div>
+            <label className={`flex items-center gap-1.5 cursor-pointer rounded-lg border border-amber-400 bg-white px-3 py-1.5 text-xs font-semibold text-amber-700 hover:bg-amber-50 transition-colors ${parsingImage ? 'opacity-60 pointer-events-none' : ''}`}>
+              {parsingImage ? (
+                <><span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-amber-400 border-t-transparent" />Procesando...</>
+              ) : (
+                <><Upload className="h-3.5 w-3.5" />Subir imagen</>
+              )}
+              <input type="file" accept="image/*" className="hidden" onChange={handleMerlinImageUpload} disabled={parsingImage} />
+            </label>
+          </div>
+          {parsedPreview && (
+            <p className="mt-2 text-xs text-amber-700 bg-amber-100 rounded-lg px-3 py-1.5">{parsedPreview}</p>
+          )}
+        </div>
         <Card>
           <CardHeader>
             <CardTitle>Seleccionar cliente</CardTitle>
@@ -520,6 +613,7 @@ export default function QuotationForm() {
             </div>
 
             {selectedClient && (
+              <>
               <div className="rounded-xl border border-blue-200 bg-blue-50 p-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
@@ -544,6 +638,24 @@ export default function QuotationForm() {
                   </div>
                 </div>
               </div>
+              {(() => {
+                const disc = CATEGORY_DISCOUNTS[selectedClient.category]
+                if (!disc) return null
+                return (
+                  <div className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 flex items-start gap-3">
+                    <span className="text-xl mt-0.5">💡</span>
+                    <div>
+                      <p className="text-sm font-semibold text-amber-800">
+                        ¡Recuerda el descuento! Este cliente es <strong>{disc.label} ({disc.code})</strong>
+                      </p>
+                      <p className="text-xs text-amber-700 mt-0.5">
+                        Aplica un <strong>{disc.pct}%</strong> de descuento en los productos del paso 2.
+                      </p>
+                    </div>
+                  </div>
+                )
+              })()}
+              </>
             )}
 
             <div className="flex justify-end">

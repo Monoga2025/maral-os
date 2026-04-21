@@ -53,16 +53,18 @@ model Client {
   creditLimit     Float           @default(0)
   paymentDays     Int             @default(0)
   factoringStatus FactoringStatus @default(NO_APLICA)
-  notes           String?
-  active          Boolean         @default(true)
+  notes             String?
+  active            Boolean           @default(true)
+  isProvider        Boolean           @default(false)
+  purchaseFrequency PurchaseFrequency @default(NINGUNA)
   /// Código interno de Merlin (campo Tercero en VENMovimientos). Lo asigna sync_maral.py.
-  merlinCode      String?
-  createdAt       DateTime        @default(now())
-  updatedAt       DateTime        @updatedAt
-  quotations      Quotation[]
-  orders          Order[]
-  invoices        Invoice[]
-  tasks           Task[]
+  merlinCode        String?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  quotations        Quotation[]
+  orders            Order[]
+  invoices          Invoice[]
+  tasks             Task[]
 }
 
 enum ClientCategory {
@@ -70,6 +72,9 @@ enum ClientCategory {
   FUNDADOR_MARAL
   ALIADO
   PROSPECTO
+  IMPORTADOR
+  DISTRIBUIDOR
+  CLIENTE_FINAL
 }
 
 enum FactoringStatus {
@@ -77,6 +82,13 @@ enum FactoringStatus {
   EN_ESTUDIO
   RECHAZADO
   NO_APLICA
+}
+
+enum PurchaseFrequency {
+  FRECUENTE
+  INTERMITENTE
+  ESPORADICA
+  NINGUNA
 }
 
 // ── Products & Kits ──────────────────────────────────────────

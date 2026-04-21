@@ -5,7 +5,7 @@ import { authenticate, AuthRequest } from '../middleware/auth';
 const router = Router();
 router.use(authenticate);
 
-const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
+const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
 
 async function callGemini(prompt: string): Promise<string> {
   const key = process.env.GOOGLE_AI_KEY;
@@ -16,7 +16,36 @@ async function callGemini(prompt: string): Promise<string> {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       contents: [{ parts: [{ text: prompt }] }],
-      generationConfig: { temperature: 0.4, maxOutputTokens: 1024, thinkingConfig: { thinkingBudget: 0 } },
+      generationConfig: { temperature: 0.4, maxOutputTokens: 2048 },
+    }),
+  });
+
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`Gemini error ${res.status}: ${err}`);
+  }
+
+  const data = await res.json() as {
+    candidates?: { content?: { parts?: { text?: string }[] } }[];
+  };
+  return data.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
+}
+
+async function callGeminiWithImage(prompt: string, imageBase64: string, mimeType: string): Promise<string> {
+  const key = process.env.GOOGLE_AI_KEY;
+  if (!key) throw new Error('GOOGLE_AI_KEY no configurada');
+
+  const res = await fetch(`${GEMINI_URL}?key=${key}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      contents: [{
+        parts: [
+          { inline_data: { mime_type: mimeType, data: imageBase64 } },
+          { text: prompt },
+        ],
+      }],
+      generationConfig: { temperature: 0.2, maxOutputTokens: 3072 },
     }),
   });
 
@@ -229,6 +258,54 @@ Responde SOLO con JSON: {"priority": "URGENTE|NORMAL|DESPUES", "dueDays": númer
   } catch (error) {
     console.error('AI autofill error:', error);
     res.status(500).json({ error: 'Error al generar sugerencias' });
+  }
+});
+
+// POST /api/ai/parse-quotation-image — extrae datos de cotización desde imagen de Merlin
+router.post('/parse-quotation-image', async (req: AuthRequest, res: Response) => {
+  try {
+    const { imageBase64, mimeType } = req.body as { imageBase64: string; mimeType: string };
+    if (!imageBase64) {
+      res.status(400).json({ error: 'imageBase64 requerido' });
+      return;
+    }
+
+    const prompt = `Analiza esta imagen que contiene una cotización o factura de un sistema contable colombiano (Merlin).
+
+Extrae la siguiente información y devuélvela como JSON válido:
+{
+  "clientName": "nombre del cliente o empresa (string)",
+  "notes": "observaciones o notas si las hay (string o null)",
+  "items": [
+    {
+      "productName": "nombre del producto (string)",
+      "productReference": "código o referencia si aparece (string o null)",
+      "qty": número de unidades (número),
+      "unitPrice": precio unitario en COP sin puntos (número),
+      "discount": porcentaje de descuento 0-100 (número)
+    }
+  ]
+}
+
+Reglas:
+- Si no encuentras algún campo, usa null o 0 según corresponda
+- Los precios deben ser números enteros en COP (sin símbolo $, sin puntos de miles)
+- qty debe ser número positivo
+- Si no hay descuento, usa 0
+- Responde SOLO con el JSON, sin texto adicional, sin markdown`;
+
+    const raw = await callGeminiWithImage(prompt, imageBase64, mimeType || 'image/jpeg');
+    const stripped = raw.replace(/```(?:json)?\s*/gi, '').replace(/```/g, '');
+    const jsonMatch = stripped.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      res.status(500).json({ error: 'No se pudo extraer datos de la imagen' });
+      return;
+    }
+
+    res.json(JSON.parse(jsonMatch[0]));
+  } catch (error) {
+    console.error('Parse quotation image error:', error);
+    res.status(500).json({ error: 'Error al procesar la imagen' });
   }
 });
 

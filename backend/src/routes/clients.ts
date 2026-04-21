@@ -16,14 +16,16 @@ const clientSchema = z.object({
   whatsapp: z.string().optional(),
   email: z.string().email().optional().or(z.literal('')),
   address: z.string().optional(),
-  category: z.enum(['FUNDADOR_HISTORICO', 'FUNDADOR_MARAL', 'ALIADO', 'PROSPECTO']).optional(),
+  category: z.enum(['FUNDADOR_HISTORICO', 'FUNDADOR_MARAL', 'ALIADO', 'PROSPECTO', 'IMPORTADOR', 'DISTRIBUIDOR', 'CLIENTE_FINAL']).optional(),
   howFound: z.string().optional(),
   allowWhiteLabel: z.boolean().optional(),
   creditLimit: z.number().min(0).optional(),
   paymentDays: z.number().min(0).optional(),
   factoringStatus: z.enum(['APROBADO', 'EN_ESTUDIO', 'RECHAZADO', 'NO_APLICA']).optional(),
+  purchaseFrequency: z.enum(['FRECUENTE', 'INTERMITENTE', 'ESPORADICA', 'NINGUNA']).optional(),
+  isProvider: z.boolean().optional(),
   notes: z.string().optional(),
-  merlinCode: z.string().optional(), // Código interno Merlin (asignado por sync_maral.py)
+  merlinCode: z.string().optional(),
 });
 
 // GET /api/clients
@@ -33,20 +35,26 @@ router.get('/', async (req: AuthRequest, res: Response) => {
     const limit = parseInt((req.query.pageSize || req.query.limit) as string) || 20;
     const search = req.query.search as string;
     const category = req.query.category as string;
+    const city = req.query.city as string;
     const active = req.query.active !== 'false';
 
-    const where: Record<string, unknown> = { active };
+    const where: Record<string, unknown> = { active, isProvider: false };
 
     if (search) {
       where.OR = [
         { name: { contains: search, mode: 'insensitive' } },
         { company: { contains: search, mode: 'insensitive' } },
         { city: { contains: search, mode: 'insensitive' } },
+        { rut: { contains: search, mode: 'insensitive' } },
       ];
     }
 
     if (category) {
       where.category = category;
+    }
+
+    if (city) {
+      where.city = { contains: city, mode: 'insensitive' };
     }
 
     const [clients, total] = await Promise.all([
@@ -62,26 +70,58 @@ router.get('/', async (req: AuthRequest, res: Response) => {
           city: true,
           department: true,
           phone: true,
+          whatsapp: true,
           email: true,
           category: true,
           factoringStatus: true,
           creditLimit: true,
           paymentDays: true,
+          purchaseFrequency: true,
           active: true,
           createdAt: true,
           _count: { select: { orders: true, quotations: true } },
+          orders: {
+            orderBy: { createdAt: 'desc' },
+            take: 3,
+            select: { createdAt: true, status: true },
+          },
         },
       }),
       prisma.client.count({ where }),
     ]);
 
+    // Map orders to lastOrders array of dates
+    const data = clients.map((c) => {
+      const { orders, ...rest } = c;
+      return {
+        ...rest,
+        lastOrderAt: orders[0]?.createdAt ?? null,
+        lastOrders: orders.map((o) => o.createdAt),
+      };
+    });
+
     res.json({
-      data: clients,
+      data,
       pagination: { page, limit, total, pages: Math.ceil(total / limit) },
     });
   } catch (error) {
     console.error('Get clients error:', error);
     res.status(500).json({ error: 'Error al obtener clientes' });
+  }
+});
+
+// GET /api/clients/cities — distinct city list for filter dropdown
+router.get('/cities', async (_req: AuthRequest, res: Response) => {
+  try {
+    const cities = await prisma.client.findMany({
+      where: { active: true, isProvider: false, city: { not: null } },
+      select: { city: true },
+      distinct: ['city'],
+      orderBy: { city: 'asc' },
+    });
+    res.json(cities.map((c) => c.city).filter(Boolean));
+  } catch (error) {
+    res.status(500).json({ error: 'Error al obtener ciudades' });
   }
 });
 
@@ -160,7 +200,23 @@ router.post('/', async (req: AuthRequest, res: Response) => {
       return;
     }
 
-    const client = await prisma.client.create({ data: validation.data as any });
+    const { merlinCode, ...rest } = validation.data;
+
+    // Upsert by merlinCode when provided (prevents duplicates on re-sync)
+    let client;
+    if (merlinCode) {
+      const existing = await prisma.client.findFirst({ where: { merlinCode } });
+      if (existing) {
+        client = await prisma.client.update({
+          where: { id: existing.id },
+          data: { ...rest, merlinCode } as any,
+        });
+      } else {
+        client = await prisma.client.create({ data: { ...rest, merlinCode } as any });
+      }
+    } else {
+      client = await prisma.client.create({ data: validation.data as any });
+    }
 
     await prisma.activityLog.create({
       data: {

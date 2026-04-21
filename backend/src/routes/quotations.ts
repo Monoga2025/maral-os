@@ -1,8 +1,12 @@
 import { Router, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import PDFDocument from 'pdfkit';
+import fs from 'fs';
+import path from 'path';
 import prisma from '../lib/prisma';
 import { authenticate, AuthRequest } from '../middleware/auth';
+
+const LOGO_PATH = path.join(__dirname, '..', 'assets', 'logo.png');
 
 const router = Router();
 router.use(authenticate);
@@ -35,11 +39,30 @@ function fmtNIT(raw: string): string {
 const COMPANY = {
   name:    process.env.COMPANY_NAME    ?? 'MARAL TECNOLOGÍA Y COMUNICACIONES S.A.S.',
   nit:     fmtNIT(process.env.COMPANY_NIT ?? '9018894798'),
-  address: process.env.COMPANY_ADDRESS ?? 'CALLE 3 6 A 22 PISO 1',
-  city:    'Curití, Santander',
+  address: process.env.COMPANY_ADDRESS ?? 'Calle 3 # 6 A - 22 (Bodega 101)',
+  city:    'Curití - Santander, Colombia',
   phone:   process.env.COMPANY_PHONE   ?? '3167760692',
   email:   process.env.COMPANY_EMAIL   ?? 'ventas@industriasmaral.com',
   website: process.env.COMPANY_WEBSITE ?? 'www.industriasmaral.com',
+};
+
+const SELLER_PHONES: Record<string, string> = {
+  'john': '3177606126',
+  'ingenieria@industriasmaral.com': '3177606126',
+};
+
+function getSellerPhone(seller: { name?: string; email?: string } | null): string {
+  if (!seller) return COMPANY.phone;
+  const email = (seller.email ?? '').toLowerCase();
+  const name  = (seller.name  ?? '').toLowerCase();
+  if (email.includes('ingenieria') || name.includes('john')) return '3177606126';
+  return COMPANY.phone;
+}
+
+const CATEGORY_CODES: Record<string, string> = {
+  IMPORTADOR:    'IM',
+  DISTRIBUIDOR:  'DS',
+  CLIENTE_FINAL: 'CF',
 };
 
 const kitComponentOverrideSchema = z.object({
@@ -146,7 +169,7 @@ router.get('/:id/pdf', async (req: AuthRequest, res: Response) => {
     }
 
     const num = String(quotation.number).padStart(5, '0');
-    const doc = new PDFDocument({ size: 'LETTER', margin: 0 });
+    const doc = new PDFDocument({ size: [612, 936], margin: 0 });
 
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="COT-${num}.pdf"`);
@@ -342,6 +365,25 @@ router.put('/:id', async (req: AuthRequest, res: Response) => {
   }
 });
 
+// PATCH /api/quotations/:id/status
+router.patch('/:id/status', async (req: AuthRequest, res: Response) => {
+  try {
+    const { status } = req.body;
+    const validStatuses = ['BORRADOR', 'ENVIADA', 'APROBADA', 'RECHAZADA'];
+    if (!validStatuses.includes(status)) {
+      res.status(400).json({ error: 'Estado inválido' });
+      return;
+    }
+    const updated = await prisma.quotation.update({
+      where: { id: req.params.id },
+      data: { status },
+    });
+    res.json(updated);
+  } catch {
+    res.status(500).json({ error: 'Error al cambiar estado' });
+  }
+});
+
 // DELETE /api/quotations/:id
 router.delete('/:id', async (req: AuthRequest, res: Response) => {
   try {
@@ -463,6 +505,8 @@ function drawQuotationPDF(doc: PDFKit.PDFDocument, q: any): void {
     white: '#ffffff',
     black: '#111827',
     red:   '#dc2626',
+    gold:  '#b45309',
+    goldBg:'#fffbeb',
   };
 
   const fmtCOP = (n: number) =>
@@ -476,42 +520,42 @@ function drawQuotationPDF(doc: PDFKit.PDFDocument, q: any): void {
   const expiry = new Date(q.createdAt);
   expiry.setDate(expiry.getDate() + q.validityDays);
 
+  const sellerPhone = getSellerPhone(q.seller);
+  const catCode = CATEGORY_CODES[q.client?.category ?? ''] ?? null;
+
   let y = 40;
 
   // ── HEADER ────────────────────────────────────────────────────
-  //
-  // Layout (612pt wide, 50pt margins each side → 512pt content):
-  //   [LOGO 100pt] gap10 [COMPANY INFO 254pt] gap8 [BADGE 140pt]
-  //   50           150   160                  414  422          562
-  //
   const LOGO_W  = 100;
   const LOGO_H  = 70;
   const BADGE_W = 140;
-  const INFO_X  = ML + LOGO_W + 10;          // 160
-  const BADGE_X = MR - BADGE_W;              // 422
-  const INFO_W  = BADGE_X - INFO_X - 8;      // 254
+  const INFO_X  = ML + LOGO_W + 10;     // 160
+  const BADGE_X = MR - BADGE_W;         // 422
+  const INFO_W  = BADGE_X - INFO_X - 8; // 254
 
-  // Logo — solid dark-blue box so it never bleeds into company text
-  doc.rect(ML, y, LOGO_W, LOGO_H).fill(C.dark);
-  // "M" monogram, large
-  doc.fillColor(C.white).font('Helvetica-Bold').fontSize(28)
-     .text('M', ML, y + 8, { width: LOGO_W, align: 'center', lineBreak: false });
-  doc.fillColor('#93c5fd').font('Helvetica-Bold').fontSize(7)
-     .text('MARAL', ML, y + 42, { width: LOGO_W, align: 'center', lineBreak: false });
-  doc.fillColor('#93c5fd').font('Helvetica').fontSize(6)
-     .text('TECNOLOGÍA', ML, y + 52, { width: LOGO_W, align: 'center', lineBreak: false });
+  // Logo — carga PNG si existe, placeholder si no
+  if (fs.existsSync(LOGO_PATH)) {
+    doc.rect(ML, y, LOGO_W, LOGO_H).fill('#ffffff');
+    doc.image(LOGO_PATH, ML, y + 5, { fit: [LOGO_W, LOGO_H - 10], align: 'center', valign: 'center' });
+  } else {
+    doc.rect(ML, y, LOGO_W, LOGO_H).fill(C.dark);
+    doc.fillColor(C.white).font('Helvetica-Bold').fontSize(28)
+       .text('M', ML, y + 8, { width: LOGO_W, align: 'center', lineBreak: false });
+    doc.fillColor('#93c5fd').font('Helvetica-Bold').fontSize(7)
+       .text('MARAL', ML, y + 42, { width: LOGO_W, align: 'center', lineBreak: false });
+    doc.fillColor('#93c5fd').font('Helvetica').fontSize(6)
+       .text('TECNOLOGÍA', ML, y + 52, { width: LOGO_W, align: 'center', lineBreak: false });
+  }
 
-  // Company info — starts at INFO_X, well clear of the logo box
   doc.fillColor(C.dark).font('Helvetica-Bold').fontSize(10)
      .text(COMPANY.name, INFO_X, y + 4, { width: INFO_W, lineBreak: false });
   doc.fillColor(C.tgray).font('Helvetica').fontSize(8.5)
-     .text(`NIT: ${COMPANY.nit}`,                      INFO_X, y + 18, { lineBreak: false })
-     .text(COMPANY.address,                             INFO_X, y + 29, { lineBreak: false })
+     .text(`NIT: ${COMPANY.nit}`,                     INFO_X, y + 18, { lineBreak: false })
+     .text(COMPANY.address,                            INFO_X, y + 29, { lineBreak: false })
      .text(COMPANY.city,                               INFO_X, y + 40, { lineBreak: false })
-     .text(`${COMPANY.phone}   ·   ${COMPANY.email}`,  INFO_X, y + 51, { lineBreak: false })
-     .text(COMPANY.website,                             INFO_X, y + 62, { lineBreak: false });
+     .text(`${COMPANY.phone}   ·   ${COMPANY.email}`, INFO_X, y + 51, { lineBreak: false })
+     .text(COMPANY.website,                            INFO_X, y + 62, { lineBreak: false });
 
-  // Badge — dark-blue box, top-right corner
   doc.rect(BADGE_X, y, BADGE_W, LOGO_H).fill(C.dark);
   const num = String(q.number).padStart(5, '0');
   doc.fillColor(C.white).font('Helvetica-Bold').fontSize(8)
@@ -523,7 +567,6 @@ function drawQuotationPDF(doc: PDFKit.PDFDocument, q: any): void {
 
   y += LOGO_H + 8;
 
-  // Full-width rule
   doc.moveTo(ML, y).lineTo(MR, y).lineWidth(0.5).strokeColor(C.bgray).stroke();
   y += 12;
 
@@ -542,13 +585,22 @@ function drawQuotationPDF(doc: PDFKit.PDFDocument, q: any): void {
   const ROW_H = 13;
 
   const cl = q.client;
+
   const clientRows: [string, string][] = [
     ['Empresa / Razón social', cl.company || cl.name],
-    ['NIT / CC',               cl.rut     || '—'],
-    ['Ciudad',                 [cl.city, cl.department].filter(Boolean).join(', ') || '—'],
-    ['Teléfono',               cl.phone   || '—'],
-    ['Email',                  cl.email   || '—'],
   ];
+  if (cl.company) {
+    clientRows.push(['Contacto', cl.name]);
+  }
+  if (catCode) {
+    clientRows.push(['Categoría', catCode]);
+  }
+  clientRows.push(
+    ['NIT / CC',  cl.rut || '—'],
+    ['Ciudad',    [cl.city, cl.department].filter(Boolean).join(', ') || '—'],
+    ['Teléfono',  cl.phone || '—'],
+    ['Email',     cl.email || '—'],
+  );
 
   const condRows: [string, string][] = [
     ['Vigencia',          `${q.validityDays} días`],
@@ -556,6 +608,7 @@ function drawQuotationPDF(doc: PDFKit.PDFDocument, q: any): void {
     ['Condición de pago', q.paymentTerms],
     ['IVA aplicado',      taxPct > 0 ? `${taxPct}%` : 'No aplica'],
     ['Asesor comercial',  q.seller?.name || '—'],
+    ['Tel. asesor',       sellerPhone],
   ];
 
   const nRows = Math.max(clientRows.length, condRows.length);
@@ -563,9 +616,9 @@ function drawQuotationPDF(doc: PDFKit.PDFDocument, q: any): void {
     const ry = y + i * ROW_H;
     if (clientRows[i]) {
       doc.fillColor(C.tgray).font('Helvetica').fontSize(7.5)
-         .text(`${clientRows[i][0]}:`, ML, ry, { width: 60, lineBreak: false });
+         .text(`${clientRows[i][0]}:`, ML, ry, { width: 65, lineBreak: false });
       doc.fillColor(C.black).font('Helvetica').fontSize(8)
-         .text(clientRows[i][1], ML + 62, ry, { width: 225, lineBreak: false, ellipsis: true });
+         .text(clientRows[i][1], ML + 67, ry, { width: 220, lineBreak: false, ellipsis: true });
     }
     if (condRows[i]) {
       doc.fillColor(C.tgray).font('Helvetica').fontSize(7.5)
@@ -575,7 +628,6 @@ function drawQuotationPDF(doc: PDFKit.PDFDocument, q: any): void {
     }
   }
 
-  // Vertical divider
   const sectionH = nRows * ROW_H;
   doc.moveTo(midX, sectionTopY - 4).lineTo(midX, sectionTopY + sectionH)
      .lineWidth(0.4).strokeColor(C.bgray).stroke();
@@ -586,16 +638,16 @@ function drawQuotationPDF(doc: PDFKit.PDFDocument, q: any): void {
   y += 10;
 
   // ── TABLE ─────────────────────────────────────────────────────
-  // Column widths sum = 512:  22+65+165+28+38+82+36+76 = 512
+  // Cols sum=512: Cant(38)+Ref(55)+Desc(162)+Und(26)+P.Unit(76)+Desc%(32)+P.c/dto(75)+Subtotal(48)
   const cols = [
-    { label: '#',           x: ML,       w: 22,  align: 'center' as const },
-    { label: 'Referencia',  x: ML + 22,  w: 65,  align: 'left'   as const },
-    { label: 'Descripción', x: ML + 87,  w: 165, align: 'left'   as const },
-    { label: 'Und',         x: ML + 252, w: 28,  align: 'center' as const },
-    { label: 'Cant',        x: ML + 280, w: 38,  align: 'right'  as const },
-    { label: 'P. Unitario', x: ML + 318, w: 82,  align: 'right'  as const },
-    { label: 'Desc%',       x: ML + 400, w: 36,  align: 'right'  as const },
-    { label: 'Subtotal',    x: ML + 436, w: 76,  align: 'right'  as const },
+    { label: 'Cant',       x: ML,       w: 38,  align: 'right'  as const },
+    { label: 'Referencia', x: ML + 38,  w: 55,  align: 'left'   as const },
+    { label: 'Descripción',x: ML + 93,  w: 162, align: 'left'   as const },
+    { label: 'Und',        x: ML + 255, w: 26,  align: 'center' as const },
+    { label: 'P. Unit',    x: ML + 281, w: 76,  align: 'right'  as const },
+    { label: 'Desc%',      x: ML + 357, w: 32,  align: 'right'  as const },
+    { label: 'P. c/dto',   x: ML + 389, w: 75,  align: 'right'  as const },
+    { label: 'Subtotal',   x: ML + 464, w: 48,  align: 'right'  as const },
   ];
 
   const HEADER_H   = 20;
@@ -614,8 +666,8 @@ function drawQuotationPDF(doc: PDFKit.PDFDocument, q: any): void {
   y += HEADER_H;
 
   for (let i = 0; i < q.items.length; i++) {
-    if (y + ROW_HEIGHT > 710) {
-      doc.addPage({ size: 'LETTER', margin: 0 });
+    if (y + ROW_HEIGHT > 870) {
+      doc.addPage({ size: [612, 936], margin: 0 });
       y = 40;
       drawTableHeader(y);
       y += HEADER_H;
@@ -623,35 +675,42 @@ function drawQuotationPDF(doc: PDFKit.PDFDocument, q: any): void {
 
     const item = q.items[i];
     const prod = item.product;
+    const finalPrice = item.unitPrice * (1 - (item.discount || 0) / 100);
 
     if (i % 2 === 1) {
       doc.rect(ML, y, CW, ROW_HEIGHT).fill(C.lgray);
     }
 
     const ty = y + 5;
-    doc.fillColor(C.tgray).font('Helvetica').fontSize(7.5)
-       .text(String(i + 1), cols[0].x + 3, ty,
-             { width: cols[0].w - 6, align: 'center', lineBreak: false });
+    // Cant
+    doc.fillColor(C.black).font('Helvetica-Bold').fontSize(7.5)
+       .text(item.qty % 1 === 0 ? String(item.qty) : item.qty.toFixed(2),
+             cols[0].x + 3, ty, { width: cols[0].w - 6, align: 'right', lineBreak: false });
+    // Ref
     doc.fillColor(C.black).font('Helvetica').fontSize(7.5)
        .text(prod.reference || '—', cols[1].x + 3, ty,
              { width: cols[1].w - 6, align: 'left', lineBreak: false, ellipsis: true });
+    // Desc
     doc.fillColor(C.black).font('Helvetica').fontSize(7.5)
        .text(prod.name, cols[2].x + 3, ty,
              { width: cols[2].w - 6, align: 'left', lineBreak: false, ellipsis: true });
+    // Und
     doc.fillColor(C.tgray).font('Helvetica').fontSize(7.5)
        .text(prod.unit || 'UN', cols[3].x + 3, ty,
              { width: cols[3].w - 6, align: 'center', lineBreak: false });
-    doc.fillColor(C.black).font('Helvetica').fontSize(7.5)
-       .text(item.qty % 1 === 0 ? String(item.qty) : item.qty.toFixed(2),
-             cols[4].x + 3, ty,
+    // P. Unit
+    doc.fillColor(C.tgray).font('Helvetica').fontSize(7.5)
+       .text(fmtCOP(item.unitPrice), cols[4].x + 3, ty,
              { width: cols[4].w - 6, align: 'right', lineBreak: false });
-    doc.fillColor(C.black).font('Helvetica').fontSize(7.5)
-       .text(fmtCOP(item.unitPrice), cols[5].x + 3, ty,
-             { width: cols[5].w - 6, align: 'right', lineBreak: false });
+    // Desc%
     doc.fillColor(item.discount > 0 ? C.red : C.tgray).font('Helvetica').fontSize(7.5)
        .text(item.discount > 0 ? `${item.discount}%` : '—',
-             cols[6].x + 3, ty,
+             cols[5].x + 3, ty, { width: cols[5].w - 6, align: 'right', lineBreak: false });
+    // P. c/dto
+    doc.fillColor(C.black).font('Helvetica-Bold').fontSize(7.5)
+       .text(fmtCOP(finalPrice), cols[6].x + 3, ty,
              { width: cols[6].w - 6, align: 'right', lineBreak: false });
+    // Subtotal
     doc.fillColor(C.black).font('Helvetica-Bold').fontSize(7.5)
        .text(fmtCOP(item.subtotal), cols[7].x + 3, ty,
              { width: cols[7].w - 6, align: 'right', lineBreak: false });
@@ -669,7 +728,7 @@ function drawQuotationPDF(doc: PDFKit.PDFDocument, q: any): void {
   const totX = ML + 310;
   const lblW = 110;
   const valX = totX + lblW;
-  const valW = MR - valX;   // 102
+  const valW = MR - valX;
 
   doc.fillColor(C.tgray).font('Helvetica').fontSize(9)
      .text('Subtotal:', totX, y, { width: lblW, align: 'right', lineBreak: false });
@@ -697,15 +756,16 @@ function drawQuotationPDF(doc: PDFKit.PDFDocument, q: any): void {
 
   y += 34;
 
-  // ── NOTES ─────────────────────────────────────────────────────
+  // ── OBSERVACIONES (fondo dorado) ──────────────────────────────
 
   if (q.notes) {
-    doc.moveTo(ML, y).lineTo(MR, y).lineWidth(0.5).strokeColor(C.bgray).stroke();
-    y += 10;
-    doc.fillColor(C.dark).font('Helvetica-Bold').fontSize(7.5)
+    doc.rect(ML, y, CW, 4).fill(C.gold);
+    y += 8;
+    doc.fillColor(C.gold).font('Helvetica-Bold').fontSize(7.5)
        .text('OBSERVACIONES', ML, y, { lineBreak: false });
     y += 11;
-    doc.fillColor(C.black).font('Helvetica').fontSize(8.5)
+    doc.rect(ML, y - 3, CW, 1).fill('#fde68a');
+    doc.fillColor('#78350f').font('Helvetica').fontSize(8.5)
        .text(q.notes, ML, y, { width: CW });
     y = doc.y + 10;
   }
@@ -725,12 +785,24 @@ function drawQuotationPDF(doc: PDFKit.PDFDocument, q: any): void {
   doc.fillColor(C.tgray).font('Helvetica').fontSize(7.5)
      .text('Este documento no constituye factura de venta.',
            ML, y, { width: CW, lineBreak: false });
-  y += 11;
+  y += 16;
+
+  // Bloque de firma
+  const sellerName = q.seller?.name || 'John Mónoga';
+  doc.fillColor(C.black).font('Helvetica-Bold').fontSize(8.5)
+     .text(sellerName, ML, y, { lineBreak: false });
   doc.fillColor(C.tgray).font('Helvetica').fontSize(7.5)
-     .text(`Para confirmar su pedido comuníquese con ${q.seller?.name || 'su asesor'}` +
-           (q.seller?.email ? ` — ${q.seller.email}` : ''),
-           ML, y, { width: CW, lineBreak: false });
-  y += 22;
+     .text('Gerente de Proyectos', ML, y + 11, { lineBreak: false });
+  doc.fillColor(C.tgray).font('Helvetica').fontSize(7.5)
+     .text(`Tel: ${sellerPhone}`, ML, y + 21, { lineBreak: false });
+
+  doc.fillColor(C.dark).font('Helvetica-Bold').fontSize(8)
+     .text('MARAL TECNOLOGÍA Y COMUNICACIONES S.A.S.', ML + 220, y, { width: CW - 220, align: 'right', lineBreak: false });
+  doc.fillColor(C.tgray).font('Helvetica').fontSize(7.5)
+     .text('"Apoyando el mercado de las telecomunicaciones desde 2003"',
+           ML + 220, y + 11, { width: CW - 220, align: 'right', lineBreak: false });
+
+  y += 34;
 
   // Branding strip
   doc.rect(ML, y, CW, 18).fill(C.dark);
@@ -758,102 +830,122 @@ function drawShippingLabel(
 ): void {
   const CW = MR - ML;
 
-  // Heights for each zone
-  const REMITE_H  = 68;   // sender box
-  const DEST_H    = 105;  // recipient box (NIT + city + address + phone)
+  const REMITE_H  = 88;   // sender box — guía completa (nombre, NIT, dirección, tel, email, ciudad)
+  const DEST_H    = 112;  // recipient box
   const TOTAL_H   = REMITE_H + DEST_H;
 
-  // If less than 230pt remain on the current page, open a new one
-  const PAGE_H = 792;
+  const PAGE_H = 936;
   const NEEDED = 32 + TOTAL_H + 20;
   if (y + NEEDED > PAGE_H - 30) {
-    doc.addPage({ size: 'LETTER', margin: 0 });
+    doc.addPage({ size: [612, 936], margin: 0 });
     y = 40;
   } else {
-    y += 22; // spacing after branding strip
+    y += 22;
   }
 
-  // Section hint
   doc.fillColor(C.tgray).font('Helvetica').fontSize(7)
      .text('ETIQUETA DE ENVIO — recortar y pegar en el paquete',
            ML, y, { width: CW, align: 'center', lineBreak: false });
   y += 12;
 
-  // ── REMITE (sender) ───────────────────────────────────────────
-  //  Light gray fill + dark border
+  // ── REMITE (remitente) ────────────────────────────────────────
   doc.rect(ML, y, CW, REMITE_H).fill(C.lgray);
   doc.rect(ML, y, CW, REMITE_H).lineWidth(1.2).strokeColor(C.dark).stroke();
 
-  // "REMITE" pill label
   doc.rect(ML + 10, y + 8, 48, 13).fill(C.dark);
   doc.fillColor(C.white).font('Helvetica-Bold').fontSize(7.5)
      .text('REMITE', ML + 10, y + 11, { width: 48, align: 'center', lineBreak: false });
 
+  const remX = ML + 12;
+  const remW = CW - 24;
+  const remR = ML + 10 + 48 + 8; // right of pill + gap, start second column if needed
+
+  // Nombre
   doc.fillColor(C.dark).font('Helvetica-Bold').fontSize(11)
-     .text('MARAL TECNOLOGÍA Y COMUNICACIONES S.A.S.',
-           ML + 12, y + 26, { width: CW - 24, lineBreak: false });
-  doc.fillColor(C.tgray).font('Helvetica').fontSize(9.5)
-     .text('Calle 3 # 6A-22 Piso 1, Curití, Santander',
-           ML + 12, y + 40, { lineBreak: false });
-  doc.fillColor(C.tgray).font('Helvetica').fontSize(9.5)
-     .text('Tel: 3167760692',
-           ML + 12, y + 53, { lineBreak: false });
+     .text('MARAL TECNOLOGÍA Y COMUNICACIONES S.A.S.', remX, y + 26, { width: remW, lineBreak: false, ellipsis: true });
+  // NIT
+  doc.fillColor(C.tgray).font('Helvetica').fontSize(8.5)
+     .text(`NIT: ${COMPANY.nit}`, remX, y + 40, { lineBreak: false });
+  // Dirección
+  doc.fillColor(C.tgray).font('Helvetica').fontSize(8.5)
+     .text(`Dir: ${COMPANY.address}`, remX, y + 51, { width: remW, lineBreak: false, ellipsis: true });
+  // Ciudad
+  doc.fillColor(C.tgray).font('Helvetica').fontSize(8.5)
+     .text(`Ciudad: ${COMPANY.city}`, remX, y + 62, { lineBreak: false });
+  // Tel · Email
+  doc.fillColor(C.tgray).font('Helvetica').fontSize(8.5)
+     .text(`Tel: ${COMPANY.phone}   ·   ${COMPANY.email}`, remX, y + 73, { width: remW, lineBreak: false, ellipsis: true });
+
+  // Unused remR — keep for potential future right-column use
+  void remR;
 
   y += REMITE_H;
 
   // ── CUT LINE ──────────────────────────────────────────────────
-  // Centered label on a dashed rule
   const cutLabel = ' CORTAR AQUI ';
   doc.fillColor(C.tgray).font('Helvetica').fontSize(7)
      .text(cutLabel, ML, y + 4, { width: CW, align: 'center', lineBreak: false });
 
-  const labelApproxW = cutLabel.length * 3.8; // rough px estimate for 7pt font
+  const labelApproxW = cutLabel.length * 3.8;
   const midX = ML + CW / 2;
 
-  // Left dash segment
   doc.moveTo(ML, y + 8)
      .lineTo(midX - labelApproxW / 2 - 4, y + 8)
      .lineWidth(0.6).strokeColor(C.tgray)
      .dash(3, { space: 3 }).stroke();
-  // Right dash segment
   doc.moveTo(midX + labelApproxW / 2 + 4, y + 8)
      .lineTo(MR, y + 8)
      .dash(3, { space: 3 }).stroke();
   doc.undash();
 
-  y += 16; // height of cut zone
+  y += 16;
 
-  // ── DESTINO (recipient) ───────────────────────────────────────
+  // ── DESTINO (destinatario) ────────────────────────────────────
   doc.rect(ML, y, CW, DEST_H).lineWidth(1.2).strokeColor(C.dark).stroke();
 
-  // "DESTINO" pill label
   doc.rect(ML + 10, y + 8, 52, 13).fill(C.dark);
   doc.fillColor(C.white).font('Helvetica-Bold').fontSize(7.5)
      .text('DESTINO', ML + 10, y + 11, { width: 52, align: 'center', lineBreak: false });
 
   const cl = q.client;
-  const destName    = cl.company || cl.name || '—';
+  const destCompany = cl.company || cl.name || '—';
+  const destContact = cl.company ? cl.name : null;
   const destNIT     = cl.rut     || '—';
   const destAddress = q.shippingAddress || cl.address || '—';
   const destCity    = [cl.city, cl.department].filter(Boolean).join(', ') || '—';
   const destPhone   = cl.phone   || '—';
+  const destEmail   = cl.email   || null;
 
-  // Row layout inside DESTINO box:
-  //  y+27  Company/name  — 14pt bold
-  //  y+44  NIT           — 9.5pt gray
-  //  y+56  Address       — 11pt
-  //  y+70  City/dept     — 11pt
-  //  y+84  Phone         — 10pt gray
-  doc.fillColor(C.black).font('Helvetica-Bold').fontSize(14)
-     .text(destName, ML + 12, y + 27, { width: CW - 24, lineBreak: false, ellipsis: true });
-  doc.fillColor(C.tgray).font('Helvetica').fontSize(9.5)
-     .text(`NIT / CC: ${destNIT}`, ML + 12, y + 44, { lineBreak: false });
-  doc.fillColor(C.black).font('Helvetica').fontSize(11)
-     .text(destAddress, ML + 12, y + 56, { width: CW - 24, lineBreak: false, ellipsis: true });
-  doc.fillColor(C.black).font('Helvetica').fontSize(11)
-     .text(destCity,    ML + 12, y + 70, { width: CW - 24, lineBreak: false });
-  doc.fillColor(C.tgray).font('Helvetica').fontSize(10)
-     .text(`Tel: ${destPhone}`, ML + 12, y + 84, { lineBreak: false });
+  const dX = ML + 12;
+  const dW = CW - 24;
+
+  // Empresa — 14pt bold, max 1 línea con ellipsis
+  doc.fillColor(C.black).font('Helvetica-Bold').fontSize(13)
+     .text(destCompany, dX, y + 27, { width: dW, lineBreak: false, ellipsis: true });
+
+  let dy = y + 43;
+  // Contacto (si hay empresa separada)
+  if (destContact) {
+    doc.fillColor(C.tgray).font('Helvetica').fontSize(9)
+       .text(`Contacto: ${destContact}`, dX, dy, { width: dW, lineBreak: false, ellipsis: true });
+    dy += 12;
+  }
+  // NIT
+  doc.fillColor(C.tgray).font('Helvetica').fontSize(9)
+     .text(`NIT / CC: ${destNIT}`, dX, dy, { lineBreak: false });
+  dy += 12;
+  // Dirección
+  doc.fillColor(C.black).font('Helvetica').fontSize(10)
+     .text(`Dir: ${destAddress}`, dX, dy, { width: dW, lineBreak: false, ellipsis: true });
+  dy += 12;
+  // Ciudad
+  doc.fillColor(C.black).font('Helvetica').fontSize(10)
+     .text(destCity, dX, dy, { width: dW, lineBreak: false });
+  dy += 12;
+  // Tel · Email
+  const telLine = destEmail ? `Tel: ${destPhone}   ·   ${destEmail}` : `Tel: ${destPhone}`;
+  doc.fillColor(C.tgray).font('Helvetica').fontSize(9)
+     .text(telLine, dX, dy, { width: dW, lineBreak: false, ellipsis: true });
 }
 
 export default router;

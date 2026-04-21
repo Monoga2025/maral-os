@@ -11,6 +11,7 @@ import {
   X,
   Download,
   Pencil,
+  Eye,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { quotationsApi } from '../lib/api'
@@ -36,13 +37,22 @@ import type { ConvertToOrderRequest } from '../lib/contracts'
 import { TourButton } from '../components/tour/TourButton'
 
 const STATUS_TABS: { value: string; label: string }[] = [
-  { value: 'all', label: 'Todas' },
+  { value: 'active', label: 'Activas' },
   { value: 'BORRADOR', label: 'Borrador' },
   { value: 'ENVIADA', label: 'Enviada' },
-  { value: 'APROBADA', label: 'Aprobada' },
+  { value: 'APROBADA', label: 'Aprobadas' },
   { value: 'RECHAZADA', label: 'Rechazada' },
   { value: 'CONVERTIDA', label: 'Convertida' },
 ]
+
+// Devuelve clase CSS según antigüedad de la cotización (solo para estados activos)
+function getDateAgeClass(createdAt: string, status: string): string {
+  if (['APROBADA', 'RECHAZADA', 'CONVERTIDA'].includes(status)) return 'text-gray-500'
+  const days = Math.floor((Date.now() - new Date(createdAt).getTime()) / 86400000)
+  if (days <= 7) return 'text-green-600 font-medium'
+  if (days <= 30) return 'text-amber-500 font-medium'
+  return 'text-red-500 font-semibold'
+}
 
 const CARRIERS = ['Servientrega', 'Interrapidísimo', 'Coordinadora', 'TCC', 'Envia', 'Otro']
 
@@ -208,6 +218,8 @@ export default function Quotations() {
   const [page, setPage] = useState(1)
   const [flashId, setFlashId] = useState<string | null>(null)
   const [downloadingId, setDownloadingId] = useState<string | null>(null)
+  const [viewingId, setViewingId] = useState<string | null>(null)
+  const [changingStatusId, setChangingStatusId] = useState<string | null>(null)
   const [convertingQuotation, setConvertingQuotation] = useState<{
     id: string; clientName: string; clientPhone?: string; clientAddress?: string; clientCity?: string
   } | null>(null)
@@ -227,15 +239,34 @@ export default function Quotations() {
 
   const { data, isLoading } = useQuery({
     queryKey: ['quotations', { search, status: statusTab, page }],
-    queryFn: () =>
-      quotationsApi
+    queryFn: async () => {
+      if (statusTab === 'active') {
+        // Fetch BORRADOR + ENVIADA merged (two calls, combined client-side)
+        const [borradores, enviadas] = await Promise.all([
+          quotationsApi.getAll({ search: search || undefined, status: 'BORRADOR', page, pageSize: 10 }).then((r) => r.data),
+          quotationsApi.getAll({ search: search || undefined, status: 'ENVIADA', page, pageSize: 10 }).then((r) => r.data),
+        ])
+        const combined = [...(borradores.data ?? []), ...(enviadas.data ?? [])]
+          .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+        return {
+          data: combined,
+          pagination: {
+            total: (borradores.pagination?.total ?? 0) + (enviadas.pagination?.total ?? 0),
+            page,
+            pages: 1,
+            limit: 20,
+          },
+        }
+      }
+      return quotationsApi
         .getAll({
           search: search || undefined,
-          status: statusTab === 'all' ? undefined : statusTab,
+          status: statusTab,
           page,
           pageSize: 20,
         })
-        .then((r) => r.data),
+        .then((r) => r.data)
+    },
   })
 
   const convertMutation = useMutation({
@@ -267,6 +298,17 @@ export default function Quotations() {
       toast.success('Cotización eliminada')
     },
     onError: () => toast.error('No se puede eliminar esta cotización'),
+  })
+
+  const changeStatusMutation = useMutation({
+    mutationFn: ({ id, status }: { id: string; status: string }) =>
+      quotationsApi.updateStatus(id, status),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['quotations'] })
+      setChangingStatusId(null)
+      toast.success('Estado actualizado')
+    },
+    onError: () => toast.error('Error al cambiar estado'),
   })
 
   return (
@@ -379,7 +421,12 @@ export default function Quotations() {
                     <TableRow
                       key={q.id}
                       className={`cursor-pointer ${q.id === flashId ? 'row-flash' : ''}`}
-                      onClick={() => navigate(`/cotizaciones/${q.id}`)}
+                      onClick={async () => {
+                        setViewingId(q.id)
+                        try { await quotationsApi.viewPDF(q.id) }
+                        catch { toast.error('Error al abrir PDF') }
+                        finally { setViewingId(null) }
+                      }}
                     >
                       <TableCell>
                         <div className="flex items-center gap-2">
@@ -403,7 +450,11 @@ export default function Quotations() {
                           )}
                         </div>
                       </TableCell>
-                      <TableCell>{formatDate(q.createdAt)}</TableCell>
+                      <TableCell>
+                        <span className={getDateAgeClass(q.createdAt, q.status)}>
+                          {formatDate(q.createdAt)}
+                        </span>
+                      </TableCell>
                       <TableCell>
                         <div>
                           <span className="text-gray-600">
@@ -423,8 +474,34 @@ export default function Quotations() {
                       <TableCell className="font-semibold">
                         {formatCOP(q.total)}
                       </TableCell>
-                      <TableCell>
-                        <QuotationStatusBadge status={q.status as QuotationStatus} />
+                      <TableCell onClick={(e) => e.stopPropagation()}>
+                        {changingStatusId === q.id ? (
+                          <select
+                            autoFocus
+                            defaultValue={q.status}
+                            onBlur={() => setChangingStatusId(null)}
+                            onChange={(e) => {
+                              if (e.target.value !== q.status) {
+                                changeStatusMutation.mutate({ id: q.id, status: e.target.value })
+                              } else {
+                                setChangingStatusId(null)
+                              }
+                            }}
+                            className="rounded-lg border border-blue-400 px-2 py-1 text-xs focus:outline-none bg-white"
+                          >
+                            {['BORRADOR', 'ENVIADA', 'APROBADA', 'RECHAZADA'].map((s) => (
+                              <option key={s} value={s}>{s.charAt(0) + s.slice(1).toLowerCase()}</option>
+                            ))}
+                          </select>
+                        ) : (
+                          <button
+                            title="Clic para cambiar estado"
+                            onClick={() => q.status !== 'CONVERTIDA' && setChangingStatusId(q.id)}
+                            className={q.status !== 'CONVERTIDA' ? 'hover:opacity-75 transition-opacity' : ''}
+                          >
+                            <QuotationStatusBadge status={q.status as QuotationStatus} />
+                          </button>
+                        )}
                       </TableCell>
                       <TableCell>
                         <span className="text-gray-600">
@@ -465,8 +542,23 @@ export default function Quotations() {
                             </button>
                           )}
                           <button
+                            disabled={viewingId === q.id}
+                            onClick={async (e) => {
+                              e.stopPropagation()
+                              setViewingId(q.id)
+                              try { await quotationsApi.viewPDF(q.id) }
+                              catch { toast.error('Error al abrir PDF') }
+                              finally { setViewingId(null) }
+                            }}
+                            className="flex h-7 w-7 items-center justify-center rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors disabled:opacity-50"
+                            title="Ver PDF"
+                          >
+                            <Eye className="h-3.5 w-3.5" />
+                          </button>
+                          <button
                             disabled={downloadingId === q.id}
-                            onClick={async () => {
+                            onClick={async (e) => {
+                              e.stopPropagation()
                               setDownloadingId(q.id)
                               try {
                                 await quotationsApi.downloadPDF(q.id, q.number)

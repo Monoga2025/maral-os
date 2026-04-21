@@ -10,6 +10,9 @@ const CATEGORY_LABELS: Record<ClientCategory, string> = {
   FUNDADOR_MARAL: 'Fundador M.',
   ALIADO: 'Aliado',
   PROSPECTO: 'Prospecto',
+  IMPORTADOR: 'IM',
+  DISTRIBUIDOR: 'DS',
+  CLIENTE_FINAL: 'CF',
 }
 
 const CATEGORY_COLORS: Record<ClientCategory, string> = {
@@ -17,6 +20,9 @@ const CATEGORY_COLORS: Record<ClientCategory, string> = {
   FUNDADOR_MARAL: 'bg-blue-900 text-blue-300',
   ALIADO: 'bg-[#14532D] text-[#22C55E]',
   PROSPECTO: 'bg-yellow-900 text-yellow-300',
+  IMPORTADOR: 'bg-purple-900 text-purple-300',
+  DISTRIBUIDOR: 'bg-indigo-900 text-indigo-300',
+  CLIENTE_FINAL: 'bg-orange-900 text-orange-300',
 }
 
 export default function MobileClients() {

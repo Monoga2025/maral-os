@@ -53,6 +53,9 @@ const clientCategoryMap: Record<
   FUNDADOR_MARAL: { label: 'Fundador Maral', variant: 'blue' },
   ALIADO: { label: 'Aliado', variant: 'green' },
   PROSPECTO: { label: 'Prospecto', variant: 'yellow' },
+  IMPORTADOR: { label: 'Importador (IM)', variant: 'purple' },
+  DISTRIBUIDOR: { label: 'Distribuidor (DS)', variant: 'indigo' },
+  CLIENTE_FINAL: { label: 'Cliente Final (CF)', variant: 'orange' },
 }
 
 const productionStatusMap: Record<
