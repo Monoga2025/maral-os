@@ -15,6 +15,7 @@ WORKDIR /app
 ENV NODE_ENV=production
 RUN apk add --no-cache openssl
 COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/src/assets ./src/assets
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/prisma ./prisma
 COPY package*.json ./
