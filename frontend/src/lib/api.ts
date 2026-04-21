@@ -132,31 +132,16 @@ export const quotationsApi = {
   duplicate: (id: string) => api.post<Quotation>(`/quotations/${id}/duplicate`),
   updateStatus: (id: string, status: string) =>
     api.patch<Quotation>(`/quotations/${id}/status`, { status }),
-  downloadPDF: async (id: string, number: number | string): Promise<void> => {
+  downloadPDF: async (id: string, _number: number | string): Promise<void> => {
     const token = localStorage.getItem('token')
-    const response = await fetch(`/api/quotations/${id}/pdf`, {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-    if (!response.ok) throw new Error('Error al generar PDF')
-    const blob = await response.blob()
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `COT-${String(number).padStart(5, '0')}.pdf`
-    a.click()
-    URL.revokeObjectURL(url)
+    // Opens HTML in new tab — user prints/saves as PDF from browser
+    const url = `/api/quotations/${id}/html?token=${encodeURIComponent(token || '')}`
+    window.open(url, '_blank')
   },
   viewPDF: async (id: string): Promise<void> => {
     const token = localStorage.getItem('token')
-    const response = await fetch(`/api/quotations/${id}/pdf`, {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-    if (!response.ok) throw new Error('Error al generar PDF')
-    const blob = await response.blob()
-    const url = URL.createObjectURL(blob)
+    const url = `/api/quotations/${id}/html?token=${encodeURIComponent(token || '')}`
     window.open(url, '_blank')
-    // revoke after short delay to let the new tab load
-    setTimeout(() => URL.revokeObjectURL(url), 10000)
   },
   parseQuotationImage: (imageBase64: string, mimeType: string) =>
     api.post<{

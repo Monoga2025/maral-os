@@ -39,7 +39,7 @@ function fmtNIT(raw: string): string {
 const COMPANY = {
   name:    process.env.COMPANY_NAME    ?? 'MARAL TECNOLOGÍA Y COMUNICACIONES S.A.S.',
   nit:     fmtNIT(process.env.COMPANY_NIT ?? '9018894798'),
-  address: process.env.COMPANY_ADDRESS ?? 'Calle 3 # 6 A - 22 (Bodega 101)',
+  address: process.env.COMPANY_ADDRESS ?? 'Calle 3 # 6 A - 22 Bodega 101',
   city:    'Curití - Santander, Colombia',
   phone:   process.env.COMPANY_PHONE   ?? '3167760692',
   email:   process.env.COMPANY_EMAIL   ?? 'ventas@industriasmaral.com',
@@ -63,6 +63,12 @@ const CATEGORY_CODES: Record<string, string> = {
   IMPORTADOR:    'IM',
   DISTRIBUIDOR:  'DS',
   CLIENTE_FINAL: 'CF',
+};
+
+const CATEGORY_LABELS: Record<string, string> = {
+  IMPORTADOR:    'Importador',
+  DISTRIBUIDOR:  'Distribuidor',
+  CLIENTE_FINAL: 'Cliente final',
 };
 
 const kitComponentOverrideSchema = z.object({
@@ -143,6 +149,36 @@ router.get('/', async (req: AuthRequest, res: Response) => {
   } catch (error) {
     console.error('Get quotations error:', error);
     res.status(500).json({ error: 'Error al obtener cotizaciones' });
+  }
+});
+
+// GET /api/quotations/:id/html
+router.get('/:id/html', async (req: AuthRequest, res: Response) => {
+  try {
+    const quotation = await prisma.quotation.findUnique({
+      where: { id: req.params.id },
+      include: {
+        client: true,
+        seller: { select: { id: true, name: true, email: true } },
+        items: {
+          include: {
+            product: { select: { id: true, reference: true, name: true, unit: true, warrantyYears: true } },
+          },
+          orderBy: { id: 'asc' },
+        },
+      },
+    });
+
+    if (!quotation) {
+      res.status(404).json({ error: 'Cotización no encontrada' });
+      return;
+    }
+
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.send(generateQuotationHTML(quotation));
+  } catch (error) {
+    console.error('HTML quotation error:', error);
+    res.status(500).json({ error: 'Error al generar cotización' });
   }
 });
 
@@ -489,6 +525,303 @@ router.post('/:id/convert-to-order', async (req: AuthRequest, res: Response) => 
   }
 });
 
+// ─── HTML generator ────────────────────────────────────────────
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function generateQuotationHTML(q: any): string {
+  const fmtCOP = (n: number) =>
+    new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(n);
+  const fmtDate = (d: Date | string) =>
+    new Date(d).toLocaleDateString('es-CO', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  const escape = (s: string) =>
+    s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+  const expiry = new Date(q.createdAt);
+  expiry.setDate(expiry.getDate() + q.validityDays);
+  const expiryLong = expiry.toLocaleDateString('es-CO', { day: 'numeric', month: 'long', year: 'numeric' });
+  const taxPct = q.subtotal > 0 ? Math.round((q.tax / q.subtotal) * 100) : 0;
+  const sellerPhone = getSellerPhone(q.seller);
+  const catCode  = CATEGORY_CODES[q.client?.category ?? ''] ?? null;
+  const catLabel = CATEGORY_LABELS[q.client?.category ?? ''] ?? null;
+  const num = String(q.number).padStart(5, '0');
+  const cl = q.client;
+
+  // Logo base64 if exists
+  let logoHtml = '';
+  if (fs.existsSync(LOGO_PATH)) {
+    const ext = path.extname(LOGO_PATH).slice(1).toLowerCase();
+    const mime = ext === 'svg' ? 'image/svg+xml' : `image/${ext}`;
+    const data = fs.readFileSync(LOGO_PATH).toString('base64');
+    logoHtml = `<img src="data:${mime};base64,${data}" alt="Logo MARAL" style="max-height:70px;max-width:130px;object-fit:contain;display:block;">`;
+  } else {
+    logoHtml = `<div style="width:100px;height:70px;background:#1e3a5f;display:flex;flex-direction:column;align-items:center;justify-content:center;border-radius:6px;gap:4px;">
+      <span style="color:white;font-size:30px;font-weight:900;line-height:1;">M</span>
+      <span style="color:#93c5fd;font-size:8px;letter-spacing:3px;font-weight:700;">MARAL</span>
+    </div>`;
+  }
+
+  // Empresa column (left)
+  const empresaRows: [string, string][] = [
+    ['Razón Social', escape(cl.company || cl.name || '—')],
+    ['NIT / CC', escape(cl.rut || '—')],
+    ['Ciudad', escape([cl.city, cl.department].filter(Boolean).join(', ') || '—')],
+  ];
+  if (catLabel) empresaRows.push(['Categoría', escape(catLabel)]);
+
+  // Contacto column (right)
+  const contactoRows: [string, string][] = [];
+  if (cl.company) contactoRows.push(['Nombre', escape(cl.name || '—')]);
+  contactoRows.push(
+    ['Teléfono', escape(cl.phone || '—')],
+    ['Email', escape(cl.email || '—')],
+  );
+
+  const condRowPairs: [string, string][] = [
+    ['Vigencia', `${q.validityDays} días`],
+    ['Válida hasta', fmtDate(expiry)],
+    ['Condición de pago', escape(q.paymentTerms || 'Contado')],
+    ['IVA aplicado', taxPct > 0 ? `${taxPct}%` : 'No aplica'],
+    ['Asesor comercial', escape(q.seller?.name || '—')],
+    ['Tel. asesor', escape(sellerPhone)],
+  ];
+
+  const makeInfoTable = (rows: [string, string][]) =>
+    rows.map(([lbl, val]) => `
+      <tr>
+        <td style="color:#6b7280;font-size:11px;padding:3px 0;white-space:nowrap;vertical-align:top;">${lbl}:</td>
+        <td style="padding:3px 0 3px 10px;font-size:12px;vertical-align:top;">${val}</td>
+      </tr>`).join('');
+
+  // Product rows
+  const itemRows = (q.items as any[]).map((item, i: number) => {
+    const prod = item.product;
+    const finalPrice = item.unitPrice * (1 - (item.discount || 0) / 100);
+    const bg = i % 2 === 0 ? '#ffffff' : '#f8fafc';
+    const discStyle = item.discount > 0 ? 'color:#dc2626;font-weight:700;' : 'color:#9ca3af;';
+    return `<tr style="background:${bg};">
+      <td style="text-align:right;padding:7px 8px;font-weight:600;white-space:nowrap;">${item.qty % 1 === 0 ? item.qty : item.qty.toFixed(2)}</td>
+      <td style="padding:7px 8px;color:#4b5563;font-size:11px;white-space:nowrap;">${escape(prod.reference || '—')}</td>
+      <td style="padding:7px 8px;word-break:break-word;white-space:normal;line-height:1.4;">${escape(prod.name)}</td>
+      <td style="text-align:center;padding:7px 8px;color:#6b7280;white-space:nowrap;">${escape(prod.unit || 'UN')}</td>
+      <td style="text-align:right;padding:7px 8px;color:#6b7280;white-space:nowrap;">${fmtCOP(item.unitPrice)}</td>
+      <td style="text-align:right;padding:7px 8px;white-space:nowrap;${discStyle}">${item.discount > 0 ? item.discount + '%' : '—'}</td>
+      <td style="text-align:right;padding:7px 8px;font-weight:700;white-space:nowrap;">${fmtCOP(finalPrice)}</td>
+      <td style="text-align:right;padding:7px 8px;font-weight:700;white-space:nowrap;">${fmtCOP(item.subtotal)}</td>
+    </tr>`;
+  }).join('');
+
+  // Shipping data
+  const destCompany = escape(cl.company || cl.name || '—');
+  const destContact = cl.company ? escape(cl.name) : null;
+  const destNIT = escape(cl.rut || '—');
+  const destAddress = escape(q.shippingAddress || cl.address || '—');
+  const destCity = escape([cl.city, cl.department].filter(Boolean).join(', ') || '—');
+  const destPhone = escape(cl.phone || '—');
+  const destEmail = escape(cl.email || '—');
+
+  const notesBlock = q.notes ? `
+    <div style="margin-top:18px;border-left:4px solid #b45309;background:#fffbeb;padding:13px 16px;border-radius:4px;">
+      <div style="color:#b45309;font-weight:700;font-size:10px;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:6px;">⚠ Observaciones</div>
+      <div style="color:#78350f;font-size:13px;line-height:1.6;">${escape(q.notes)}</div>
+    </div>` : '';
+
+  const taxRow = q.tax > 0 ? `
+    <div style="display:flex;justify-content:space-between;padding:4px 0;font-size:13px;">
+      <span style="color:#6b7280;">IVA (${taxPct}%):</span>
+      <span>${fmtCOP(q.tax)}</span>
+    </div>` : '';
+
+  return `<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Cotización COT-${num}</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:'Segoe UI',system-ui,Arial,sans-serif;font-size:13px;background:#d1d5db;color:#111827;line-height:1.5;}
+.no-print{position:fixed;top:16px;right:16px;z-index:999;display:flex;gap:8px;}
+.btn{padding:10px 20px;border:none;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;box-shadow:0 2px 8px rgba(0,0,0,.2);}
+.btn-print{background:#1e3a5f;color:white;}
+.btn-print:hover{background:#1d4ed8;}
+.page{width:21cm;min-height:29.7cm;margin:20px auto;background:white;padding:1.3cm 1.5cm 1.5cm;box-shadow:0 4px 32px rgba(0,0,0,.15);border-radius:2px;}
+.header{display:flex;align-items:flex-start;gap:16px;margin-bottom:18px;}
+.header-info{flex:1;}
+.company-name{font-weight:800;color:#1e3a5f;font-size:14px;margin-bottom:3px;text-transform:uppercase;letter-spacing:.5px;}
+.company-meta{font-size:11px;color:#6b7280;line-height:1.8;}
+.badge{background:#1e3a5f;color:white;padding:12px 18px;border-radius:8px;text-align:center;min-width:148px;flex-shrink:0;}
+.badge-label{font-size:9px;text-transform:uppercase;letter-spacing:2px;opacity:.75;}
+.badge-number{font-size:27px;font-weight:800;margin:2px 0;letter-spacing:-.5px;}
+.badge-date{font-size:10px;color:#bfdbfe;margin-top:3px;}
+hr{border:none;border-top:1px solid #e5e7eb;margin:14px 0;}
+.info-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:14px;}
+.section-title{font-size:9.5px;font-weight:800;color:#1e3a5f;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:8px;padding-bottom:5px;border-bottom:2px solid #1e3a5f;}
+.info-table{width:100%;border-collapse:collapse;}
+table.products{width:100%;border-collapse:collapse;font-size:12px;margin-bottom:16px;}
+table.products thead tr{background:#1e3a5f;}
+table.products th{color:white;padding:9px 8px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;}
+table.products td{border-bottom:1px solid #e5e7eb;vertical-align:top;}
+table.products tbody tr:last-child td{border-bottom:none;}
+.totals{display:flex;justify-content:flex-end;margin-bottom:6px;}
+.totals-box{width:290px;border:1px solid #e5e7eb;border-radius:8px;padding:12px 14px;background:#f9fafb;}
+.total-final{background:#1e3a5f;color:white;padding:10px 14px;border-radius:6px;display:flex;justify-content:space-between;align-items:center;margin-top:10px;}
+.signature-block{border-top:2px solid #e5e7eb;padding-top:16px;margin-top:16px;display:flex;justify-content:space-between;align-items:flex-start;gap:20px;}
+.signature-left{flex:1;}
+.signature-right{text-align:right;font-size:11px;color:#6b7280;line-height:1.8;}
+.signature-right strong{color:#1e3a5f;display:block;}
+.signature-name{font-size:16px;font-weight:800;color:#1e3a5f;margin-bottom:2px;}
+.signature-line{font-size:12px;color:#374151;line-height:1.9;}
+.signature-company{font-weight:700;color:#1e3a5f;}
+.signature-tagline{font-style:italic;color:#9ca3af;font-size:11px;}
+.strip{background:#1e3a5f;color:white;padding:8px 12px;text-align:center;font-size:10px;margin-top:18px;border-radius:4px;letter-spacing:.3px;}
+/* Shipping label */
+.shipping-section{margin-top:26px;padding-top:18px;border-top:2px dashed #9ca3af;}
+.shipping-title{text-align:center;font-size:10px;color:#9ca3af;text-transform:uppercase;letter-spacing:2px;margin-bottom:12px;}
+.shipping-card{border:2px solid #1e3a5f;border-radius:8px;overflow:hidden;}
+.remite-box{background:#f0f4f8;padding:14px 16px;}
+.destino-box{padding:14px 16px;}
+.sh-badge{display:inline-block;background:#1e3a5f;color:white;font-size:9px;font-weight:800;padding:3px 10px;border-radius:3px;letter-spacing:1.5px;margin-bottom:8px;text-transform:uppercase;}
+.sh-company{font-size:16px;font-weight:800;color:#1e3a5f;margin-bottom:3px;word-break:break-word;}
+.sh-meta{font-size:12px;color:#374151;line-height:2.1;}
+.dest-company{font-size:18px;font-weight:800;color:#111827;margin-bottom:4px;word-break:break-word;}
+.cut-divider{border:none;border-top:1.5px dashed #9ca3af;margin:0;}
+.cut-label{text-align:center;font-size:10px;color:#9ca3af;padding:3px 0;letter-spacing:1px;background:white;}
+@media print{
+  body{background:white;}
+  .no-print{display:none!important;}
+  .page{margin:0;box-shadow:none;padding:.8cm 1cm;width:100%;}
+  @page{size:A4;margin:0;}
+}
+</style>
+</head>
+<body>
+<div class="no-print">
+  <button class="btn btn-print" onclick="window.print()">🖨 Imprimir / Guardar PDF</button>
+</div>
+
+<div class="page">
+  <div class="header">
+    <div style="flex-shrink:0;">${logoHtml}</div>
+    <div class="header-info">
+      <div class="company-name">${escape(COMPANY.name)}</div>
+      <div class="company-meta">
+        NIT: ${escape(COMPANY.nit)}<br>
+        ${escape(COMPANY.address)}<br>
+        ${escape(COMPANY.city)}<br>
+        ${escape(COMPANY.phone)} &nbsp;·&nbsp; ${escape(COMPANY.email)}
+      </div>
+    </div>
+    <div class="badge">
+      <div class="badge-label">Cotización</div>
+      <div class="badge-number"># ${num}</div>
+      <div class="badge-date">${fmtDate(q.createdAt)}</div>
+    </div>
+  </div>
+
+  <hr>
+
+  <div class="info-grid">
+    <div>
+      <div class="section-title">Empresa</div>
+      <table class="info-table">${makeInfoTable(empresaRows)}</table>
+    </div>
+    <div>
+      <div class="section-title">Contacto</div>
+      <table class="info-table">${makeInfoTable(contactoRows)}</table>
+    </div>
+    <div>
+      <div class="section-title">Condiciones</div>
+      <table class="info-table">${makeInfoTable(condRowPairs)}</table>
+    </div>
+  </div>
+
+  <hr>
+
+  <table class="products">
+    <thead>
+      <tr>
+        <th style="text-align:right;width:48px;">Cant</th>
+        <th style="text-align:left;width:68px;">Referencia</th>
+        <th style="text-align:left;">Descripción</th>
+        <th style="text-align:center;width:38px;">Und</th>
+        <th style="text-align:right;width:88px;">P. Unit</th>
+        <th style="text-align:right;width:44px;">Desc%</th>
+        <th style="text-align:right;width:88px;">P. c/dto</th>
+        <th style="text-align:right;width:88px;">Subtotal</th>
+      </tr>
+    </thead>
+    <tbody>${itemRows}</tbody>
+  </table>
+
+  <div class="totals">
+    <div class="totals-box">
+      <div style="display:flex;justify-content:space-between;padding:4px 0;font-size:13px;">
+        <span style="color:#6b7280;">Subtotal:</span>
+        <span>${fmtCOP(q.subtotal)}</span>
+      </div>
+      ${taxRow}
+      <div class="total-final">
+        <span style="font-size:12px;font-weight:700;">TOTAL</span>
+        <span style="font-size:18px;font-weight:800;">${fmtCOP(q.total)}</span>
+      </div>
+    </div>
+  </div>
+
+  ${notesBlock}
+
+  <div class="signature-block">
+    <div class="signature-left">
+      <div class="signature-name">John Mónoga</div>
+      <div class="signature-line">Gerente de Proyectos</div>
+      <div class="signature-line signature-company">MARAL TECNOLOGIA Y COMUNICACIONES S.A.S.</div>
+      <div class="signature-line">ingenieria@industriasmaral.com</div>
+      <div class="signature-line signature-tagline">Apoyando el mercado de las telecomunicaciones desde 2003</div>
+    </div>
+    <div class="signature-right">
+      Esta cotización es válida hasta el<br>
+      <strong>${expiryLong}</strong>
+      Este documento no constituye factura de venta.
+    </div>
+  </div>
+
+  <div class="strip">
+    ${escape(COMPANY.address)} &nbsp;-&nbsp; ${escape(COMPANY.phone)} &nbsp;-&nbsp; ${escape(COMPANY.email)} &nbsp;-&nbsp; ${escape(COMPANY.website)} &nbsp;-&nbsp; Curití - Santander - Colombia
+  </div>
+
+  <div class="shipping-section">
+    <div class="shipping-title">✂ &nbsp;Etiqueta de envío — recortar y pegar en el paquete</div>
+    <div class="shipping-card">
+      <div class="remite-box">
+        <span class="sh-badge">Remite</span>
+        <div class="sh-company">MARAL TECNOLOGIA Y COMUNICACIONES S.A.S.</div>
+        <div class="sh-meta">
+          ${escape(COMPANY.nit)}<br>
+          ${escape(COMPANY.address)}<br>
+          ${escape(COMPANY.phone)}<br>
+          ${escape(COMPANY.email)}<br>
+          Curití - Santander
+        </div>
+      </div>
+      <div class="cut-label">— — — — — — — — — — CORTAR AQUÍ — — — — — — — — — —</div>
+      <hr class="cut-divider">
+      <div class="destino-box">
+        <span class="sh-badge">Destino</span>
+        <div class="dest-company">${destCompany}</div>
+        <div class="sh-meta">
+          ${destNIT}<br>
+          ${destAddress}<br>
+          ${destPhone}<br>
+          ${destEmail}<br>
+          ${destCity}
+        </div>
+        ${destContact ? `<div style="font-size:11px;color:#6b7280;margin-top:6px;">Contacto: ${destContact}</div>` : ''}
+      </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>`;
+}
+
 // ─── PDF generator ─────────────────────────────────────────────
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function drawQuotationPDF(doc: PDFKit.PDFDocument, q: any): void {
@@ -651,7 +984,7 @@ function drawQuotationPDF(doc: PDFKit.PDFDocument, q: any): void {
   ];
 
   const HEADER_H   = 20;
-  const ROW_HEIGHT = 18;
+  const MIN_ROW_H  = 18;
 
   const drawTableHeader = (headerY: number) => {
     doc.rect(ML, headerY, CW, HEADER_H).fill(C.dark);
@@ -666,16 +999,22 @@ function drawQuotationPDF(doc: PDFKit.PDFDocument, q: any): void {
   y += HEADER_H;
 
   for (let i = 0; i < q.items.length; i++) {
+    const item = q.items[i];
+    const prod = item.product;
+    const finalPrice = item.unitPrice * (1 - (item.discount || 0) / 100);
+
+    // Calculate how many lines the description needs
+    const descW = cols[2].w - 6;
+    const charsPerLine = Math.floor(descW / 4.3); // ~4.3pt per char at 7.5pt
+    const descLines = Math.ceil(prod.name.length / charsPerLine);
+    const ROW_HEIGHT = Math.max(MIN_ROW_H, descLines * 10 + 8);
+
     if (y + ROW_HEIGHT > 870) {
       doc.addPage({ size: [612, 936], margin: 0 });
       y = 40;
       drawTableHeader(y);
       y += HEADER_H;
     }
-
-    const item = q.items[i];
-    const prod = item.product;
-    const finalPrice = item.unitPrice * (1 - (item.discount || 0) / 100);
 
     if (i % 2 === 1) {
       doc.rect(ML, y, CW, ROW_HEIGHT).fill(C.lgray);
@@ -690,10 +1029,10 @@ function drawQuotationPDF(doc: PDFKit.PDFDocument, q: any): void {
     doc.fillColor(C.black).font('Helvetica').fontSize(7.5)
        .text(prod.reference || '—', cols[1].x + 3, ty,
              { width: cols[1].w - 6, align: 'left', lineBreak: false, ellipsis: true });
-    // Desc
+    // Desc — wraps instead of ellipsis
     doc.fillColor(C.black).font('Helvetica').fontSize(7.5)
        .text(prod.name, cols[2].x + 3, ty,
-             { width: cols[2].w - 6, align: 'left', lineBreak: false, ellipsis: true });
+             { width: descW, align: 'left', lineBreak: true });
     // Und
     doc.fillColor(C.tgray).font('Helvetica').fontSize(7.5)
        .text(prod.unit || 'UN', cols[3].x + 3, ty,
@@ -788,21 +1127,18 @@ function drawQuotationPDF(doc: PDFKit.PDFDocument, q: any): void {
   y += 16;
 
   // Bloque de firma
-  const sellerName = q.seller?.name || 'John Mónoga';
-  doc.fillColor(C.black).font('Helvetica-Bold').fontSize(8.5)
-     .text(sellerName, ML, y, { lineBreak: false });
-  doc.fillColor(C.tgray).font('Helvetica').fontSize(7.5)
-     .text('Gerente de Proyectos', ML, y + 11, { lineBreak: false });
-  doc.fillColor(C.tgray).font('Helvetica').fontSize(7.5)
-     .text(`Tel: ${sellerPhone}`, ML, y + 21, { lineBreak: false });
-
+  doc.fillColor(C.black).font('Helvetica-Bold').fontSize(9)
+     .text('John Mónoga', ML, y, { lineBreak: false });
+  doc.fillColor(C.tgray).font('Helvetica').fontSize(8)
+     .text('Gerente de Proyectos', ML, y + 12, { lineBreak: false });
   doc.fillColor(C.dark).font('Helvetica-Bold').fontSize(8)
-     .text('MARAL TECNOLOGÍA Y COMUNICACIONES S.A.S.', ML + 220, y, { width: CW - 220, align: 'right', lineBreak: false });
+     .text('MARAL TECNOLOGIA Y COMUNICACIONES S.A.S.', ML, y + 24, { lineBreak: false });
+  doc.fillColor(C.tgray).font('Helvetica').fontSize(8)
+     .text('ingenieria@industriasmaral.com', ML, y + 36, { lineBreak: false });
   doc.fillColor(C.tgray).font('Helvetica').fontSize(7.5)
-     .text('"Apoyando el mercado de las telecomunicaciones desde 2003"',
-           ML + 220, y + 11, { width: CW - 220, align: 'right', lineBreak: false });
+     .text('Apoyando el mercado de las telecomunicaciones desde 2003', ML, y + 48, { lineBreak: false });
 
-  y += 34;
+  y += 62;
 
   // Branding strip
   doc.rect(ML, y, CW, 18).fill(C.dark);
@@ -830,8 +1166,8 @@ function drawShippingLabel(
 ): void {
   const CW = MR - ML;
 
-  const REMITE_H  = 88;   // sender box — guía completa (nombre, NIT, dirección, tel, email, ciudad)
-  const DEST_H    = 112;  // recipient box
+  const REMITE_H  = 98;   // sender box — nombre, NIT, dirección, tel, email, ciudad
+  const DEST_H    = 115;  // recipient box
   const TOTAL_H   = REMITE_H + DEST_H;
 
   const PAGE_H = 936;
@@ -861,20 +1197,23 @@ function drawShippingLabel(
   const remR = ML + 10 + 48 + 8; // right of pill + gap, start second column if needed
 
   // Nombre
-  doc.fillColor(C.dark).font('Helvetica-Bold').fontSize(11)
-     .text('MARAL TECNOLOGÍA Y COMUNICACIONES S.A.S.', remX, y + 26, { width: remW, lineBreak: false, ellipsis: true });
+  doc.fillColor(C.dark).font('Helvetica-Bold').fontSize(10)
+     .text('MARAL TECNOLOGIA Y COMUNICACIONES S.A.S.', remX, y + 26, { width: remW, lineBreak: false, ellipsis: true });
   // NIT
   doc.fillColor(C.tgray).font('Helvetica').fontSize(8.5)
-     .text(`NIT: ${COMPANY.nit}`, remX, y + 40, { lineBreak: false });
+     .text(COMPANY.nit, remX, y + 39, { lineBreak: false });
   // Dirección
   doc.fillColor(C.tgray).font('Helvetica').fontSize(8.5)
-     .text(`Dir: ${COMPANY.address}`, remX, y + 51, { width: remW, lineBreak: false, ellipsis: true });
+     .text(COMPANY.address, remX, y + 50, { width: remW, lineBreak: false, ellipsis: true });
+  // Teléfono
+  doc.fillColor(C.tgray).font('Helvetica').fontSize(8.5)
+     .text(COMPANY.phone, remX, y + 61, { lineBreak: false });
+  // Email
+  doc.fillColor(C.tgray).font('Helvetica').fontSize(8.5)
+     .text(COMPANY.email, remX, y + 72, { width: remW, lineBreak: false, ellipsis: true });
   // Ciudad
   doc.fillColor(C.tgray).font('Helvetica').fontSize(8.5)
-     .text(`Ciudad: ${COMPANY.city}`, remX, y + 62, { lineBreak: false });
-  // Tel · Email
-  doc.fillColor(C.tgray).font('Helvetica').fontSize(8.5)
-     .text(`Tel: ${COMPANY.phone}   ·   ${COMPANY.email}`, remX, y + 73, { width: remW, lineBreak: false, ellipsis: true });
+     .text('Curití - Santander', remX, y + 83, { lineBreak: false });
 
   // Unused remR — keep for potential future right-column use
   void remR;
@@ -909,43 +1248,34 @@ function drawShippingLabel(
 
   const cl = q.client;
   const destCompany = cl.company || cl.name || '—';
-  const destContact = cl.company ? cl.name : null;
   const destNIT     = cl.rut     || '—';
   const destAddress = q.shippingAddress || cl.address || '—';
-  const destCity    = [cl.city, cl.department].filter(Boolean).join(', ') || '—';
   const destPhone   = cl.phone   || '—';
-  const destEmail   = cl.email   || null;
+  const destEmail   = cl.email   || '—';
+  const destCity    = [cl.city, cl.department].filter(Boolean).join(', ') || '—';
 
   const dX = ML + 12;
   const dW = CW - 24;
 
-  // Empresa — 14pt bold, max 1 línea con ellipsis
+  // Nombre — 13pt bold
   doc.fillColor(C.black).font('Helvetica-Bold').fontSize(13)
      .text(destCompany, dX, y + 27, { width: dW, lineBreak: false, ellipsis: true });
 
-  let dy = y + 43;
-  // Contacto (si hay empresa separada)
-  if (destContact) {
-    doc.fillColor(C.tgray).font('Helvetica').fontSize(9)
-       .text(`Contacto: ${destContact}`, dX, dy, { width: dW, lineBreak: false, ellipsis: true });
-    dy += 12;
-  }
   // NIT
   doc.fillColor(C.tgray).font('Helvetica').fontSize(9)
-     .text(`NIT / CC: ${destNIT}`, dX, dy, { lineBreak: false });
-  dy += 12;
+     .text(destNIT, dX, y + 43, { lineBreak: false });
   // Dirección
-  doc.fillColor(C.black).font('Helvetica').fontSize(10)
-     .text(`Dir: ${destAddress}`, dX, dy, { width: dW, lineBreak: false, ellipsis: true });
-  dy += 12;
-  // Ciudad
-  doc.fillColor(C.black).font('Helvetica').fontSize(10)
-     .text(destCity, dX, dy, { width: dW, lineBreak: false });
-  dy += 12;
-  // Tel · Email
-  const telLine = destEmail ? `Tel: ${destPhone}   ·   ${destEmail}` : `Tel: ${destPhone}`;
   doc.fillColor(C.tgray).font('Helvetica').fontSize(9)
-     .text(telLine, dX, dy, { width: dW, lineBreak: false, ellipsis: true });
+     .text(destAddress, dX, y + 55, { width: dW, lineBreak: false, ellipsis: true });
+  // Teléfono
+  doc.fillColor(C.tgray).font('Helvetica').fontSize(9)
+     .text(destPhone, dX, y + 67, { lineBreak: false });
+  // Correo
+  doc.fillColor(C.tgray).font('Helvetica').fontSize(9)
+     .text(destEmail, dX, y + 79, { width: dW, lineBreak: false, ellipsis: true });
+  // Ciudad
+  doc.fillColor(C.black).font('Helvetica-Bold').fontSize(9)
+     .text(destCity, dX, y + 91, { width: dW, lineBreak: false, ellipsis: true });
 }
 
 export default router;

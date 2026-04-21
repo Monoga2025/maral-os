@@ -28,6 +28,22 @@
 
 ---
 
+## 2026-04-20 — Claude Code — Módulo cotizaciones: HTML render, firma, guía de envío, numeración
+
+### Qué se hizo
+Rediseño completo del generador de cotizaciones a HTML+CSS (imprimible como PDF desde navegador). Correcciones múltiples al módulo solicitadas por John.
+
+### Cambios realizados
+- `backend/src/routes/quotations.ts`: Nueva ruta `GET /:id/html` que retorna HTML estilizado autocontenido. Firma/footer corregida al orden exacto solicitado. REMITE: Nombre, NIT, Dirección, Tel, Email, Ciudad. DESTINO: Nombre, NIT, Dirección, Tel, Email, Ciudad. PDFKit: nombres largos wrap en lugar de ellipsis.
+- `backend/src/middleware/auth.ts`: Acepta token también en query param `?token=` (necesario para abrir HTML en nueva pestaña del navegador).
+- `frontend/src/lib/api.ts`: `viewPDF` y `downloadPDF` ahora abren la ruta HTML en nueva pestaña.
+- `backend/src/assets/` creado — colocar logo en `backend/src/assets/logo.png`.
+- Secuencia `Quotation_number_seq` reseteada a 4518 → próxima cotización = 4519.
+
+### Próximos pasos
+- John debe copiar el logo PNG a `backend/src/assets/logo.png`
+- Deploy en EasyPanel con nuevo código
+
 ## 2026-04-15 — QA humano + agente — 15 bugs UI corregidos + tours para Tareas y Gastos
 
 ### Qué se hizo

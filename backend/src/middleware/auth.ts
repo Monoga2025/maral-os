@@ -10,13 +10,19 @@ export interface AuthRequest extends Request {
 
 export function authenticate(req: AuthRequest, res: Response, next: NextFunction): void {
   const authHeader = req.headers.authorization;
+  // Allow token via query param for browser-opened HTML documents (no header support)
+  const queryToken = req.query.token as string | undefined;
 
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+  let token: string;
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    token = authHeader.substring(7);
+  } else if (queryToken) {
+    token = queryToken;
+  } else {
     res.status(401).json({ error: 'Token de autenticación requerido' });
     return;
   }
 
-  const token = authHeader.substring(7);
   const payload = verifyToken(token);
 
   if (!payload) {
