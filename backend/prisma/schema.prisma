@@ -16,6 +16,8 @@ model User {
   password          String
   role              Role             @default(VENTAS)
   active            Boolean          @default(true)
+  phone             String?
+  whatsapp          String?
   createdAt         DateTime         @default(now())
   updatedAt         DateTime         @updatedAt
   quotations        Quotation[]
