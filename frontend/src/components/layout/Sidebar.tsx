@@ -159,7 +159,7 @@ const navGroups: NavGroup[] = [
     items: [
       { to: '/clientes',     icon: <Users className="h-5 w-5" />,    label: 'Clientes',     roles: ['GERENTE', 'VENTAS'] },
       { to: '/cotizaciones', icon: <FileText className="h-5 w-5" />, label: 'Cotizaciones', roles: ['GERENTE', 'VENTAS'] },
-      { to: '/pedidos',      icon: <Package className="h-5 w-5" />,  label: 'Pedidos',      roles: ['GERENTE', 'VENTAS', 'LOGISTICA'] },
+      { to: '/pedidos',      icon: <Package className="h-5 w-5" />,  label: 'Pedidos',      roles: ['GERENTE', 'VENTAS', 'LOGISTICA', 'CONTADORA'] },
     ],
   },
   {
@@ -173,7 +173,7 @@ const navGroups: NavGroup[] = [
   {
     label: 'Finanzas',
     items: [
-      { to: '/credito', icon: <CreditCard className="h-5 w-5" />, label: 'Crédito', roles: ['GERENTE', 'VENTAS'] },
+      { to: '/credito', icon: <CreditCard className="h-5 w-5" />, label: 'Crédito', roles: ['GERENTE', 'VENTAS', 'CONTADORA'] },
       { to: '/gastos',  icon: <Receipt className="h-5 w-5" />,    label: 'Gastos' },
     ],
   },
@@ -187,7 +187,7 @@ const navGroups: NavGroup[] = [
 
 const settingsItems: NavItem[] = [
   { to: '/catalogo',      icon: <Grid3X3 className="h-5 w-5" />,   label: 'Catálogo de productos', roles: ['GERENTE', 'VENTAS'] },
-  { to: '/reportes',      icon: <TrendingUp className="h-5 w-5" />, label: 'Reportes',              roles: ['GERENTE'] },
+  { to: '/reportes',      icon: <TrendingUp className="h-5 w-5" />, label: 'Reportes',              roles: ['GERENTE', 'CONTADORA'] },
   { to: '/configuracion', icon: <Settings className="h-5 w-5" />,   label: 'Configuración',         roles: ['GERENTE'] },
   { to: '/manual',        icon: <BookOpen className="h-5 w-5" />,   label: 'Manual de Uso' },
 ]

@@ -2,45 +2,7 @@ import { Router, Response } from 'express';
 import { z } from 'zod';
 import prisma from '../lib/prisma';
 import { authenticate, AuthRequest } from '../middleware/auth';
-
-async function notifyTaskWhatsApp(
-  assigneeName: string,
-  assigneeWhatsapp: string | null | undefined,
-  taskTitle: string,
-  priority: string,
-  createdByName: string,
-): Promise<void> {
-  if (!assigneeWhatsapp) return;
-  const waUrl = process.env.EVOLUTION_API_URL ?? '';
-  const waKey = process.env.EVOLUTION_API_KEY ?? '';
-  if (!waUrl || !waKey) return;
-
-  const priorityEmoji: Record<string, string> = {
-    URGENTE: '🔴 URGENTE',
-    NORMAL:  '🟡 Normal',
-    DESPUES: '🔵 Después',
-  };
-  const prioLabel = priorityEmoji[priority] ?? priority;
-  const number = assigneeWhatsapp.replace(/\D/g, '');
-  const fullNumber = number.startsWith('57') ? number : `57${number}`;
-
-  const text =
-    `📋 *Nueva tarea asignada*\n` +
-    `Hola ${assigneeName}, tienes una nueva tarea:\n\n` +
-    `*${taskTitle}*\n` +
-    `Prioridad: ${prioLabel}\n` +
-    `Asignada por: ${createdByName}`;
-
-  try {
-    await fetch(`${waUrl}/message/sendText/maral-info`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', apikey: waKey },
-      body: JSON.stringify({ number: fullNumber, text }),
-    });
-  } catch {
-    // Notificación opcional — no bloquea la respuesta
-  }
-}
+import evolutionApi from '../lib/evolutionApi';
 
 const router = Router();
 router.use(authenticate);
@@ -147,7 +109,7 @@ router.post('/', async (req: AuthRequest, res: Response) => {
     });
 
     // Notificación WhatsApp al asignado (sin await — no bloquea la respuesta)
-    notifyTaskWhatsApp(
+    evolutionApi.notifyNewTask(
       task.assignedTo.name,
       (task.assignedTo as any).whatsapp,
       task.title,
@@ -223,7 +185,7 @@ router.put('/:id', async (req: AuthRequest, res: Response) => {
     });
 
     if (rest.assignedToId && rest.assignedToId !== existing.assignedToId) {
-      notifyTaskWhatsApp(
+      evolutionApi.notifyNewTask(
         task.assignedTo.name,
         (task.assignedTo as any).whatsapp,
         task.title,

@@ -13,14 +13,14 @@ const createUserSchema = z.object({
   name: z.string().min(2, 'Nombre muy corto'),
   email: z.string().email('Email inválido'),
   password: z.string().min(6, 'Contraseña mínimo 6 caracteres'),
-  role: z.enum(['GERENTE', 'VENTAS', 'LOGISTICA']),
+  role: z.enum(['GERENTE', 'VENTAS', 'LOGISTICA', 'CONTADORA']),
 });
 
 const updateUserSchema = z.object({
   name: z.string().min(2).optional(),
   email: z.string().email().optional(),
   password: z.string().min(6).optional(),
-  role: z.enum(['GERENTE', 'VENTAS', 'LOGISTICA']).optional(),
+  role: z.enum(['GERENTE', 'VENTAS', 'LOGISTICA', 'CONTADORA']).optional(),
   active: z.boolean().optional(),
 });
 

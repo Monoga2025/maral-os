@@ -5,6 +5,7 @@ import path from 'path';
 import fs from 'fs';
 import prisma from '../lib/prisma';
 import { authenticate, AuthRequest } from '../middleware/auth';
+import evolutionApi from '../lib/evolutionApi';
 
 const router = Router();
 router.use(authenticate);
@@ -321,7 +322,7 @@ router.put('/:id', async (req: AuthRequest, res: Response) => {
 // PATCH /api/orders/:id/status
 router.patch('/:id/status', async (req: AuthRequest, res: Response) => {
   try {
-    const { status } = req.body;
+    const { status, guideNumber } = req.body;
     const validStatuses = ['CONFIRMADO', 'EN_PRODUCCION', 'LISTO', 'EMPACADO', 'DESPACHADO', 'ENTREGADO', 'CANCELADO'];
     if (!status || !validStatuses.includes(status)) {
       res.status(400).json({ error: 'Estado inválido' });
@@ -342,6 +343,30 @@ router.patch('/:id/status', async (req: AuthRequest, res: Response) => {
         metadata: { status: order.status },
       },
     });
+
+    // Notificaciones WhatsApp (fire-and-forget)
+    // Order tiene phone/recipientName propios; para datos de cliente/seller hacemos query puntual
+    const recipientPhone = order.phone ?? null;
+    const recipientName  = order.recipientName ?? '';
+
+    if (status === 'DESPACHADO') {
+      evolutionApi.notifyOrderDispatched(recipientPhone, recipientName, order.number, order.carrier ?? '', guideNumber);
+    } else if (status === 'LISTO') {
+      // Notifica al asesor comercial (via seller del pedido o del user actual)
+      const sellerUser = await prisma.user.findUnique({
+        where: { id: req.user!.userId },
+        select: { name: true, whatsapp: true, phone: true },
+      });
+      const sellerPhone = sellerUser?.whatsapp ?? sellerUser?.phone ?? null;
+      const clientSnap  = await prisma.client.findUnique({
+        where: { id: order.clientId },
+        select: { name: true, company: true },
+      });
+      const clientName = clientSnap?.company ?? clientSnap?.name ?? recipientName;
+      evolutionApi.notifyProductionReady(sellerPhone, sellerUser?.name ?? '', order.number, clientName);
+    } else if (status === 'ENTREGADO') {
+      evolutionApi.notifyOrderStatusChange(recipientPhone, recipientName, order.number, 'ENTREGADO');
+    }
 
     res.json(order);
   } catch (error) {

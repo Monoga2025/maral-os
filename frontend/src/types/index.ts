@@ -1,4 +1,4 @@
-export type UserRole = 'GERENTE' | 'VENTAS' | 'LOGISTICA'
+export type UserRole = 'GERENTE' | 'VENTAS' | 'LOGISTICA' | 'CONTADORA'
 
 export type TaskPriority = 'URGENTE' | 'NORMAL' | 'DESPUES'
 export type TaskStatus = 'PENDIENTE' | 'EN_PROGRESO' | 'COMPLETADA' | 'CANCELADA'

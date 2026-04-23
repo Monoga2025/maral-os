@@ -131,8 +131,8 @@ function SyncSection() {
 
 // ── User modal ────────────────────────────────────────────────────────────────
 
-const ROLES = ['GERENTE', 'VENTAS', 'LOGISTICA'] as const
-const ROLE_LABELS: Record<string, string> = { GERENTE: 'Gerente', VENTAS: 'Ventas', LOGISTICA: 'Logística' }
+const ROLES = ['GERENTE', 'VENTAS', 'LOGISTICA', 'CONTADORA'] as const
+const ROLE_LABELS: Record<string, string> = { GERENTE: 'Gerente', VENTAS: 'Ventas', LOGISTICA: 'Logística', CONTADORA: 'Contadora' }
 
 interface UserFormData {
   name: string
