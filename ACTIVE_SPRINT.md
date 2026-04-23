@@ -4,6 +4,41 @@
 
 ---
 
+## Tarea #5 — Facturación electrónica DIAN — Fase B (frontend + firma)
+
+**Estado actual (Fase A hecha):**
+- Schema con `DIANConfiguration` + `DIANInvoice` + enum `DianStatus`.
+- Generador UBL 2.1 desde cero + cálculo CUFE (Anexo Técnico 1.9).
+- Rutas `/api/dian/*`: config, generate-ubl, send, status, xml.
+- Variables de entorno `DIAN_*` en `.env`.
+- **Nada de esto está conectado a UI aún.**
+
+**Pendiente Fase B:**
+1. **Firma XAdES del XML** — implementar en `backend/src/lib/dian.ts`:
+   - Leer `.p12` con `node-forge`.
+   - Firmar el UBL con `xml-crypto` + `xmldsig`.
+   - Desbloquear envío a producción (hoy bloqueado si `testingMode=false`).
+2. **Frontend — OrderDetail.tsx**: botón "Facturar electrónicamente" cuando `status = ENTREGADO`.
+   - Llama `POST /api/invoices` (crea Invoice desde Order).
+   - Llama `POST /api/dian/invoices/:id/generate-ubl`.
+   - Llama `POST /api/dian/invoices/:id/send`.
+   - Muestra estado DIAN (ACEPTADA / RECHAZADA / ERROR).
+3. **Frontend — InvoiceDetail.tsx**: nueva página.
+   - Estado DIAN, CUFE, botón descargar XML, botón descargar PDF factura oficial.
+4. **Frontend — Settings.tsx**: sección "Configuración DIAN".
+   - NIT, ruta `.p12`, contraseña, modo pruebas (toggle), resolución, prefijo, rango.
+5. **Entorno habilitación DIAN**:
+   - Subir `.p12` al servidor (`./certs/certificado.p12`).
+   - Validar XML con el XSD oficial de la DIAN.
+   - Testing E2E contra `https://vpfe-hab.dian.gov.co`.
+6. **PDF factura oficial**: generar PDF con CUFE impreso + QR del CUFE (ver Anexo Técnico, el QR apunta a `https://catalogo-vpfe.dian.gov.co/document/searchqr?documentkey=CUFE`).
+7. **Restricciones**:
+   - Nunca escribir en Merlin (.accdb).
+   - El core sigue funcionando si DIAN está apagado.
+   - Validar con Janet antes de pasar a producción.
+
+---
+
 ## Tarea #1 — Rediseño UX del módulo de Tareas (Kanban contextual)
 
 **Problema actual:** El flujo de creación de tareas es idéntico sin importar el contexto. El usuario debe llenar todos los campos cada vez, incluso cuando el contexto ya debería inferirlos.
