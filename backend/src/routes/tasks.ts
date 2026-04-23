@@ -246,6 +246,37 @@ router.patch('/:id/status', async (req: AuthRequest, res: Response) => {
   }
 });
 
+// POST /api/tasks/:id/remind — envía recordatorio WhatsApp al asignado
+router.post('/:id/remind', async (req: AuthRequest, res: Response) => {
+  try {
+    const task = await prisma.task.findUnique({
+      where: { id: req.params.id },
+      include: {
+        assignedTo: { select: { id: true, name: true, whatsapp: true, phone: true } },
+        createdBy:  { select: { id: true, name: true } },
+      },
+    });
+    if (!task) { res.status(404).json({ error: 'Tarea no encontrada' }); return; }
+
+    const phone = (task.assignedTo as any).whatsapp ?? (task.assignedTo as any).phone;
+    if (!phone) { res.status(400).json({ error: 'El usuario no tiene WhatsApp registrado' }); return; }
+
+    const overdue = task.dueDate && new Date(task.dueDate) < new Date();
+    const msg =
+      `⏰ *Recordatorio de tarea — MARAL*\n\n` +
+      `Hola ${task.assignedTo.name}, tienes una tarea pendiente:\n\n` +
+      `*${task.title}*\n` +
+      (overdue ? `🔴 *¡Está vencida!*\n` : '') +
+      `\nPor favor actualiza su estado en la app.`;
+
+    await evolutionApi.sendTextMessage(phone, msg);
+    res.json({ ok: true });
+  } catch (error) {
+    console.error('Remind task error:', error);
+    res.status(500).json({ error: 'Error al enviar recordatorio' });
+  }
+});
+
 // DELETE /api/tasks/:id — solo creador o GERENTE
 router.delete('/:id', async (req: AuthRequest, res: Response) => {
   try {

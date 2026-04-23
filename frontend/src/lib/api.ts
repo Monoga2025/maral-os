@@ -305,6 +305,7 @@ export const tasksApi = {
   updateStatus: (id: string, status: string) =>
     api.patch<Task>(`/tasks/${id}/status`, { status }),
   delete: (id: string) => api.delete(`/tasks/${id}`),
+  remind: (id: string) => api.post(`/tasks/${id}/remind`, {}),
 }
 
 // Expenses (caja menor / gastos)
