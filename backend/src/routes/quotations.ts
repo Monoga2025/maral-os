@@ -805,6 +805,7 @@ table.products tbody tr:last-child td{border-bottom:none;}
       <hr class="cut-divider">
       <div class="destino-box">
         <span class="sh-badge">Destino</span>
+        ${destContact ? `<div class="sh-meta" style="font-size:13px;font-weight:700;color:#111827;margin-bottom:2px;">${destContact}</div>` : ''}
         <div class="dest-company">${destCompany}</div>
         <div class="sh-meta">
           ${destNIT}<br>
@@ -813,7 +814,6 @@ table.products tbody tr:last-child td{border-bottom:none;}
           ${destEmail}<br>
           ${destCity}
         </div>
-        ${destContact ? `<div style="font-size:11px;color:#6b7280;margin-top:6px;">Contacto: ${destContact}</div>` : ''}
       </div>
     </div>
   </div>
@@ -1247,7 +1247,8 @@ function drawShippingLabel(
      .text('DESTINO', ML + 10, y + 11, { width: 52, align: 'center', lineBreak: false });
 
   const cl = q.client;
-  const destCompany = cl.company || cl.name || '—';
+  const destContact2 = cl.company ? cl.name || null : null;  // person name (only when company exists)
+  const destCompany  = cl.company || cl.name || '—';
   const destNIT     = cl.rut     || '—';
   const destAddress = q.shippingAddress || cl.address || '—';
   const destPhone   = cl.phone   || '—';
@@ -1257,25 +1258,39 @@ function drawShippingLabel(
   const dX = ML + 12;
   const dW = CW - 24;
 
-  // Nombre — 13pt bold
+  let dY = y + 24;
+
+  // Nombre (contacto) — si existe, va primero, más pequeño
+  if (destContact2) {
+    doc.fillColor(C.black).font('Helvetica-Bold').fontSize(9)
+       .text(destContact2, dX, dY, { width: dW, lineBreak: false, ellipsis: true });
+    dY += 13;
+  }
+
+  // Empresa / Razón social — 13pt bold
   doc.fillColor(C.black).font('Helvetica-Bold').fontSize(13)
-     .text(destCompany, dX, y + 27, { width: dW, lineBreak: false, ellipsis: true });
+     .text(destCompany, dX, dY, { width: dW, lineBreak: false, ellipsis: true });
+  dY += 18;
 
   // NIT
   doc.fillColor(C.tgray).font('Helvetica').fontSize(9)
-     .text(destNIT, dX, y + 43, { lineBreak: false });
+     .text(destNIT, dX, dY, { lineBreak: false });
+  dY += 12;
   // Dirección
   doc.fillColor(C.tgray).font('Helvetica').fontSize(9)
-     .text(destAddress, dX, y + 55, { width: dW, lineBreak: false, ellipsis: true });
+     .text(destAddress, dX, dY, { width: dW, lineBreak: false, ellipsis: true });
+  dY += 12;
   // Teléfono
   doc.fillColor(C.tgray).font('Helvetica').fontSize(9)
-     .text(destPhone, dX, y + 67, { lineBreak: false });
+     .text(destPhone, dX, dY, { lineBreak: false });
+  dY += 12;
   // Correo
   doc.fillColor(C.tgray).font('Helvetica').fontSize(9)
-     .text(destEmail, dX, y + 79, { width: dW, lineBreak: false, ellipsis: true });
+     .text(destEmail, dX, dY, { width: dW, lineBreak: false, ellipsis: true });
+  dY += 12;
   // Ciudad
   doc.fillColor(C.black).font('Helvetica-Bold').fontSize(9)
-     .text(destCity, dX, y + 91, { width: dW, lineBreak: false, ellipsis: true });
+     .text(destCity, dX, dY, { width: dW, lineBreak: false, ellipsis: true });
 }
 
 export default router;
