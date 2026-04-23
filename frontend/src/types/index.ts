@@ -77,6 +77,7 @@ export interface User {
   whatsapp?: string
   phone?: string
   title?: string
+  cedula?: string
   createdAt: string
   updatedAt: string
 }

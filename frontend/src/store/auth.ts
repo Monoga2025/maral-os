@@ -10,6 +10,7 @@ interface AuthState {
   isAuthenticated: boolean
   isLoading: boolean
   login: (email: string, password: string) => Promise<void>
+  loginCedula: (userId: string, cedula: string) => Promise<void>
   logout: () => void
   setUser: (user: User) => void
 }
@@ -34,6 +35,22 @@ export const useAuthStore = create<AuthState>()(
           const err = error as { response?: { data?: { message?: string } } }
           const message =
             err.response?.data?.message ?? 'Error al iniciar sesión'
+          toast.error(message)
+          throw error
+        }
+      },
+
+      loginCedula: async (userId, cedula) => {
+        set({ isLoading: true })
+        try {
+          const response = await authApi.loginCedula(userId, cedula)
+          const { token, user } = response.data
+          localStorage.setItem('token', token)
+          set({ user, token, isAuthenticated: true, isLoading: false })
+        } catch (error: unknown) {
+          set({ isLoading: false })
+          const err = error as { response?: { data?: { error?: string } } }
+          const message = err.response?.data?.error ?? 'Cédula incorrecta'
           toast.error(message)
           throw error
         }

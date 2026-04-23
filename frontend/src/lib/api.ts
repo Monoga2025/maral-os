@@ -61,6 +61,10 @@ export default api
 export const authApi = {
   login: (email: string, password: string) =>
     api.post<{ token: string; user: User }>('/auth/login', { email, password }),
+  loginCedula: (userId: string, cedula: string) =>
+    api.post<{ token: string; user: User }>('/auth/login-cedula', { userId, cedula }),
+  listUsers: () =>
+    api.get<{ id: string; name: string; role: string; title: string | null }[]>('/auth/users'),
   me: () => api.get<User>('/auth/me'),
 }
 
@@ -273,7 +277,7 @@ export const reportsApi = {
 export const usersApi = {
   getAll: () => api.get<User[]>('/users'),
   getById: (id: string) => api.get<User>(`/users/${id}`),
-  create: (data: { name: string; email: string; password: string; role: string; whatsapp?: string }) =>
+  create: (data: { name: string; email: string; password: string; role: string; whatsapp?: string; cedula?: string }) =>
     api.post<User>('/users', data),
   update: (id: string, data: Partial<User> & { password?: string }) =>
     api.put<User>(`/users/${id}`, data),

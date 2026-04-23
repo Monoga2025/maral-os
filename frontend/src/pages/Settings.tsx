@@ -140,6 +140,7 @@ interface UserFormData {
   password: string
   role: string
   whatsapp: string
+  cedula: string
 }
 
 function UserModal({
@@ -158,6 +159,7 @@ function UserModal({
     password: '',
     role: editUser?.role ?? 'VENTAS',
     whatsapp: editUser?.whatsapp ?? '',
+    cedula: editUser?.cedula ?? '',
   })
 
   const set = (k: keyof UserFormData) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
@@ -166,11 +168,11 @@ function UserModal({
   const save = useMutation({
     mutationFn: () => {
       if (isEdit) {
-        const payload: Record<string, unknown> = { name: form.name, email: form.email, role: form.role, whatsapp: form.whatsapp }
+        const payload: Record<string, unknown> = { name: form.name, email: form.email, role: form.role, whatsapp: form.whatsapp, cedula: form.cedula }
         if (form.password) payload.password = form.password
         return usersApi.update(editUser!.id, payload as Parameters<typeof usersApi.update>[1])
       }
-      return usersApi.create({ name: form.name, email: form.email, password: form.password, role: form.role, whatsapp: form.whatsapp })
+      return usersApi.create({ name: form.name, email: form.email, password: form.password, role: form.role, whatsapp: form.whatsapp, cedula: form.cedula })
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['users'] })
@@ -265,6 +267,18 @@ function UserModal({
               placeholder="3167760692"
             />
             <p className="text-[10px] text-gray-400 mt-1">Solo dígitos, sin indicativo país</p>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">Cédula</label>
+            <input
+              type="text"
+              inputMode="numeric"
+              value={form.cedula}
+              onChange={(e) => setForm((f) => ({ ...f, cedula: e.target.value.replace(/\D/g, '') }))}
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="1234567890"
+            />
+            <p className="text-[10px] text-gray-400 mt-1">Usada para iniciar sesión (tarjeta de usuario)</p>
           </div>
           <div className="flex gap-3 pt-1">
             <button

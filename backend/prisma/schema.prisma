@@ -19,6 +19,7 @@ model User {
   phone             String?
   whatsapp          String?
   title             String?
+  cedula            String?          @unique
   createdAt         DateTime         @default(now())
   updatedAt         DateTime         @updatedAt
   quotations        Quotation[]

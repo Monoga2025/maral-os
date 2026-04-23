@@ -17,6 +17,7 @@ const createUserSchema = z.object({
   whatsapp: z.string().optional(),
   phone: z.string().optional(),
   title: z.string().optional(),
+  cedula: z.string().optional(),
 });
 
 const updateUserSchema = z.object({
@@ -28,6 +29,7 @@ const updateUserSchema = z.object({
   phone: z.string().optional(),
   whatsapp: z.string().optional(),
   title: z.string().optional(),
+  cedula: z.string().optional(),
 });
 
 // GET /api/users — lista todos los usuarios (solo GERENTE)
@@ -43,6 +45,7 @@ router.get('/', requireRole('GERENTE'), async (_req: AuthRequest, res: Response)
         whatsapp: true,
         phone: true,
         title: true,
+        cedula: true,
         createdAt: true,
         updatedAt: true,
       },
@@ -84,6 +87,7 @@ router.get('/:id', requireRole('GERENTE'), async (req: AuthRequest, res: Respons
         whatsapp: true,
         phone: true,
         title: true,
+        cedula: true,
         createdAt: true,
         updatedAt: true,
       },
@@ -121,6 +125,7 @@ router.post('/', requireRole('GERENTE'), async (req: AuthRequest, res: Response)
         whatsapp: body.whatsapp,
         phone: body.phone,
         title: body.title,
+        cedula: body.cedula,
       },
       select: {
         id: true,
@@ -131,6 +136,7 @@ router.post('/', requireRole('GERENTE'), async (req: AuthRequest, res: Response)
         whatsapp: true,
         phone: true,
         title: true,
+        cedula: true,
         createdAt: true,
         updatedAt: true,
       },
@@ -184,6 +190,7 @@ router.put('/:id', requireRole('GERENTE'), async (req: AuthRequest, res: Respons
     if (body.phone !== undefined) updateData.phone = body.phone || null;
     if (body.whatsapp !== undefined) updateData.whatsapp = body.whatsapp || null;
     if (body.title !== undefined) updateData.title = body.title || null;
+    if (body.cedula !== undefined) updateData.cedula = body.cedula || null;
     if (body.password) {
       updateData.password = await bcrypt.hash(body.password, SALT_ROUNDS);
     }
@@ -200,6 +207,7 @@ router.put('/:id', requireRole('GERENTE'), async (req: AuthRequest, res: Respons
         whatsapp: true,
         phone: true,
         title: true,
+        cedula: true,
         createdAt: true,
         updatedAt: true,
       },
