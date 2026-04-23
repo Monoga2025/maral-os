@@ -35,6 +35,9 @@ async function main() {
       email: 'john@maral.com',
       password: passwordHash,
       role: 'GERENTE',
+      title: 'Gerente de Proyectos',
+      phone: '3177606126',
+      whatsapp: '573177606126',
     },
   });
   const vendedora = await prisma.user.create({
@@ -43,6 +46,9 @@ async function main() {
       email: 'lady@maral.com',
       password: passwordHash,
       role: 'VENTAS',
+      title: 'Asesora Comercial',
+      phone: '3167760692',
+      whatsapp: '573167760692',
     },
   });
   const logistica = await prisma.user.create({
@@ -51,11 +57,17 @@ async function main() {
       email: 'angelo@maral.com',
       password: passwordHash,
       role: 'LOGISTICA',
+      title: 'Coordinador Logística',
     },
   });
   console.log(`  ✓ ${gerente.name} (GERENTE)`);
   console.log(`  ✓ ${vendedora.name} (VENTAS)`);
   console.log(`  ✓ ${logistica.name} (LOGISTICA)\n`);
+
+  // ── Restart quotation sequence at 4585 ──────────────────
+  console.log('Resetting quotation number sequence to 4585...');
+  await prisma.$executeRaw`SELECT setval(pg_get_serial_sequence('"Quotation"', 'number'), 4584, true)`;
+  console.log('  ✓ Quotation sequence → 4585\n');
   // ── Clients ─────────────────────────────────────────────
   console.log('Creating clients...');
   const clientsData = [

@@ -18,6 +18,7 @@ model User {
   active            Boolean          @default(true)
   phone             String?
   whatsapp          String?
+  title             String?
   createdAt         DateTime         @default(now())
   updatedAt         DateTime         @updatedAt
   quotations        Quotation[]
@@ -417,6 +418,7 @@ model Invoice {
   order        Order?           @relation(fields: [orderId], references: [id])
   client       Client           @relation(fields: [clientId], references: [id])
   syncQueue    MerlinSyncQueue?
+  dianInvoice  DIANInvoice?
 
   @@index([orderId])
   @@index([clientId])
@@ -514,4 +516,47 @@ model Expense {
 enum ExpenseType {
   CAJA_MENOR
   TARJETA
+}
+
+// ── DIAN Facturación Electrónica ─────────────────────────────
+
+model DIANConfiguration {
+  id                  String   @id @default(cuid())
+  companyNIT          String   @unique
+  certificateP12Path  String?
+  certificatePassword String?
+  testingMode         Boolean  @default(true)
+  softwareId          String?
+  softwarePin         String?
+  resolucionDIAN      String?
+  resolucionFechaInicio DateTime?
+  resolucionFechaFin    DateTime?
+  prefijoFactura      String?
+  rangoDesde          Int?
+  rangoHasta          Int?
+  consecutivoActual   Int      @default(1)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+}
+
+enum DianStatus {
+  PENDIENTE
+  EN_PROCESO
+  ACEPTADA
+  RECHAZADA
+  ERROR
+}
+
+model DIANInvoice {
+  id           String      @id @default(cuid())
+  invoiceId    String      @unique
+  dianStatus   DianStatus  @default(PENDIENTE)
+  dianCUFE     String?
+  ublXmlPath   String?
+  dianSentAt   DateTime?
+  dianResponse Json?
+  errorMessage String?
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+  invoice      Invoice     @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
 }

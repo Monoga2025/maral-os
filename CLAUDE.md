@@ -1,5 +1,13 @@
 # CLAUDE.md — Reglas permanentes para Claude Code
 
+## Instrucciones de /compact
+
+Al compactar, siempre preservar:
+- Lista de archivos modificados en esta sesión
+- Tarea actual del ACTIVE_SPRINT.md
+- Cualquier decisión arquitectural tomada
+- Variables de entorno nuevas identificadas
+
 ## Identidad del proyecto
 
 **MARAL OS** es la plataforma de gestión empresarial de Maral Tecnología y Comunicaciones S.A.S., empresa familiar colombiana de ensamble y comercialización de equipos electrónicos B2B.

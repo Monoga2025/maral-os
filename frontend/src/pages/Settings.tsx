@@ -139,6 +139,7 @@ interface UserFormData {
   email: string
   password: string
   role: string
+  whatsapp: string
 }
 
 function UserModal({
@@ -156,19 +157,20 @@ function UserModal({
     email: editUser?.email ?? '',
     password: '',
     role: editUser?.role ?? 'VENTAS',
+    whatsapp: editUser?.whatsapp ?? '',
   })
 
-  const set = (k: keyof UserFormData) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
+  const set = (k: keyof UserFormData) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
     setForm((f) => ({ ...f, [k]: e.target.value }))
 
   const save = useMutation({
     mutationFn: () => {
       if (isEdit) {
-        const payload: Record<string, unknown> = { name: form.name, email: form.email, role: form.role }
+        const payload: Record<string, unknown> = { name: form.name, email: form.email, role: form.role, whatsapp: form.whatsapp }
         if (form.password) payload.password = form.password
         return usersApi.update(editUser!.id, payload as Parameters<typeof usersApi.update>[1])
       }
-      return usersApi.create({ name: form.name, email: form.email, password: form.password, role: form.role })
+      return usersApi.create({ name: form.name, email: form.email, password: form.password, role: form.role, whatsapp: form.whatsapp })
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['users'] })
@@ -252,6 +254,17 @@ function UserModal({
                 <option key={r} value={r}>{ROLE_LABELS[r]}</option>
               ))}
             </select>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">WhatsApp</label>
+            <input
+              type="tel"
+              value={form.whatsapp}
+              onChange={set('whatsapp')}
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="3167760692"
+            />
+            <p className="text-[10px] text-gray-400 mt-1">Solo dígitos, sin indicativo país</p>
           </div>
           <div className="flex gap-3 pt-1">
             <button

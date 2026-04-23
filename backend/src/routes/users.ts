@@ -14,6 +14,9 @@ const createUserSchema = z.object({
   email: z.string().email('Email inválido'),
   password: z.string().min(6, 'Contraseña mínimo 6 caracteres'),
   role: z.enum(['GERENTE', 'VENTAS', 'LOGISTICA', 'CONTADORA']),
+  whatsapp: z.string().optional(),
+  phone: z.string().optional(),
+  title: z.string().optional(),
 });
 
 const updateUserSchema = z.object({
@@ -24,6 +27,7 @@ const updateUserSchema = z.object({
   active: z.boolean().optional(),
   phone: z.string().optional(),
   whatsapp: z.string().optional(),
+  title: z.string().optional(),
 });
 
 // GET /api/users — lista todos los usuarios (solo GERENTE)
@@ -36,6 +40,9 @@ router.get('/', requireRole('GERENTE'), async (_req: AuthRequest, res: Response)
         email: true,
         role: true,
         active: true,
+        whatsapp: true,
+        phone: true,
+        title: true,
         createdAt: true,
         updatedAt: true,
       },
@@ -74,6 +81,9 @@ router.get('/:id', requireRole('GERENTE'), async (req: AuthRequest, res: Respons
         email: true,
         role: true,
         active: true,
+        whatsapp: true,
+        phone: true,
+        title: true,
         createdAt: true,
         updatedAt: true,
       },
@@ -108,6 +118,9 @@ router.post('/', requireRole('GERENTE'), async (req: AuthRequest, res: Response)
         email: body.email,
         password: passwordHash,
         role: body.role,
+        whatsapp: body.whatsapp,
+        phone: body.phone,
+        title: body.title,
       },
       select: {
         id: true,
@@ -115,6 +128,9 @@ router.post('/', requireRole('GERENTE'), async (req: AuthRequest, res: Response)
         email: true,
         role: true,
         active: true,
+        whatsapp: true,
+        phone: true,
+        title: true,
         createdAt: true,
         updatedAt: true,
       },
@@ -165,8 +181,9 @@ router.put('/:id', requireRole('GERENTE'), async (req: AuthRequest, res: Respons
     if (body.email) updateData.email = body.email;
     if (body.role) updateData.role = body.role;
     if (body.active !== undefined) updateData.active = body.active;
-    if (body.phone !== undefined) updateData.phone = body.phone;
-    if (body.whatsapp !== undefined) updateData.whatsapp = body.whatsapp;
+    if (body.phone !== undefined) updateData.phone = body.phone || null;
+    if (body.whatsapp !== undefined) updateData.whatsapp = body.whatsapp || null;
+    if (body.title !== undefined) updateData.title = body.title || null;
     if (body.password) {
       updateData.password = await bcrypt.hash(body.password, SALT_ROUNDS);
     }
@@ -180,6 +197,9 @@ router.put('/:id', requireRole('GERENTE'), async (req: AuthRequest, res: Respons
         email: true,
         role: true,
         active: true,
+        whatsapp: true,
+        phone: true,
+        title: true,
         createdAt: true,
         updatedAt: true,
       },
