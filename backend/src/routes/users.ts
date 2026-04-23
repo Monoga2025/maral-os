@@ -22,6 +22,8 @@ const updateUserSchema = z.object({
   password: z.string().min(6).optional(),
   role: z.enum(['GERENTE', 'VENTAS', 'LOGISTICA', 'CONTADORA']).optional(),
   active: z.boolean().optional(),
+  phone: z.string().optional(),
+  whatsapp: z.string().optional(),
 });
 
 // GET /api/users — lista todos los usuarios (solo GERENTE)
@@ -163,6 +165,8 @@ router.put('/:id', requireRole('GERENTE'), async (req: AuthRequest, res: Respons
     if (body.email) updateData.email = body.email;
     if (body.role) updateData.role = body.role;
     if (body.active !== undefined) updateData.active = body.active;
+    if (body.phone !== undefined) updateData.phone = body.phone;
+    if (body.whatsapp !== undefined) updateData.whatsapp = body.whatsapp;
     if (body.password) {
       updateData.password = await bcrypt.hash(body.password, SALT_ROUNDS);
     }
