@@ -9,7 +9,7 @@
  * Todas las notificaciones son fire-and-forget: nunca bloquean la respuesta HTTP.
  */
 
-const BASE_URL = process.env.EVOLUTION_API_URL ?? '';
+const BASE_URL = (process.env.EVOLUTION_API_URL ?? '').replace(/\/+$/, '');  // strip trailing slash
 const API_KEY  = process.env.EVOLUTION_API_KEY  ?? '';
 const INSTANCE = process.env.EVOLUTION_INSTANCE ?? 'maral-info';
 
@@ -36,13 +36,18 @@ async function sendTextMessage(phone: string, message: string): Promise<void> {
   if (!BASE_URL || !API_KEY || !phone) return;
   try {
     const number = formatPhone(phone);
-    const response = await fetch(`${BASE_URL}/message/sendText/${INSTANCE}`, {
+    const url = `${BASE_URL}/message/sendText/${INSTANCE}`;
+    const response = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', apikey: API_KEY },
       body: JSON.stringify({ number, text: message }),
     });
     if (!response.ok) {
-      console.warn(`[EvolutionAPI] sendText ${number} → ${response.status}`);
+      let body = '';
+      try { body = await response.text(); } catch { /* ignore */ }
+      console.warn(`[EvolutionAPI] sendText ${number} → ${response.status} | URL: ${url} | body: ${body.slice(0, 200)}`);
+    } else {
+      console.log(`[EvolutionAPI] ✓ enviado a ${number}`);
     }
   } catch (err) {
     // Notificación opcional — nunca bloquea
