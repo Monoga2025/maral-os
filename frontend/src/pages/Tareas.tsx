@@ -99,6 +99,8 @@ export default function Tareas() {
 
   const [statusFilter, setStatusFilter] = useState('')
   const [priorityFilter, setPriorityFilter] = useState('')
+  const [viewUserId, setViewUserId] = useState(user?.id ?? '')
+  const [isContextModal, setIsContextModal] = useState(false)
   const [showModal, setShowModal] = useState(false)
   const [form, setForm] = useState<CreateForm>(DEFAULT_FORM)
   const [viewMode, setViewMode] = useState<'list' | 'kanban'>('kanban')
@@ -127,6 +129,7 @@ export default function Tareas() {
   const filters = {
     status: statusFilter || undefined,
     priority: priorityFilter || undefined,
+    assignedToId: viewUserId || undefined,
   }
 
   const { data: tasks, isLoading } = useQuery<Task[]>({
@@ -222,7 +225,7 @@ export default function Tareas() {
             </button>
           </div>
           {canCreate && (
-            <Button data-tour="tasks-new-btn" leftIcon={<Plus className="h-4 w-4" />} onClick={() => { setForm({ ...DEFAULT_FORM, dueDate: todayISO() }); setShowModal(true) }}>
+            <Button data-tour="tasks-new-btn" leftIcon={<Plus className="h-4 w-4" />} onClick={() => { setIsContextModal(false); setForm({ ...DEFAULT_FORM, assignedToId: user!.id, dueDate: todayISO() }); setShowModal(true) }}>
               Nueva Tarea
             </Button>
           )}
@@ -266,6 +269,35 @@ export default function Tareas() {
           </div>
         </div>
       </Card>
+
+      {/* Vista por usuario */}
+      {users && users.length > 0 && (
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-xs font-medium text-gray-400">Vista:</span>
+          <button
+            onClick={() => setViewUserId(user!.id)}
+            className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${viewUserId === user!.id ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+          >
+            Mis tareas
+          </button>
+          {users.filter(u => u.id !== user!.id).map(u => (
+            <button
+              key={u.id}
+              onClick={() => setViewUserId(u.id)}
+              className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium transition-colors ${viewUserId === u.id ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+            >
+              <UserAvatar name={u.name} size="xs" />
+              {u.name.split(' ')[0]}
+            </button>
+          ))}
+          <button
+            onClick={() => setViewUserId('')}
+            className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${viewUserId === '' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+          >
+            Todas
+          </button>
+        </div>
+      )}
 
       {/* Kanban view */}
       {viewMode === 'kanban' && (
@@ -341,7 +373,7 @@ export default function Tareas() {
                   </div>
                   {canCreate && (
                     <button
-                      onClick={() => { setForm({ ...DEFAULT_FORM, priority, dueDate: todayISO() }); setShowModal(true) }}
+                      onClick={() => { setIsContextModal(true); setForm({ ...DEFAULT_FORM, priority, assignedToId: viewUserId || user!.id, dueDate: todayISO() }); setShowModal(true) }}
                       className="mt-2 w-full flex items-center justify-center gap-1 text-xs text-gray-400 hover:text-gray-600 py-2 rounded-lg border border-dashed border-gray-300 hover:border-gray-400 transition-colors"
                     >
                       <Plus className="h-3 w-3" />
@@ -450,9 +482,20 @@ export default function Tareas() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
           <div className="w-full max-w-lg rounded-2xl bg-white shadow-2xl">
             <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4">
-              <h2 className="text-lg font-semibold text-gray-900">Nueva Tarea</h2>
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900">Nueva Tarea</h2>
+                {isContextModal && (
+                  <p className="text-xs text-gray-400 mt-0.5">
+                    {form.priority === 'URGENTE' ? '🔴 Urgente' : form.priority === 'NORMAL' ? '🔵 Normal' : '⚪ Después'}
+                    {' · '}
+                    {form.assignedToId === user?.id
+                      ? `Yo (${user?.name?.split(' ')[0]})`
+                      : users?.find(u => u.id === form.assignedToId)?.name.split(' ')[0] ?? '—'}
+                  </p>
+                )}
+              </div>
               <button
-                onClick={() => { setShowModal(false); setForm(DEFAULT_FORM) }}
+                onClick={() => { setShowModal(false); setIsContextModal(false); setForm(DEFAULT_FORM) }}
                 className="flex h-7 w-7 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors text-xl leading-none"
               >
                 ×
@@ -506,62 +549,64 @@ export default function Tareas() {
                 className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm placeholder-gray-300 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 resize-none"
               />
 
-              {/* Priority pills */}
-              <div>
-                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Prioridad</p>
-                <div className="flex gap-2">
-                  {([['URGENTE', 'Urgente 🔴', 'bg-red-600 text-white', 'border-red-200 text-red-700 hover:bg-red-50'],
-                    ['NORMAL', 'Normal', 'bg-blue-600 text-white', 'border-blue-200 text-blue-700 hover:bg-blue-50'],
-                    ['DESPUES', 'Después', 'bg-gray-600 text-white', 'border-gray-200 text-gray-600 hover:bg-gray-100']] as const).map(([val, label, activeClass, inactiveClass]) => (
-                    <button
-                      key={val}
-                      type="button"
-                      onClick={() => setForm({ ...form, priority: val as TaskPriority })}
-                      className={`flex-1 rounded-full border py-1.5 text-sm font-semibold transition-all ${
-                        form.priority === val ? activeClass + ' border-transparent shadow-sm' : 'bg-white ' + inactiveClass
-                      }`}
-                    >
-                      {label}
-                    </button>
-                  ))}
+              {/* Priority pills — ocultas en modo contextual */}
+              {!isContextModal && (
+                <div>
+                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Prioridad</p>
+                  <div className="flex gap-2">
+                    {([['URGENTE', 'Urgente 🔴', 'bg-red-600 text-white', 'border-red-200 text-red-700 hover:bg-red-50'],
+                      ['NORMAL', 'Normal', 'bg-blue-600 text-white', 'border-blue-200 text-blue-700 hover:bg-blue-50'],
+                      ['DESPUES', 'Después', 'bg-gray-600 text-white', 'border-gray-200 text-gray-600 hover:bg-gray-100']] as const).map(([val, label, activeClass, inactiveClass]) => (
+                      <button
+                        key={val}
+                        type="button"
+                        onClick={() => setForm({ ...form, priority: val as TaskPriority })}
+                        className={`flex-1 rounded-full border py-1.5 text-sm font-semibold transition-all ${
+                          form.priority === val ? activeClass + ' border-transparent shadow-sm' : 'bg-white ' + inactiveClass
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
-              </div>
+              )}
 
-              {/* Assigned to chips */}
-              <div>
-                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Asignar a</p>
-                <div className="flex flex-wrap gap-2">
-                  {/* Yo */}
-                  <button
-                    type="button"
-                    onClick={() => setForm({ ...form, assignedToId: user!.id })}
-                    className={`flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm font-medium transition-all ${
-                      form.assignedToId === user?.id || !form.assignedToId
-                        ? 'border-transparent shadow-sm ring-2 ring-blue-200 bg-white'
-                        : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
-                    }`}
-                  >
-                    <UserAvatar name={user?.name ?? 'Y'} size="xs" />
-                    <span className="text-gray-700">Yo ({user?.name?.split(' ')[0]})</span>
-                  </button>
-                  {/* Otros usuarios */}
-                  {users?.filter((u) => u.id !== user?.id).map((u) => (
+              {/* Assigned to chips — ocultas en modo contextual */}
+              {!isContextModal && (
+                <div>
+                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Asignar a</p>
+                  <div className="flex flex-wrap gap-2">
                     <button
-                      key={u.id}
                       type="button"
-                      onClick={() => setForm({ ...form, assignedToId: u.id })}
+                      onClick={() => setForm({ ...form, assignedToId: user!.id })}
                       className={`flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm font-medium transition-all ${
-                        form.assignedToId === u.id
+                        form.assignedToId === user?.id || !form.assignedToId
                           ? 'border-transparent shadow-sm ring-2 ring-blue-200 bg-white'
                           : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
                       }`}
                     >
-                      <UserAvatar name={u.name} size="xs" />
-                      <span className="text-gray-700">{u.name.split(' ')[0]}</span>
+                      <UserAvatar name={user?.name ?? 'Y'} size="xs" />
+                      <span className="text-gray-700">Yo ({user?.name?.split(' ')[0]})</span>
                     </button>
-                  ))}
+                    {users?.filter((u) => u.id !== user?.id).map((u) => (
+                      <button
+                        key={u.id}
+                        type="button"
+                        onClick={() => setForm({ ...form, assignedToId: u.id })}
+                        className={`flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm font-medium transition-all ${
+                          form.assignedToId === u.id
+                            ? 'border-transparent shadow-sm ring-2 ring-blue-200 bg-white'
+                            : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
+                        }`}
+                      >
+                        <UserAvatar name={u.name} size="xs" />
+                        <span className="text-gray-700">{u.name.split(' ')[0]}</span>
+                      </button>
+                    ))}
+                  </div>
                 </div>
-              </div>
+              )}
 
               {/* Quick date presets */}
               <div>
@@ -633,7 +678,7 @@ export default function Tareas() {
               <div className="flex justify-end gap-3 pt-1 border-t border-gray-100">
                 <button
                   type="button"
-                  onClick={() => { setShowModal(false); setForm(DEFAULT_FORM) }}
+                  onClick={() => { setShowModal(false); setIsContextModal(false); setForm(DEFAULT_FORM) }}
                   className="rounded-xl border border-gray-200 px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors"
                 >
                   Cancelar

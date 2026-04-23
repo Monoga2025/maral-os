@@ -74,6 +74,9 @@ export interface User {
   role: UserRole
   active?: boolean
   avatar?: string
+  whatsapp?: string
+  phone?: string
+  title?: string
   createdAt: string
   updatedAt: string
 }

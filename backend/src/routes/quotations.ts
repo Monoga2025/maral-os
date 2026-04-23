@@ -46,17 +46,23 @@ const COMPANY = {
   website: process.env.COMPANY_WEBSITE ?? 'www.industriasmaral.com',
 };
 
-const SELLER_PHONES: Record<string, string> = {
-  'john': '3177606126',
-  'ingenieria@industriasmaral.com': '3177606126',
-};
-
-function getSellerPhone(seller: { name?: string; email?: string } | null): string {
+function getSellerPhone(seller: { name?: string; email?: string; phone?: string | null } | null): string {
   if (!seller) return COMPANY.phone;
+  if (seller.phone) return seller.phone;
   const email = (seller.email ?? '').toLowerCase();
   const name  = (seller.name  ?? '').toLowerCase();
   if (email.includes('ingenieria') || name.includes('john')) return '3177606126';
   return COMPANY.phone;
+}
+
+function getSellerSignature(seller: { name?: string; email?: string; title?: string | null; phone?: string | null } | null) {
+  if (!seller) return { name: 'John Mónoga', title: 'Gerente de Proyectos', email: 'ingenieria@industriasmaral.com', phone: '3177606126' };
+  return {
+    name:  seller.name  ?? 'John Mónoga',
+    title: seller.title ?? 'Asesor Comercial',
+    email: seller.email ?? COMPANY.email,
+    phone: getSellerPhone(seller),
+  };
 }
 
 const CATEGORY_CODES: Record<string, string> = {
@@ -159,7 +165,7 @@ router.get('/:id/html', async (req: AuthRequest, res: Response) => {
       where: { id: req.params.id },
       include: {
         client: true,
-        seller: { select: { id: true, name: true, email: true } },
+        seller: { select: { id: true, name: true, email: true, title: true, phone: true } },
         items: {
           include: {
             product: { select: { id: true, reference: true, name: true, unit: true, warrantyYears: true } },
@@ -189,7 +195,7 @@ router.get('/:id/pdf', async (req: AuthRequest, res: Response) => {
       where: { id: req.params.id },
       include: {
         client: true,
-        seller: { select: { id: true, name: true, email: true } },
+        seller: { select: { id: true, name: true, email: true, title: true, phone: true } },
         items: {
           include: {
             product: { select: { id: true, reference: true, name: true, unit: true, warrantyYears: true } },
@@ -226,7 +232,7 @@ router.get('/:id', async (req: AuthRequest, res: Response) => {
       where: { id: req.params.id },
       include: {
         client: true,
-        seller: { select: { id: true, name: true, email: true } },
+        seller: { select: { id: true, name: true, email: true, title: true, phone: true } },
         items: {
           include: {
             product: {
@@ -539,7 +545,8 @@ function generateQuotationHTML(q: any): string {
   expiry.setDate(expiry.getDate() + q.validityDays);
   const expiryLong = expiry.toLocaleDateString('es-CO', { day: 'numeric', month: 'long', year: 'numeric' });
   const taxPct = q.subtotal > 0 ? Math.round((q.tax / q.subtotal) * 100) : 0;
-  const sellerPhone = getSellerPhone(q.seller);
+  const sig      = getSellerSignature(q.seller);
+  const sellerPhone = sig.phone;
   const catCode  = CATEGORY_CODES[q.client?.category ?? ''] ?? null;
   const catLabel = CATEGORY_LABELS[q.client?.category ?? ''] ?? null;
   const num = String(q.number).padStart(5, '0');
@@ -770,15 +777,15 @@ table.products tbody tr:last-child td{border-bottom:none;}
 
   <div class="signature-block">
     <div class="signature-left">
-      <div class="signature-name">John Mónoga</div>
-      <div class="signature-line">Gerente de Proyectos</div>
+      <div class="signature-name">${escape(sig.name)}</div>
+      <div class="signature-line">${escape(sig.title)}</div>
       <div class="signature-line signature-company">MARAL TECNOLOGIA Y COMUNICACIONES S.A.S.</div>
-      <div class="signature-line">ingenieria@industriasmaral.com</div>
+      <div class="signature-line">${escape(sig.phone)} &nbsp;·&nbsp; ${escape(sig.email)}</div>
       <div class="signature-line signature-tagline">Apoyando el mercado de las telecomunicaciones desde 2003</div>
     </div>
     <div class="signature-right">
-      Esta cotización es válida hasta el<br>
-      <strong>${expiryLong}</strong>
+      Documento oficial de cotización válida por ${q.validityDays} días<br>
+      Válida hasta: <strong>${expiryLong}</strong><br>
       Este documento no constituye factura de venta.
     </div>
   </div>
@@ -853,7 +860,8 @@ function drawQuotationPDF(doc: PDFKit.PDFDocument, q: any): void {
   const expiry = new Date(q.createdAt);
   expiry.setDate(expiry.getDate() + q.validityDays);
 
-  const sellerPhone = getSellerPhone(q.seller);
+  const sig = getSellerSignature(q.seller);
+  const sellerPhone = sig.phone;
   const catCode = CATEGORY_CODES[q.client?.category ?? ''] ?? null;
 
   let y = 40;
@@ -1118,23 +1126,23 @@ function drawQuotationPDF(doc: PDFKit.PDFDocument, q: any): void {
     { day: 'numeric', month: 'long', year: 'numeric' });
 
   doc.fillColor(C.tgray).font('Helvetica').fontSize(8)
-     .text(`Esta cotización es válida hasta el ${expiryLong}.`,
+     .text(`Documento oficial de cotización válida por ${q.validityDays} días — hasta el ${expiryLong}.`,
            ML, y, { width: CW, lineBreak: false });
   y += 11;
   doc.fillColor(C.tgray).font('Helvetica').fontSize(7.5)
-     .text('Este documento no constituye factura de venta.',
+     .text('Este documento no constituye factura de venta. La factura será emitida en el momento de la confirmación del pedido.',
            ML, y, { width: CW, lineBreak: false });
   y += 16;
 
-  // Bloque de firma
+  // Bloque de firma — dinámico según seller
   doc.fillColor(C.black).font('Helvetica-Bold').fontSize(9)
-     .text('John Mónoga', ML, y, { lineBreak: false });
+     .text(sig.name, ML, y, { lineBreak: false });
   doc.fillColor(C.tgray).font('Helvetica').fontSize(8)
-     .text('Gerente de Proyectos', ML, y + 12, { lineBreak: false });
+     .text(sig.title, ML, y + 12, { lineBreak: false });
   doc.fillColor(C.dark).font('Helvetica-Bold').fontSize(8)
      .text('MARAL TECNOLOGIA Y COMUNICACIONES S.A.S.', ML, y + 24, { lineBreak: false });
   doc.fillColor(C.tgray).font('Helvetica').fontSize(8)
-     .text('ingenieria@industriasmaral.com', ML, y + 36, { lineBreak: false });
+     .text(`${sig.phone}   ·   ${sig.email}`, ML, y + 36, { lineBreak: false });
   doc.fillColor(C.tgray).font('Helvetica').fontSize(7.5)
      .text('Apoyando el mercado de las telecomunicaciones desde 2003', ML, y + 48, { lineBreak: false });
 

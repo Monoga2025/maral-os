@@ -273,7 +273,7 @@ export const reportsApi = {
 export const usersApi = {
   getAll: () => api.get<User[]>('/users'),
   getById: (id: string) => api.get<User>(`/users/${id}`),
-  create: (data: { name: string; email: string; password: string; role: string }) =>
+  create: (data: { name: string; email: string; password: string; role: string; whatsapp?: string }) =>
     api.post<User>('/users', data),
   update: (id: string, data: Partial<User> & { password?: string }) =>
     api.put<User>(`/users/${id}`, data),
