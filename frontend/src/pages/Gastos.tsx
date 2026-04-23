@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Receipt, Wallet, CreditCard, TrendingDown, ChevronLeft, ChevronRight, Camera, X, ImageIcon, Sparkles } from 'lucide-react'
-import { expensesApi } from '../lib/api'
+import { Receipt, Wallet, CreditCard, TrendingDown, ChevronLeft, ChevronRight, Camera, X, ImageIcon, Sparkles, Mic, Loader2 } from 'lucide-react'
+import { expensesApi, aiApi } from '../lib/api'
 import api from '../lib/api'
 import { formatCOP } from '../lib/utils'
 import { useAuthStore } from '../store/auth'
@@ -58,6 +58,72 @@ export default function Gastos() {
   const [aiSuggestion, setAiSuggestion] = useState<{ type: string; notes: string | null } | null>(null)
   const [aiLoading, setAiLoading] = useState(false)
   const conceptDebounce = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // Voice input
+  const [voiceState, setVoiceState] = useState<'idle' | 'recording' | 'processing'>('idle')
+  const [voiceTranscript, setVoiceTranscript] = useState('')
+  const recognitionRef = useRef<any>(null)
+
+  const startVoiceCapture = () => {
+    const w = window as any
+    const SR = w.SpeechRecognition || w.webkitSpeechRecognition
+    if (!SR) {
+      toast.error('Tu navegador no soporta dictado por voz. Usa Chrome o Edge.')
+      return
+    }
+    const rec = new SR()
+    rec.lang = 'es-CO'
+    rec.interimResults = true
+    rec.continuous = false
+    let finalText = ''
+    rec.onresult = (e: any) => {
+      let interim = ''
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        const t = e.results[i][0].transcript
+        if (e.results[i].isFinal) finalText += t
+        else interim += t
+      }
+      setVoiceTranscript(finalText + interim)
+    }
+    rec.onerror = (e: any) => {
+      console.error('Voice error:', e)
+      toast.error(e.error === 'not-allowed' ? 'Permiso de micrófono denegado' : 'Error al escuchar')
+      setVoiceState('idle')
+    }
+    rec.onend = async () => {
+      if (!finalText.trim()) {
+        setVoiceState('idle')
+        toast.error('No se detectó audio. Intenta de nuevo.')
+        return
+      }
+      setVoiceState('processing')
+      try {
+        const { data: parsed } = await aiApi.parseExpenseVoice(finalText.trim())
+        setForm({
+          date: new Date().toISOString().slice(0, 10),
+          concept: parsed.concept,
+          amount: String(parsed.amount),
+          type: parsed.type,
+          notes: parsed.notes ?? '',
+        })
+        setShowModal(true)
+        toast.success('Gasto interpretado. Revisa y confirma.')
+      } catch (err: any) {
+        toast.error(err?.response?.data?.error ?? 'No se pudo interpretar el gasto')
+      } finally {
+        setVoiceState('idle')
+        setVoiceTranscript('')
+      }
+    }
+    recognitionRef.current = rec
+    setVoiceTranscript('')
+    setVoiceState('recording')
+    rec.start()
+  }
+
+  const stopVoiceCapture = () => {
+    try { recognitionRef.current?.stop() } catch { /* noop */ }
+  }
 
   useEffect(() => {
     if (!form.concept.trim() || form.concept.length < 4) {
@@ -165,6 +231,26 @@ export default function Gastos() {
         <div className="flex items-center gap-2">
           <TourButton tourId="gastos" />
           <button
+            onClick={voiceState === 'recording' ? stopVoiceCapture : startVoiceCapture}
+            disabled={voiceState === 'processing'}
+            className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
+              voiceState === 'recording'
+                ? 'bg-red-600 text-white animate-pulse'
+                : voiceState === 'processing'
+                ? 'bg-gray-200 text-gray-500 cursor-wait'
+                : 'bg-purple-600 text-white hover:bg-purple-700'
+            }`}
+            title="Dictar gasto por voz"
+          >
+            {voiceState === 'processing' ? (
+              <><Loader2 className="h-4 w-4 animate-spin" /> Interpretando...</>
+            ) : voiceState === 'recording' ? (
+              <><Mic className="h-4 w-4" /> Detener</>
+            ) : (
+              <><Mic className="h-4 w-4" /> Dictar gasto</>
+            )}
+          </button>
+          <button
             data-tour="expenses-new-btn"
             onClick={() => { setShowModal(true); setForm(defaultForm()) }}
             className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 transition-colors"
@@ -174,6 +260,23 @@ export default function Gastos() {
           </button>
         </div>
       </div>
+
+      {voiceState === 'recording' && (
+        <div className="rounded-xl border-2 border-red-300 bg-red-50 p-4 flex items-start gap-3">
+          <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center shrink-0">
+            <Mic className="h-5 w-5 text-red-600 animate-pulse" />
+          </div>
+          <div className="flex-1">
+            <p className="text-xs font-semibold text-red-700 uppercase tracking-wide">Escuchando... habla ahora</p>
+            <p className="text-sm text-gray-700 mt-1 italic">
+              {voiceTranscript || 'Ejemplo: "Gasto de 45 mil pesos en gasolina, caja menor"'}
+            </p>
+          </div>
+          <button onClick={stopVoiceCapture} className="text-xs font-medium text-red-700 hover:text-red-900">
+            Detener
+          </button>
+        </div>
+      )}
 
       {/* Summary cards */}
       <div data-tour="expenses-summary" className="grid grid-cols-3 gap-4">

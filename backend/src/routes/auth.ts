@@ -21,35 +21,50 @@ const loginCedulaSchema = z.object({
 router.get('/users', async (_req, res: Response) => {
   try {
     const users = await prisma.user.findMany({
-      where: { active: true, cedula: { not: null } },
-      select: { id: true, name: true, role: true, title: true },
+      where: { active: true },
+      select: { id: true, name: true, role: true, title: true, cedula: true },
       orderBy: { name: 'asc' },
     });
-    res.json(users);
+    res.json(
+      users.map((u) => ({
+        id: u.id,
+        name: u.name,
+        role: u.role,
+        title: u.title,
+        needsCedula: !!u.cedula,
+      })),
+    );
   } catch (error) {
     console.error('List users error:', error);
     res.status(500).json({ error: 'Error interno del servidor' });
   }
 });
 
-// POST /api/auth/login-cedula
+const loginCardSchema = z.object({ userId: z.string().min(1) });
+
+// POST /api/auth/login-cedula — login con cédula (o directo si el usuario no tiene cédula)
 router.post('/login-cedula', async (req, res: Response) => {
   try {
-    const validation = loginCedulaSchema.safeParse(req.body);
-    if (!validation.success) {
-      res.status(400).json({ error: 'Datos inválidos' });
-      return;
-    }
-    const { userId, cedula } = validation.data;
+    const { userId } = loginCardSchema.parse(req.body);
+    const cedula = typeof req.body?.cedula === 'string' ? req.body.cedula.trim() : '';
+
     const user = await prisma.user.findUnique({ where: { id: userId } });
-    if (!user || !user.active || !user.cedula) {
-      res.status(401).json({ error: 'Credenciales incorrectas' });
+    if (!user || !user.active) {
+      res.status(401).json({ error: 'Usuario no disponible' });
       return;
     }
-    if (user.cedula !== cedula.trim()) {
-      res.status(401).json({ error: 'Cédula incorrecta' });
-      return;
+
+    if (user.cedula) {
+      if (!cedula) {
+        res.status(401).json({ error: 'Cédula requerida' });
+        return;
+      }
+      if (user.cedula !== cedula) {
+        res.status(401).json({ error: 'Cédula incorrecta' });
+        return;
+      }
     }
+
     const token = signToken({ userId: user.id, role: user.role });
     res.json({
       token,

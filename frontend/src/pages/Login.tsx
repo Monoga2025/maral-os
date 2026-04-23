@@ -5,7 +5,7 @@ import { useAuthStore } from '../store/auth'
 import { Button } from '../components/ui/Button'
 import { authApi } from '../lib/api'
 
-type PublicUser = { id: string; name: string; role: string; title: string | null }
+type PublicUser = { id: string; name: string; role: string; title: string | null; needsCedula: boolean }
 
 const roleColors: Record<string, string> = {
   GERENTE: 'from-amber-500 to-orange-500',
@@ -107,10 +107,19 @@ export default function Login() {
                   <button
                     key={u.id}
                     type="button"
-                    onClick={() => {
+                    onClick={async () => {
+                      setError('')
+                      if (!u.needsCedula) {
+                        try {
+                          await loginCedula(u.id, '')
+                          navigate('/')
+                        } catch {
+                          setError('No se pudo ingresar con este usuario')
+                        }
+                        return
+                      }
                       setSelected(u)
                       setCedula('')
-                      setError('')
                     }}
                     className="group flex flex-col items-center gap-3 rounded-xl border border-white/10 bg-white/5 p-4 hover:border-blue-500/50 hover:bg-white/10 transition-all"
                   >

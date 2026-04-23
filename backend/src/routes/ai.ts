@@ -242,6 +242,54 @@ Responde SOLO con JSON: {"priority":"URGENTE|NORMAL|DESPUES","dueDays":número}`
   }
 });
 
+// ─── Parse expense voice ──────────────────────────────────────────
+
+router.post('/parse-expense-voice', async (req: AuthRequest, res: Response) => {
+  if (!process.env.OPENROUTER_API_KEY) {
+    res.status(503).json({ error: 'IA no configurada' });
+    return;
+  }
+  try {
+    const { text } = req.body as { text: string };
+    if (!text || typeof text !== 'string' || text.trim().length < 3) {
+      res.status(400).json({ error: 'Texto requerido' });
+      return;
+    }
+
+    const prompt = `Eres un asistente que transforma descripciones de voz en español colombiano en un registro de gasto para una empresa.
+
+El usuario dictó: "${text.trim()}"
+
+Extrae y devuelve SOLO un JSON (sin markdown) con:
+- "amount": monto numérico en pesos COP (entero). Convierte "mil/mil pesos"=1000, "cinco mil"=5000, "cuarenta y cinco mil"=45000, "un millón"=1000000, "2 millones y medio"=2500000.
+- "concept": concepto claro del gasto (string corto, máx 60 chars, sin mencionar el monto).
+- "type": "CAJA_MENOR" (efectivo: ferretería, fletes, materiales, papelería, gasolina, comida) o "TARJETA" (tarjeta: Amazon, proveedores online, pagos mayores, servicios digitales). Si el usuario menciona "efectivo" o "caja menor" → CAJA_MENOR. Si menciona "tarjeta" o "cuenta" → TARJETA. Si no menciona, deduce por el monto: ≥200000 suele ser TARJETA.
+- "notes": detalles extra si los mencionó (string o null, máx 100 chars).
+
+Formato estricto:
+{"amount":número,"concept":"texto","type":"CAJA_MENOR|TARJETA","notes":"texto o null"}`;
+
+    const raw = await callAI(prompt);
+    const stripped = raw.replace(/```(?:json)?\s*/gi, '').replace(/```/g, '');
+    const jsonMatch = stripped.match(/\{[\s\S]*?\}/);
+    if (!jsonMatch) {
+      res.status(500).json({ error: 'No se pudo entender el gasto' });
+      return;
+    }
+
+    const parsed = JSON.parse(jsonMatch[0]);
+    res.json({
+      amount: Number(parsed.amount) || 0,
+      concept: String(parsed.concept ?? '').slice(0, 200),
+      type: parsed.type === 'TARJETA' ? 'TARJETA' : 'CAJA_MENOR',
+      notes: parsed.notes ? String(parsed.notes).slice(0, 200) : null,
+    });
+  } catch (error) {
+    console.error('Parse expense voice error:', error);
+    res.status(500).json({ error: 'Error al procesar audio' });
+  }
+});
+
 // ─── Parse quotation image ─────────────────────────────────────────
 
 router.post('/parse-quotation-image', async (req: AuthRequest, res: Response) => {

@@ -64,7 +64,7 @@ export const authApi = {
   loginCedula: (userId: string, cedula: string) =>
     api.post<{ token: string; user: User }>('/auth/login-cedula', { userId, cedula }),
   listUsers: () =>
-    api.get<{ id: string; name: string; role: string; title: string | null }[]>('/auth/users'),
+    api.get<{ id: string; name: string; role: string; title: string | null; needsCedula: boolean }[]>('/auth/users'),
   me: () => api.get<User>('/auth/me'),
 }
 
@@ -153,6 +153,14 @@ export const quotationsApi = {
       notes: string | null
       items: { productName: string; productReference: string | null; qty: number; unitPrice: number; discount: number }[]
     }>('/ai/parse-quotation-image', { imageBase64, mimeType }),
+}
+
+export const aiApi = {
+  parseExpenseVoice: (text: string) =>
+    api.post<{ amount: number; concept: string; type: 'CAJA_MENOR' | 'TARJETA'; notes: string | null }>(
+      '/ai/parse-expense-voice',
+      { text },
+    ),
 }
 
 // Orders
