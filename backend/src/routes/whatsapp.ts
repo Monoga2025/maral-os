@@ -11,7 +11,8 @@ const router = Router();
 const EVOL_BASE  = process.env.EVOLUTION_API_URL ?? '';
 const EVOL_KEY   = process.env.EVOLUTION_API_KEY ?? '';
 const EVOL_INST  = process.env.EVOLUTION_INSTANCE ?? 'maral-info';
-const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
+const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
+const OPENROUTER_MODEL = 'google/gemini-2.5-flash';
 
 // ─── Lady system prompt (trained on real WhatsApp history) ────
 
@@ -69,23 +70,30 @@ function evolHeaders() {
   return { 'Content-Type': 'application/json', apikey: EVOL_KEY };
 }
 
-async function callGemini(systemPrompt: string, userContent: string): Promise<string> {
-  const key = process.env.GOOGLE_AI_KEY;
-  if (!key) throw new Error('GOOGLE_AI_KEY no configurada');
-  const res = await fetch(`${GEMINI_URL}?key=${key}`, {
+async function callOpenRouter(systemPrompt: string, userContent: string): Promise<string> {
+  const key = process.env.OPENROUTER_API_KEY;
+  if (!key) throw new Error('OPENROUTER_API_KEY no configurada');
+  const res = await fetch(OPENROUTER_URL, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${key}`,
+    },
     body: JSON.stringify({
-      system_instruction: { parts: [{ text: systemPrompt }] },
-      contents: [{ role: 'user', parts: [{ text: userContent }] }],
-      generationConfig: { temperature: 0.78, maxOutputTokens: 350 },
+      model: OPENROUTER_MODEL,
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userContent },
+      ],
+      temperature: 0.78,
+      max_tokens: 350,
     }),
   });
-  if (!res.ok) throw new Error(`Gemini ${res.status}`);
+  if (!res.ok) throw new Error(`OpenRouter ${res.status}`);
   const data = await res.json() as {
-    candidates?: { content?: { parts?: { text?: string }[] } }[];
+    choices?: { message?: { content?: string } }[];
   };
-  return data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() ?? '';
+  return data.choices?.[0]?.message?.content?.trim() ?? '';
 }
 
 /** Resolve JID → clean phone number for Evolution API */
@@ -214,7 +222,7 @@ async function generateAndStoreSuggestion(messageId: string, chatId: string, cli
       .join('\n');
 
     const prompt = `${clientName ? `El cliente se llama ${clientName}.\n` : ''}Historial reciente:\n${history}\n\nMensaje nuevo del cliente: "${clientText}"\n\nResponde como Lady:`;
-    const suggestion = await callGemini(LADY_PROMPT, prompt);
+    const suggestion = await callOpenRouter(LADY_PROMPT, prompt);
 
     if (suggestion) {
       await prisma.whatsAppMessage.update({
@@ -578,7 +586,7 @@ router.post('/suggest', async (req: AuthRequest, res: Response) => {
       .join('\n') ?? '';
 
     const prompt = `${clientName ? `El cliente se llama ${clientName}.\n` : ''}${history ? `Historial:\n${history}\n\n` : ''}Mensaje nuevo del cliente: "${newMessage}"\n\nResponde como Lady:`;
-    const suggestion = await callGemini(LADY_PROMPT, prompt);
+    const suggestion = await callOpenRouter(LADY_PROMPT, prompt);
     res.json({ suggestion });
   } catch (err) {
     res.status(500).json({ error: (err as Error).message });
