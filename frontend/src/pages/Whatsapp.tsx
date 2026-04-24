@@ -3,9 +3,9 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { whatsappApi } from '../lib/api'
 import type { WaChat, WaMessage } from '../types'
 import {
-  MessageCircle, Send, Search, Users, User, RefreshCw,
-  Paperclip, Mic, MicOff, Image, FileText, X, Check,
-  CheckCheck, Sparkles, Settings, Download,
+  MessageCircle, Send, Search, Users, RefreshCw,
+  Paperclip, Mic, FileText, X, Check,
+  CheckCheck, Sparkles, Settings, Download, Zap,
 } from 'lucide-react'
 import { cn } from '../lib/utils'
 import { toast } from 'sonner'
@@ -171,41 +171,122 @@ function MessageBubble({
 
 function AISuggestionBar({
   suggestion,
+  isRegenerating,
   onUse,
+  onRegenerate,
   onDismiss,
 }: {
   suggestion: string
+  isRegenerating: boolean
   onUse: (text: string) => void
+  onRegenerate: () => void
   onDismiss: () => void
 }) {
-  // Show each part separated by |||
   const parts = suggestion.split('|||').map(s => s.trim()).filter(Boolean)
   const displayText = parts.join('\n')
 
   return (
-    <div className="border-t border-emerald-200 bg-emerald-50 px-4 py-2.5 flex items-start gap-3">
-      <Sparkles className="h-4 w-4 text-emerald-600 mt-0.5 shrink-0" />
-      <div className="flex-1 min-w-0">
-        <p className="text-[10px] font-semibold text-emerald-700 uppercase tracking-wide mb-1">
-          Sugerencia Lady IA
-        </p>
-        <p className="text-sm text-emerald-900 leading-relaxed whitespace-pre-wrap">{displayText}</p>
+    <div className="border-t border-emerald-200 bg-gradient-to-r from-emerald-50 via-emerald-50 to-teal-50 px-4 py-3 flex items-start gap-3 shadow-inner">
+      <div className="relative shrink-0 mt-0.5">
+        <div className="absolute inset-0 rounded-full bg-emerald-400/30 blur-sm animate-pulse" />
+        <div className="relative flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 shadow-sm">
+          <Sparkles className="h-4 w-4 text-white" />
+        </div>
       </div>
-      <div className="flex items-center gap-1 shrink-0">
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2 mb-1">
+          <p className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider">
+            Lady IA sugiere
+          </p>
+          <span className="text-[9px] text-emerald-600/70 font-medium">
+            Responde en 1 clic · Cierra más rápido
+          </span>
+        </div>
+        <p className="text-sm text-gray-800 leading-relaxed whitespace-pre-wrap">
+          {displayText}
+        </p>
+      </div>
+      <div className="flex flex-col items-end gap-1.5 shrink-0">
         <button
           onClick={() => onUse(suggestion)}
-          className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 transition-colors"
+          disabled={isRegenerating}
+          className="flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3.5 py-2 text-xs font-bold text-white shadow-sm hover:bg-emerald-700 active:scale-95 disabled:opacity-50 transition-all"
         >
-          Usar
+          <Zap className="h-3 w-3" />
+          Usar y enviar
         </button>
-        <button
-          onClick={onDismiss}
-          className="rounded-lg p-1.5 text-emerald-600 hover:bg-emerald-100 transition-colors"
-        >
-          <X className="h-3.5 w-3.5" />
-        </button>
+        <div className="flex items-center gap-0.5">
+          <button
+            onClick={onRegenerate}
+            disabled={isRegenerating}
+            title="Regenerar sugerencia"
+            className="rounded-lg p-1.5 text-emerald-700 hover:bg-emerald-100 disabled:opacity-50 transition-colors"
+          >
+            <RefreshCw className={cn('h-3.5 w-3.5', isRegenerating && 'animate-spin')} />
+          </button>
+          <button
+            onClick={onDismiss}
+            title="Descartar"
+            className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-200 hover:text-gray-600 transition-colors"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        </div>
       </div>
     </div>
+  )
+}
+
+// ─── Quick Ask Lady Bar (when no suggestion exists) ──────────
+
+function QuickAskLadyBar({
+  isLoading,
+  onRequest,
+}: {
+  isLoading: boolean
+  onRequest: () => void
+}) {
+  if (isLoading) {
+    return (
+      <div className="border-t border-emerald-200 bg-gradient-to-r from-emerald-50 to-teal-50 px-4 py-3 flex items-center gap-3">
+        <div className="relative shrink-0">
+          <div className="absolute inset-0 rounded-full bg-emerald-400/40 blur-md animate-pulse" />
+          <div className="relative flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-emerald-500 to-teal-600">
+            <Sparkles className="h-4 w-4 text-white animate-pulse" />
+          </div>
+        </div>
+        <div className="flex-1">
+          <p className="text-xs font-semibold text-emerald-800">Lady está pensando…</p>
+          <div className="flex gap-1 mt-1.5">
+            <div className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-bounce" style={{ animationDelay: '0ms' }} />
+            <div className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-bounce" style={{ animationDelay: '150ms' }} />
+            <div className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-bounce" style={{ animationDelay: '300ms' }} />
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <button
+      onClick={onRequest}
+      className="group w-full border-t border-emerald-200 bg-gradient-to-r from-emerald-50 via-white to-emerald-50 hover:from-emerald-100 hover:to-emerald-100 px-4 py-2.5 flex items-center gap-3 transition-colors text-left"
+    >
+      <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 shadow-sm group-hover:scale-110 transition-transform">
+        <Sparkles className="h-4 w-4 text-white" />
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="text-xs font-bold text-emerald-800">
+          ✨ Pedir sugerencia a Lady IA
+        </p>
+        <p className="text-[11px] text-emerald-600/80">
+          Responde al cliente con el tono perfecto en 1 clic
+        </p>
+      </div>
+      <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-100 px-2 py-1 rounded-md group-hover:bg-emerald-200 transition-colors">
+        Generar
+      </span>
+    </button>
   )
 }
 
@@ -418,13 +499,20 @@ function ChatView({
   const qc = useQueryClient()
   const [dismissedSuggestions, setDismissedSuggestions] = useState<Set<string>>(new Set())
   const [overrideSuggestion, setOverrideSuggestion] = useState<string | null>(null)
-  const [sendText, setSendText] = useState('')
+  const [manualSuggestion, setManualSuggestion] = useState<string | null>(null)
+  const [manualLoading, setManualLoading] = useState(false)
 
   const { data, isLoading } = useQuery({
     queryKey: ['wa-chat', chat.jid],
     queryFn: () => whatsappApi.getChat(chat.jid),
     refetchInterval: 3000,
   })
+
+  // Reset manual suggestion when switching chats
+  useEffect(() => {
+    setManualSuggestion(null)
+    setManualLoading(false)
+  }, [chat.jid])
 
   // Mark as read on open
   useEffect(() => {
@@ -447,8 +535,18 @@ function ChatView({
 
   const messages: WaMessage[] = data?.data.messages ?? []
 
+  // Last client text message (for manual requests)
+  const lastClientMessage = (() => {
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const m = messages[i]
+      if (m.fromMe) return null
+      if ((m.type === 'text' || m.type === 'other') && m.text) return m
+    }
+    return null
+  })()
+
   // Find latest auto-suggestion from the last client message
-  const latestSuggestion = (() => {
+  const autoSuggestion = (() => {
     if (overrideSuggestion !== null) return null
     for (let i = messages.length - 1; i >= 0; i--) {
       const m = messages[i]
@@ -460,21 +558,56 @@ function ChatView({
     return null
   })()
 
+  // Effective suggestion = auto OR manual
+  const activeSuggestion = autoSuggestion?.text ?? manualSuggestion
+  const showQuickAsk = !activeSuggestion && !overrideSuggestion && !!lastClientMessage
+
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages.length])
 
+  const requestSuggestion = async () => {
+    if (!lastClientMessage?.text || manualLoading) return
+    setManualLoading(true)
+    try {
+      const ctx = messages
+        .slice(-12)
+        .filter(m => (m.type === 'text' || m.type === 'other') && m.text)
+        .map(m => ({
+          role: (m.fromMe ? 'lady' : 'cliente') as 'lady' | 'cliente',
+          text: m.text as string,
+        }))
+      const res = await whatsappApi.suggest({
+        newMessage: lastClientMessage.text,
+        context: ctx,
+        clientName: chat.name,
+      })
+      if (res.data.suggestion?.trim()) {
+        setManualSuggestion(res.data.suggestion)
+      } else {
+        toast.error('Lady no generó respuesta, intenta de nuevo')
+      }
+    } catch (err) {
+      const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error
+      toast.error(msg ?? 'Error generando sugerencia. Verifica OPENROUTER_API_KEY')
+    } finally {
+      setManualLoading(false)
+    }
+  }
+
   const handleUseSuggestion = (text: string) => {
     setOverrideSuggestion(text)
-    if (latestSuggestion) {
-      setDismissedSuggestions(prev => new Set([...prev, latestSuggestion.messageId]))
+    setManualSuggestion(null)
+    if (autoSuggestion) {
+      setDismissedSuggestions(prev => new Set([...prev, autoSuggestion.messageId]))
     }
   }
 
   const handleDismissSuggestion = () => {
-    if (latestSuggestion) {
-      setDismissedSuggestions(prev => new Set([...prev, latestSuggestion.messageId]))
+    if (autoSuggestion) {
+      setDismissedSuggestions(prev => new Set([...prev, autoSuggestion.messageId]))
     }
+    setManualSuggestion(null)
   }
 
   return (
@@ -512,12 +645,22 @@ function ChatView({
         <div ref={messagesEndRef} />
       </div>
 
-      {/* AI suggestion bar */}
-      {latestSuggestion && (
+      {/* AI suggestion bar (active suggestion) */}
+      {activeSuggestion && (
         <AISuggestionBar
-          suggestion={latestSuggestion.text}
+          suggestion={activeSuggestion}
+          isRegenerating={manualLoading}
           onUse={handleUseSuggestion}
+          onRegenerate={requestSuggestion}
           onDismiss={handleDismissSuggestion}
+        />
+      )}
+
+      {/* Quick ask Lady bar (no suggestion yet, but client message pending) */}
+      {showQuickAsk && (
+        <QuickAskLadyBar
+          isLoading={manualLoading}
+          onRequest={requestSuggestion}
         />
       )}
 
@@ -667,15 +810,35 @@ function ChatItem({
 function EmptyState() {
   return (
     <div className="flex flex-col items-center justify-center h-full text-center p-8 bg-[#f0f2f5]">
-      <div className="h-20 w-20 rounded-full bg-[#dfe5e7] flex items-center justify-center mb-4">
-        <MessageCircle className="h-10 w-10 text-[#54656f]" />
+      <div className="relative mb-6">
+        <div className="absolute inset-0 rounded-full bg-emerald-400/20 blur-xl" />
+        <div className="relative h-20 w-20 rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-lg">
+          <MessageCircle className="h-10 w-10 text-white" />
+        </div>
+        <div className="absolute -top-1 -right-1 flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-amber-400 to-orange-500 shadow-md">
+          <Sparkles className="h-3.5 w-3.5 text-white" />
+        </div>
       </div>
-      <h3 className="text-xl font-light text-[#41525d] mb-2">
-        MARAL WhatsApp
+      <h3 className="text-2xl font-semibold text-[#41525d] mb-2">
+        WhatsApp + Lady IA
       </h3>
-      <p className="text-sm text-[#667781] max-w-xs">
-        Selecciona una conversación para ver el historial. La IA sugerirá respuestas automáticamente cuando llegue un mensaje.
+      <p className="text-sm text-[#667781] max-w-sm mb-6">
+        Selecciona una conversación. Lady sugiere respuestas comerciales con el tono de MARAL — listas para enviar en un clic.
       </p>
+      <div className="grid grid-cols-3 gap-4 max-w-md text-center">
+        <div>
+          <p className="text-2xl font-bold text-emerald-600">3×</p>
+          <p className="text-[10px] text-gray-500 uppercase tracking-wide">Más rápido</p>
+        </div>
+        <div>
+          <p className="text-2xl font-bold text-emerald-600">24/7</p>
+          <p className="text-[10px] text-gray-500 uppercase tracking-wide">Disponible</p>
+        </div>
+        <div>
+          <p className="text-2xl font-bold text-emerald-600">+$$</p>
+          <p className="text-[10px] text-gray-500 uppercase tracking-wide">Cierre ventas</p>
+        </div>
+      </div>
     </div>
   )
 }
