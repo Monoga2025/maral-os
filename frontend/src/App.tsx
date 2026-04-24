@@ -25,6 +25,7 @@ import Settings from './pages/Settings'
 import Manual from './pages/Manual'
 import Tareas from './pages/Tareas'
 import Gastos from './pages/Gastos'
+import Whatsapp from './pages/Whatsapp'
 import MobileDashboard from './pages/mobile/MobileDashboard'
 import MobileOrders from './pages/mobile/MobileOrders'
 import MobileClients from './pages/mobile/MobileClients'
@@ -81,6 +82,7 @@ export default function App() {
         <Route path="reportes" element={<Reports />} />
         <Route path="configuracion" element={<Settings />} />
         <Route path="manual" element={<Manual />} />
+        <Route path="whatsapp" element={<Whatsapp />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

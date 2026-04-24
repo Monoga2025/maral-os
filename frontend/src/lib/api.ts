@@ -15,6 +15,8 @@ import type {
   User,
   Task,
   Expense,
+  WaChat,
+  WaMessage,
 } from '../types'
 import type {
   CreateQuotationRequest,
@@ -347,4 +349,17 @@ export const expensesApi = {
     api.post<Expense>(`/expenses/${id}/receipt`, formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     }),
+}
+
+// WhatsApp Assist
+export const whatsappApi = {
+  getChats: () =>
+    api.get<{ data: WaChat[]; total: number; configured: boolean }>('/whatsapp/chats'),
+  getChat: (number: string) =>
+    api.get<{ chat: WaChat; messages: WaMessage[] }>(`/whatsapp/chats/${number}`),
+  suggest: (payload: {
+    newMessage: string
+    context?: { role: 'cliente' | 'lady'; text: string }[]
+    clientName?: string
+  }) => api.post<{ suggestion: string }>('/whatsapp/suggest', payload),
 }

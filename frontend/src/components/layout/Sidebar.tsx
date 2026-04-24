@@ -23,6 +23,7 @@ import {
   RefreshCw,
   CheckSquare,
   Receipt,
+  MessageCircle,
 } from 'lucide-react'
 import { cn, getInitials } from '../../lib/utils'
 import { useAuthStore } from '../../store/auth'
@@ -157,9 +158,10 @@ const navGroups: NavGroup[] = [
   {
     label: 'Comercial',
     items: [
-      { to: '/clientes',     icon: <Users className="h-5 w-5" />,    label: 'Clientes',     roles: ['GERENTE', 'VENTAS'] },
-      { to: '/cotizaciones', icon: <FileText className="h-5 w-5" />, label: 'Cotizaciones', roles: ['GERENTE', 'VENTAS'] },
-      { to: '/pedidos',      icon: <Package className="h-5 w-5" />,  label: 'Pedidos',      roles: ['GERENTE', 'VENTAS', 'LOGISTICA', 'CONTADORA'] },
+      { to: '/clientes',     icon: <Users className="h-5 w-5" />,         label: 'Clientes',        roles: ['GERENTE', 'VENTAS'] },
+      { to: '/cotizaciones', icon: <FileText className="h-5 w-5" />,       label: 'Cotizaciones',    roles: ['GERENTE', 'VENTAS'] },
+      { to: '/pedidos',      icon: <Package className="h-5 w-5" />,        label: 'Pedidos',         roles: ['GERENTE', 'VENTAS', 'LOGISTICA', 'CONTADORA'] },
+      { to: '/whatsapp',     icon: <MessageCircle className="h-5 w-5" />,  label: 'WhatsApp Assist', roles: ['GERENTE', 'VENTAS'] },
     ],
   },
   {

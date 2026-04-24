@@ -23,6 +23,7 @@ import taskRoutes from './routes/tasks';
 import expenseRoutes from './routes/expenses';
 import aiRoutes from './routes/ai';
 import dianRoutes from './routes/dian';
+import whatsappRoutes from './routes/whatsapp';
 
 const app = express();
 const PORT = parseInt(process.env.PORT || '3001', 10);
@@ -91,6 +92,7 @@ app.use('/api/tasks', taskRoutes);
 app.use('/api/expenses', expenseRoutes);
 app.use('/api/ai', aiRoutes);
 app.use('/api/dian', dianRoutes);
+app.use('/api/whatsapp', whatsappRoutes);
 
 // ── Serve frontend in production ────────────────────────────
 if (process.env.NODE_ENV === 'production') {

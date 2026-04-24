@@ -410,3 +410,31 @@ export interface Expense {
   createdBy?: Pick<User, 'id' | 'name'>
   approvedBy?: Pick<User, 'id' | 'name'>
 }
+
+// WhatsApp Assist
+export interface WaChat {
+  jid: string
+  number: string
+  name: string
+  type: 'contacto' | 'grupo'
+  messageCount: number
+  lastMessage: string
+  lastTimestamp: string
+  fromMeLast: boolean
+  unanswered: boolean
+}
+
+export interface WaMessage {
+  chat_jid: string
+  chat_number: string
+  chat_name: string
+  chat_type: string
+  message_id: string
+  from_me: boolean
+  sender: string
+  timestamp: string
+  message_type: string
+  text: string
+  local_file?: string
+  status?: string
+}
