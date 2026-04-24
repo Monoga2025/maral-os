@@ -172,18 +172,22 @@ function MessageBubble({
 function AISuggestionBar({
   suggestion,
   isRegenerating,
-  onUse,
+  isSending,
+  onSendDirect,
+  onEdit,
   onRegenerate,
   onDismiss,
 }: {
   suggestion: string
   isRegenerating: boolean
-  onUse: (text: string) => void
+  isSending: boolean
+  onSendDirect: (text: string) => void
+  onEdit: (text: string) => void
   onRegenerate: () => void
   onDismiss: () => void
 }) {
   const parts = suggestion.split('|||').map(s => s.trim()).filter(Boolean)
-  const displayText = parts.join('\n')
+  const displayText = parts.join(' · ')
 
   return (
     <div className="border-t border-emerald-200 bg-gradient-to-r from-emerald-50 via-emerald-50 to-teal-50 px-4 py-3 flex items-start gap-3 shadow-inner">
@@ -198,27 +202,43 @@ function AISuggestionBar({
           <p className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider">
             Lady IA sugiere
           </p>
-          <span className="text-[9px] text-emerald-600/70 font-medium">
-            Responde en 1 clic · Cierra más rápido
-          </span>
+          {parts.length > 1 && (
+            <span className="text-[9px] text-emerald-600/70 bg-emerald-100 px-1.5 py-0.5 rounded-full font-medium">
+              {parts.length} mensajes
+            </span>
+          )}
         </div>
         <p className="text-sm text-gray-800 leading-relaxed whitespace-pre-wrap">
-          {displayText}
+          {parts.length > 1
+            ? parts.map((p, i) => (
+                <span key={i}>
+                  {i > 0 && <span className="inline-block mx-1 text-emerald-400 font-bold text-xs">›</span>}
+                  {p}
+                </span>
+              ))
+            : displayText}
         </p>
       </div>
       <div className="flex flex-col items-end gap-1.5 shrink-0">
         <button
-          onClick={() => onUse(suggestion)}
-          disabled={isRegenerating}
+          onClick={() => onSendDirect(suggestion)}
+          disabled={isRegenerating || isSending}
           className="flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3.5 py-2 text-xs font-bold text-white shadow-sm hover:bg-emerald-700 active:scale-95 disabled:opacity-50 transition-all"
         >
-          <Zap className="h-3 w-3" />
-          Usar y enviar
+          {isSending ? <RefreshCw className="h-3 w-3 animate-spin" /> : <Zap className="h-3 w-3" />}
+          {isSending ? 'Enviando…' : 'Enviar ya'}
+        </button>
+        <button
+          onClick={() => onEdit(suggestion)}
+          disabled={isRegenerating || isSending}
+          className="text-[10px] text-emerald-700 hover:text-emerald-900 font-medium disabled:opacity-50 transition-colors"
+        >
+          Editar antes
         </button>
         <div className="flex items-center gap-0.5">
           <button
             onClick={onRegenerate}
-            disabled={isRegenerating}
+            disabled={isRegenerating || isSending}
             title="Regenerar sugerencia"
             className="rounded-lg p-1.5 text-emerald-700 hover:bg-emerald-100 disabled:opacity-50 transition-colors"
           >
@@ -595,7 +615,24 @@ function ChatView({
     }
   }
 
-  const handleUseSuggestion = (text: string) => {
+  const sendDirectMutation = useMutation({
+    mutationFn: (text: string) =>
+      whatsappApi.send({ jid: chat.jid, type: 'text', text: text.trim() }),
+    onSuccess: () => {
+      setManualSuggestion(null)
+      if (autoSuggestion) {
+        setDismissedSuggestions(prev => new Set([...prev, autoSuggestion.messageId]))
+      }
+      qc.invalidateQueries({ queryKey: ['wa-chat', chat.jid] })
+      qc.invalidateQueries({ queryKey: ['wa-chats'] })
+    },
+    onError: (err: unknown) => {
+      const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error
+      toast.error(msg ?? 'Error enviando')
+    },
+  })
+
+  const handleEditSuggestion = (text: string) => {
     setOverrideSuggestion(text)
     setManualSuggestion(null)
     if (autoSuggestion) {
@@ -650,13 +687,15 @@ function ChatView({
         <AISuggestionBar
           suggestion={activeSuggestion}
           isRegenerating={manualLoading}
-          onUse={handleUseSuggestion}
+          isSending={sendDirectMutation.isPending}
+          onSendDirect={(text) => sendDirectMutation.mutate(text)}
+          onEdit={handleEditSuggestion}
           onRegenerate={requestSuggestion}
           onDismiss={handleDismissSuggestion}
         />
       )}
 
-      {/* Quick ask Lady bar (no suggestion yet, but client message pending) */}
+      {/* Quick ask Lady bar */}
       {showQuickAsk && (
         <QuickAskLadyBar
           isLoading={manualLoading}
