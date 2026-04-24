@@ -355,11 +355,27 @@ export const expensesApi = {
 export const whatsappApi = {
   getChats: () =>
     api.get<{ data: WaChat[]; total: number; configured: boolean }>('/whatsapp/chats'),
-  getChat: (number: string) =>
-    api.get<{ chat: WaChat; messages: WaMessage[] }>(`/whatsapp/chats/${number}`),
+  getChat: (jid: string) =>
+    api.get<{ chat: WaChat; messages: WaMessage[] }>(`/whatsapp/chats/${encodeURIComponent(jid)}`),
+  markRead: (jid: string) =>
+    api.patch<{ ok: boolean }>(`/whatsapp/chats/${encodeURIComponent(jid)}/read`),
+  send: (payload: {
+    jid: string
+    type?: string
+    text?: string
+    mediaBase64?: string
+    mimeType?: string
+    fileName?: string
+    caption?: string
+  }) => api.post<{ ok: boolean }>('/whatsapp/send', payload),
   suggest: (payload: {
     newMessage: string
     context?: { role: 'cliente' | 'lady'; text: string }[]
     clientName?: string
   }) => api.post<{ suggestion: string }>('/whatsapp/suggest', payload),
+  importHistory: () =>
+    api.post<{ imported: number }>('/whatsapp/import-history', {}),
+  configureWebhook: (webhookUrl: string) =>
+    api.post('/whatsapp/configure-webhook', { webhookUrl }),
+  getMediaUrl: (messageId: string) => `/api/whatsapp/media/${messageId}`,
 }

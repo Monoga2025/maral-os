@@ -413,11 +413,12 @@ export interface Expense {
 
 // WhatsApp Assist
 export interface WaChat {
+  id: string
   jid: string
   number: string
   name: string
   type: 'contacto' | 'grupo'
-  messageCount: number
+  unread: number
   lastMessage: string
   lastTimestamp: string
   fromMeLast: boolean
@@ -425,16 +426,15 @@ export interface WaChat {
 }
 
 export interface WaMessage {
-  chat_jid: string
-  chat_number: string
-  chat_name: string
-  chat_type: string
-  message_id: string
-  from_me: boolean
-  sender: string
-  timestamp: string
-  message_type: string
+  id: string
+  remoteId?: string
+  fromMe: boolean
+  sender?: string
+  type: string
   text: string
-  local_file?: string
-  status?: string
+  mediaUrl?: string
+  mimeType?: string
+  fileName?: string
+  timestamp: string
+  aiSuggestion?: string
 }

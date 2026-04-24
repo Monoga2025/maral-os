@@ -561,3 +561,37 @@ model DIANInvoice {
   updatedAt    DateTime    @updatedAt
   invoice      Invoice     @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
 }
+
+// ── WhatsApp Inbox ───────────────────────────────────────────
+
+model WhatsAppChat {
+  id        String            @id @default(cuid())
+  jid       String            @unique
+  number    String
+  pushName  String?
+  type      String            @default("contacto")
+  unread    Int               @default(0)
+  lastText  String?
+  lastAt    DateTime?
+  messages  WhatsAppMessage[]
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+}
+
+model WhatsAppMessage {
+  id           String       @id @default(cuid())
+  remoteId     String?      @unique
+  chatId       String
+  chat         WhatsAppChat @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  fromMe       Boolean
+  sender       String?
+  type         String       @default("text")
+  text         String?
+  mediaUrl     String?
+  mimeType     String?
+  fileName     String?
+  rawMessage   Json?
+  timestamp    DateTime
+  aiSuggestion String?
+  createdAt    DateTime     @default(now())
+}

@@ -1,217 +1,568 @@
-import { Router, Response } from 'express';
+import { Router, Request, Response } from 'express';
 import path from 'path';
 import fs from 'fs';
 import { authenticate, AuthRequest } from '../middleware/auth';
+import { prisma } from '../lib/prisma';
 
 const router = Router();
-router.use(authenticate);
 
-const GEMINI_BASE = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
-const OR_BASE     = 'https://openrouter.ai/api/v1/chat/completions';
-const OR_MODEL    = 'google/gemini-2.0-flash-001';
+// ─── Constants ────────────────────────────────────────────────
 
-// ─── WhatsApp export types ────────────────────────────────────
+const EVOL_BASE  = process.env.EVOLUTION_API_URL ?? '';
+const EVOL_KEY   = process.env.EVOLUTION_API_KEY ?? '';
+const EVOL_INST  = process.env.EVOLUTION_INSTANCE ?? 'maral-info';
+const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
 
-interface WaMessage {
-  chat_jid: string;
-  chat_number: string;
-  chat_name: string;
-  chat_type: string;
-  message_id: string;
-  from_me: boolean;
-  sender: string;
-  timestamp: string;
-  message_type: string;
-  text: string;
-  local_file?: string;
-  status?: string;
+// ─── Lady system prompt (trained on real WhatsApp history) ────
+
+const LADY_PROMPT = `Eres Lady, asesora comercial de MARAL TECNOLOGÍA Y COMUNICACIONES S.A.S., empresa colombiana que fabrica y vende equipos de telecomunicaciones B2B (antenas VHF/UHF, bases, cables, radios, accesorios).
+
+## Personalidad
+Cálida, directa, eficiente. Sin rodeos pero siempre amable. Español colombiano real.
+Cuando conoces el nombre del cliente lo usas: "Don William", "Laura", "Don Carlos".
+
+## Reglas de WhatsApp
+- MÁXIMO 3 oraciones por mensaje
+- 1-2 emojis cuando van natural: 👌🏼 🙏🏻 ✨ 😊 🌺 🥰 💫
+- NUNCA: "entiendo tu preocupación", "con gusto te ayudo", "es un placer", "¿algo más?"
+- Para precios que no sabes: "Ya le confirmo el valor en un momentico 👌🏼"
+- Para confirmar acción inmediata: "Con gusto, ya..."
+- Para cerrar: "Quedo atenta 👌🏼" o "Quedamos atentos a su requerimiento"
+- Si la respuesta natural son 2 mensajes separados, ponlos separados por "|||"
+
+## Ejemplos reales
+
+Pedido nuevo:
+Cliente: Buenos Días. Necesito 1 base uña Magnética, 4 látigos de antenas vhf
+Lady: Don William muy buenos días! ||| Claro que sí, con gusto ya genero la prefactura! 👌🏼
+
+Confirmación de prefactura:
+Lady: Don William por favor confirmar que esté correcta su prefactura, quedo atenta a la confirmación! 👌🏼
+Cliente: Con gusto.
+Lady: Perfecto don William! 👌🏼
+
+Consulta de precio:
+Cliente: Cuánto vale la antena ultra flexible?
+Lady: Don Carlos esa antena ultra flexible tiene un valor de $84.715 + IVA
+
+Añadir ítem:
+Cliente: Por favor añadir 30 metros de cable
+Lady: Con gusto, ya anexamos los 30 metros de cable! 👌🏼
+
+Pedido con dirección de envío:
+Cliente: Enviar a La Loma Cesar. Oficina Interrapidísimo. Hernán Liñan 317-226-0128
+Lady: Perfecto Laura! 👌🏼 ||| Con gusto, ya actualizamos los datos de envío.
+
+Actualización de pedido:
+Cliente: Cómo va mi pedido?
+Lady: Don Elías su pedido está en proceso de ensamble y será despachado el lunes! 👌🏼
+
+Cierre:
+Cliente: Gracias, hasta el lunes
+Lady: Bueno quedamos atentos al requerimiento, que tengan un bendecido FDS! 🥰🙌🏼💫
+
+Genera la respuesta como Lady. Sin encabezados. Solo el texto. Si son 2 mensajes naturales, sepáralos con "|||".`;
+
+// ─── Helpers ──────────────────────────────────────────────────
+
+function evolHeaders() {
+  return { 'Content-Type': 'application/json', apikey: EVOL_KEY };
 }
 
-let _cachedMessages: WaMessage[] = [];
-let _lastLoaded = 0;
+async function callGemini(systemPrompt: string, userContent: string): Promise<string> {
+  const key = process.env.GOOGLE_AI_KEY;
+  if (!key) throw new Error('GOOGLE_AI_KEY no configurada');
+  const res = await fetch(`${GEMINI_URL}?key=${key}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      system_instruction: { parts: [{ text: systemPrompt }] },
+      contents: [{ role: 'user', parts: [{ text: userContent }] }],
+      generationConfig: { temperature: 0.78, maxOutputTokens: 350 },
+    }),
+  });
+  if (!res.ok) throw new Error(`Gemini ${res.status}`);
+  const data = await res.json() as {
+    candidates?: { content?: { parts?: { text?: string }[] } }[];
+  };
+  return data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() ?? '';
+}
 
-function loadMessages(): WaMessage[] {
+/** Resolve JID → clean phone number for Evolution API */
+function jidToNumber(jid: string): string {
+  return jid.replace(/@.+$/, '').replace(/:\d+$/, '');
+}
+
+/** Classify message type from Evolution webhook data */
+function parseEvolutionMessage(data: Record<string, unknown>): {
+  type: string;
+  text: string;
+  mediaUrl?: string;
+  mimeType?: string;
+  fileName?: string;
+} {
+  const msg = data.message as Record<string, unknown> | undefined;
+  if (!msg) return { type: 'text', text: '' };
+
+  if (msg.conversation)
+    return { type: 'text', text: String(msg.conversation) };
+  if (msg.extendedTextMessage)
+    return { type: 'text', text: String((msg.extendedTextMessage as Record<string, unknown>).text ?? '') };
+
+  if (msg.imageMessage) {
+    const im = msg.imageMessage as Record<string, unknown>;
+    return { type: 'image', text: String(im.caption ?? ''), mimeType: String(im.mimetype ?? 'image/jpeg') };
+  }
+  if (msg.audioMessage) {
+    const am = msg.audioMessage as Record<string, unknown>;
+    return { type: 'audio', text: '', mimeType: String(am.mimetype ?? 'audio/ogg') };
+  }
+  if (msg.videoMessage) {
+    const vm = msg.videoMessage as Record<string, unknown>;
+    return { type: 'video', text: String(vm.caption ?? ''), mimeType: String(vm.mimetype ?? 'video/mp4') };
+  }
+  if (msg.documentMessage) {
+    const dm = msg.documentMessage as Record<string, unknown>;
+    return { type: 'document', text: String(dm.title ?? dm.fileName ?? ''), mimeType: String(dm.mimetype ?? ''), fileName: String(dm.fileName ?? '') };
+  }
+  if (msg.stickerMessage)
+    return { type: 'sticker', text: '' };
+
+  return { type: 'text', text: '' };
+}
+
+/** Store / update chat + new message. Returns the saved message. */
+async function upsertChatAndMessage(params: {
+  jid: string;
+  number: string;
+  pushName?: string;
+  type: 'contacto' | 'grupo';
+  remoteId?: string;
+  fromMe: boolean;
+  sender?: string;
+  msgType: string;
+  text?: string;
+  mediaUrl?: string;
+  mimeType?: string;
+  fileName?: string;
+  rawMessage?: unknown;
+  timestamp: Date;
+}) {
+  const labelText = params.text
+    ? params.text.slice(0, 200)
+    : params.msgType === 'image' ? '[imagen]'
+    : params.msgType === 'audio' ? '[audio]'
+    : params.msgType === 'video' ? '[video]'
+    : params.msgType === 'document' ? `[doc: ${params.fileName ?? ''}]`
+    : `[${params.msgType}]`;
+
+  const chat = await prisma.whatsAppChat.upsert({
+    where: { jid: params.jid },
+    create: {
+      jid: params.jid,
+      number: params.number,
+      pushName: params.pushName,
+      type: params.type,
+      unread: params.fromMe ? 0 : 1,
+      lastText: labelText,
+      lastAt: params.timestamp,
+    },
+    update: {
+      pushName: params.pushName ?? undefined,
+      lastText: labelText,
+      lastAt: params.timestamp,
+      unread: params.fromMe ? { set: 0 } : { increment: 1 },
+    },
+  });
+
+  const message = await prisma.whatsAppMessage.upsert({
+    where: { remoteId: params.remoteId ?? `local_${Date.now()}_${Math.random()}` },
+    create: {
+      remoteId: params.remoteId,
+      chatId: chat.id,
+      fromMe: params.fromMe,
+      sender: params.sender,
+      type: params.msgType,
+      text: params.text,
+      mediaUrl: params.mediaUrl,
+      mimeType: params.mimeType,
+      fileName: params.fileName,
+      rawMessage: params.rawMessage ? (params.rawMessage as object) : undefined,
+      timestamp: params.timestamp,
+    },
+    update: {},
+  });
+
+  return { chat, message };
+}
+
+/** Generate AI suggestion and store it on the message */
+async function generateAndStoreSuggestion(messageId: string, chatId: string, clientText: string) {
+  try {
+    const recent = await prisma.whatsAppMessage.findMany({
+      where: { chatId },
+      orderBy: { timestamp: 'desc' },
+      take: 12,
+    });
+    recent.reverse();
+
+    const chat = await prisma.whatsAppChat.findUnique({ where: { id: chatId } });
+    const clientName = chat?.pushName ?? '';
+    const history = recent
+      .filter(m => m.text)
+      .map(m => `${m.fromMe ? 'Lady' : 'Cliente'}: ${m.text}`)
+      .join('\n');
+
+    const prompt = `${clientName ? `El cliente se llama ${clientName}.\n` : ''}Historial reciente:\n${history}\n\nMensaje nuevo del cliente: "${clientText}"\n\nResponde como Lady:`;
+    const suggestion = await callGemini(LADY_PROMPT, prompt);
+
+    if (suggestion) {
+      await prisma.whatsAppMessage.update({
+        where: { id: messageId },
+        data: { aiSuggestion: suggestion },
+      });
+    }
+  } catch {
+    // non-blocking
+  }
+}
+
+// ─── Split + send humanized messages via Evolution ────────────
+
+async function sendHumanizedText(number: string, text: string) {
+  if (!EVOL_BASE) throw new Error('EVOLUTION_API_URL no configurada');
+
+  // Split by ||| first (AI-generated splits), then by length
+  const parts = text.split('|||').map(s => s.trim()).filter(Boolean);
+
+  for (let i = 0; i < parts.length; i++) {
+    const part = parts[i];
+    await fetch(`${EVOL_BASE}/message/sendText/${EVOL_INST}`, {
+      method: 'POST',
+      headers: evolHeaders(),
+      body: JSON.stringify({ number, text: part }),
+    });
+    if (i < parts.length - 1) {
+      await new Promise(r => setTimeout(r, 1200 + Math.random() * 800));
+    }
+  }
+}
+
+// ─── Import history from local export files ───────────────────
+
+async function importFromExport() {
   const exportPath = process.env.WHATSAPP_EXPORT_PATH;
-  if (!exportPath) return [];
-
+  if (!exportPath) return 0;
   const filePath = path.join(exportPath, 'mensajes_todos.json');
-  if (!fs.existsSync(filePath)) return [];
+  if (!fs.existsSync(filePath)) return 0;
 
-  const now = Date.now();
-  if (now - _lastLoaded < 60_000 && _cachedMessages.length > 0) return _cachedMessages;
+  const existing = await prisma.whatsAppMessage.count();
+  if (existing > 0) return 0; // already imported
+
+  const raw = fs.readFileSync(filePath, 'utf-8');
+  const msgs = JSON.parse(raw) as Array<{
+    chat_jid: string; chat_number: string; chat_name: string; chat_type: string;
+    message_id: string; from_me: boolean; sender: string; timestamp: string;
+    message_type: string; text: string;
+  }>;
+
+  let count = 0;
+  for (const m of msgs) {
+    try {
+      const jid = m.chat_jid;
+      const isGroup = m.chat_type === 'group' || jid.endsWith('@g.us');
+      const msgType = m.message_type === 'conversation' ? 'text'
+        : m.message_type === 'imageMessage' ? 'image'
+        : m.message_type === 'audioMessage' ? 'audio'
+        : m.message_type === 'videoMessage' ? 'video'
+        : m.message_type === 'documentMessage' ? 'document'
+        : 'other';
+      const ts = new Date(m.timestamp);
+      if (isNaN(ts.getTime())) continue;
+
+      await upsertChatAndMessage({
+        jid,
+        number: m.chat_number,
+        pushName: m.chat_name !== m.chat_number ? m.chat_name : undefined,
+        type: isGroup ? 'grupo' : 'contacto',
+        remoteId: m.message_id || undefined,
+        fromMe: m.from_me,
+        sender: m.sender,
+        msgType,
+        text: m.text || undefined,
+        timestamp: ts,
+      });
+      count++;
+    } catch { /* skip duplicates */ }
+  }
+  return count;
+}
+
+// Auto-import on startup (non-blocking)
+importFromExport().then(n => { if (n > 0) console.log(`[WhatsApp] Importados ${n} mensajes del historial`); });
+
+// ─── PUBLIC: Webhook (no auth) ────────────────────────────────
+
+router.post('/webhook', async (req: Request, res: Response) => {
+  res.sendStatus(200); // respond immediately
 
   try {
-    const raw = fs.readFileSync(filePath, 'utf-8');
-    _cachedMessages = JSON.parse(raw) as WaMessage[];
-    _lastLoaded = now;
-  } catch {
-    // keep stale cache
-  }
-  return _cachedMessages;
-}
+    const body = req.body as Record<string, unknown>;
+    if (body.event !== 'messages.upsert') return;
 
-// ─── Lady persona (built from real WhatsApp history) ──────────
+    const data = body.data as Record<string, unknown>;
+    if (!data) return;
 
-const LADY_SYSTEM_PROMPT = `Eres Lady, asesora comercial de MARAL TECNOLOGÍA Y COMUNICACIONES S.A.S., empresa colombiana de ensamble y venta de equipos de telecomunicaciones (antenas, bases, cables, radios VHF/UHF).
+    const key = data.key as Record<string, unknown>;
+    if (!key) return;
 
-Tu estilo en WhatsApp:
-- Cálida, amable, directa y profesional
-- Tratas de "Don" o "Doña" + nombre al cliente cuando lo conoces
-- Mensajes cortos: máximo 2-3 oraciones, nunca listas ni bullets
-- Emojis con moderación: 👌🏼 🙏🏻 ✨ 😊 🌺 🥰
-- "Con gusto, ya..." para confirmar acción inmediata
-- "Ya le confirmo..." cuando necesitas verificar internamente
-- "Quedo atenta" para cerrar conversación
-- Español colombiano casual — nunca corporativo ni formal
-- Nunca dices "Entiendo tu preocupación" ni "es importante destacar"
-- Para preguntas de precio que no sabes: "Ya le confirmo el valor en un momentico 👌🏼"
+    const jid     = String(key.remoteJid ?? '');
+    const fromMe  = Boolean(key.fromMe);
+    const remoteId = String(key.id ?? '');
+    const pushName = String(data.pushName ?? '');
+    const ts      = new Date((Number(data.messageTimestamp) || 0) * 1000);
+    const isGroup = jid.endsWith('@g.us');
+    const number  = jidToNumber(jid);
 
-Ejemplos reales de tus mensajes:
-- "Claro que sí, con gusto ya genero la prefactura! 👌🏼"
-- "Don William por favor confirmar que esté correcta su prefactura, quedo atenta! 👌🏼"
-- "Don Carlos esa antena tiene un valor de $84.715 + IVA"
-- "Perfecto don Gabriel, esperemos a que le den respuesta! 👌🏼"
-- "Con gusto, ya anexamos los 30 metros de cable! 👌🏼"
-- "Que Dios te multiplique y te permita suplir todas tus necesidades! 😘🙏🏻✨"
-- "Bueno quedamos atentos, que tengan un bendecido FDS! 🥰🙌🏼💫"
+    const parsed = parseEvolutionMessage(data);
 
-Genera UNA SOLA respuesta corta como Lady la escribiría en WhatsApp. Sin encabezados.`;
-
-// ─── AI helper (Gemini direct → OpenRouter fallback) ─────────
-
-async function callAI(systemPrompt: string, userContent: string): Promise<string> {
-  const geminiKey = process.env.GOOGLE_AI_KEY;
-  const orKey     = process.env.OPENROUTER_API_KEY;
-
-  if (!geminiKey && !orKey) throw new Error('Configura GOOGLE_AI_KEY o OPENROUTER_API_KEY');
-
-  // Try Gemini API first
-  if (geminiKey) {
-    const res = await fetch(`${GEMINI_BASE}?key=${geminiKey}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        system_instruction: { parts: [{ text: systemPrompt }] },
-        contents: [{ role: 'user', parts: [{ text: userContent }] }],
-        generationConfig: { temperature: 0.78, maxOutputTokens: 300 },
-      }),
+    const { message } = await upsertChatAndMessage({
+      jid,
+      number,
+      pushName: pushName || undefined,
+      type: isGroup ? 'grupo' : 'contacto',
+      remoteId,
+      fromMe,
+      sender: fromMe ? undefined : number,
+      msgType: parsed.type,
+      text: parsed.text || undefined,
+      mediaUrl: parsed.mediaUrl,
+      mimeType: parsed.mimeType,
+      fileName: parsed.fileName,
+      rawMessage: data,
+      timestamp: ts,
     });
-    if (res.ok) {
-      const data = await res.json() as {
-        candidates?: { content?: { parts?: { text?: string }[] } }[];
-      };
-      const text = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
-      if (text) return text;
-    }
-  }
 
-  // Fallback: OpenRouter
-  if (orKey) {
-    const res = await fetch(OR_BASE, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${orKey}`,
-        'HTTP-Referer': 'https://maral-os.app',
-        'X-Title': 'MARAL OS',
-      },
-      body: JSON.stringify({
-        model: OR_MODEL,
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userContent },
-        ],
-        temperature: 0.78,
-        max_tokens: 300,
-      }),
-    });
-    if (!res.ok) {
-      const err = await res.text();
-      throw new Error(`OpenRouter ${res.status}: ${err.slice(0, 200)}`);
-    }
-    const data = await res.json() as {
-      choices?: { message?: { content?: string } }[];
-    };
-    return data.choices?.[0]?.message?.content?.trim() ?? '';
-  }
-
-  throw new Error('Sin respuesta de IA');
-}
-
-// ─── Routes ──────────────────────────────────────────────────
-
-// GET /api/whatsapp/chats
-router.get('/chats', (_req: AuthRequest, res: Response) => {
-  const msgs = loadMessages();
-
-  const chatMap = new Map<string, {
-    jid: string;
-    number: string;
-    name: string;
-    type: string;
-    messageCount: number;
-    lastMessage: string;
-    lastTimestamp: string;
-    fromMeLast: boolean;
-    unanswered: boolean;
-  }>();
-
-  for (const m of msgs) {
-    const existing = chatMap.get(m.chat_jid);
-    if (!existing) {
-      chatMap.set(m.chat_jid, {
-        jid: m.chat_jid,
-        number: m.chat_number,
-        name: m.chat_name,
-        type: m.chat_type,
-        messageCount: 1,
-        lastMessage: m.text || `[${m.message_type}]`,
-        lastTimestamp: m.timestamp,
-        fromMeLast: m.from_me,
-        unanswered: !m.from_me,
-      });
-    } else {
-      existing.messageCount++;
-      if (new Date(m.timestamp) > new Date(existing.lastTimestamp)) {
-        existing.lastMessage = m.text || `[${m.message_type}]`;
-        existing.lastTimestamp = m.timestamp;
-        existing.fromMeLast = m.from_me;
-        existing.unanswered = !m.from_me;
+    // Auto-generate AI suggestion for client messages (non-blocking)
+    if (!fromMe && parsed.type === 'text' && parsed.text) {
+      const chatRecord = await prisma.whatsAppChat.findUnique({ where: { jid } });
+      if (chatRecord) {
+        generateAndStoreSuggestion(message.id, chatRecord.id, parsed.text);
       }
     }
+  } catch (err) {
+    console.error('[WhatsApp webhook]', err);
   }
-
-  const chats = Array.from(chatMap.values())
-    .sort((a, b) => new Date(b.lastTimestamp).getTime() - new Date(a.lastTimestamp).getTime());
-
-  res.json({ data: chats, total: chats.length, configured: !!process.env.WHATSAPP_EXPORT_PATH });
 });
 
-// GET /api/whatsapp/chats/:number
-router.get('/chats/:number', (req: AuthRequest, res: Response) => {
-  const msgs = loadMessages();
-  const { number } = req.params;
+// ─── All remaining routes require auth ───────────────────────
 
-  const thread = msgs
-    .filter(m => m.chat_number === number || m.chat_jid.startsWith(number))
-    .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+router.use(authenticate);
 
-  if (thread.length === 0) {
+// ─── GET /api/whatsapp/chats ──────────────────────────────────
+
+router.get('/chats', async (_req: AuthRequest, res: Response) => {
+  const chats = await prisma.whatsAppChat.findMany({
+    orderBy: { lastAt: 'desc' },
+  });
+
+  const configured = !!(EVOL_BASE && EVOL_KEY) || !!(process.env.WHATSAPP_EXPORT_PATH);
+
+  res.json({
+    data: chats.map(c => ({
+      id: c.id,
+      jid: c.jid,
+      number: c.number,
+      name: c.pushName ?? c.number,
+      type: c.type,
+      unread: c.unread,
+      lastMessage: c.lastText ?? '',
+      lastTimestamp: c.lastAt?.toISOString() ?? new Date(0).toISOString(),
+      fromMeLast: false,
+      unanswered: c.unread > 0,
+    })),
+    total: chats.length,
+    configured,
+  });
+});
+
+// ─── GET /api/whatsapp/chats/:jid ─────────────────────────────
+
+router.get('/chats/:jid', async (req: AuthRequest, res: Response) => {
+  const { jid } = req.params;
+
+  const chat = await prisma.whatsAppChat.findFirst({
+    where: { OR: [{ jid }, { number: jid }] },
+  });
+
+  if (!chat) {
     res.status(404).json({ error: 'Chat no encontrado' });
     return;
   }
 
-  const chatInfo = {
-    jid: thread[0].chat_jid,
-    number: thread[0].chat_number,
-    name: thread[0].chat_name,
-    type: thread[0].chat_type,
-  };
+  const messages = await prisma.whatsAppMessage.findMany({
+    where: { chatId: chat.id },
+    orderBy: { timestamp: 'asc' },
+  });
 
-  res.json({ chat: chatInfo, messages: thread });
+  res.json({
+    chat: {
+      id: chat.id,
+      jid: chat.jid,
+      number: chat.number,
+      name: chat.pushName ?? chat.number,
+      type: chat.type,
+      unread: chat.unread,
+    },
+    messages: messages.map(m => ({
+      id: m.id,
+      remoteId: m.remoteId,
+      fromMe: m.fromMe,
+      sender: m.sender,
+      type: m.type,
+      text: m.text ?? '',
+      mediaUrl: m.mediaUrl,
+      mimeType: m.mimeType,
+      fileName: m.fileName,
+      timestamp: m.timestamp.toISOString(),
+      aiSuggestion: m.aiSuggestion,
+    })),
+  });
 });
 
-// POST /api/whatsapp/suggest
+// ─── PATCH /api/whatsapp/chats/:jid/read ─────────────────────
+
+router.patch('/chats/:jid/read', async (req: AuthRequest, res: Response) => {
+  await prisma.whatsAppChat.updateMany({
+    where: { OR: [{ jid: req.params.jid }, { id: req.params.jid }] },
+    data: { unread: 0 },
+  });
+  res.json({ ok: true });
+});
+
+// ─── POST /api/whatsapp/send ──────────────────────────────────
+
+router.post('/send', async (req: AuthRequest, res: Response) => {
+  const {
+    jid,
+    type = 'text',
+    text,
+    mediaBase64,
+    mimeType,
+    fileName,
+    caption,
+  } = req.body as {
+    jid: string;
+    type?: string;
+    text?: string;
+    mediaBase64?: string;
+    mimeType?: string;
+    fileName?: string;
+    caption?: string;
+  };
+
+  if (!jid) { res.status(400).json({ error: 'jid requerido' }); return; }
+  if (!EVOL_BASE) { res.status(503).json({ error: 'Evolution API no configurada' }); return; }
+
+  const number = jidToNumber(jid);
+
+  try {
+    if (type === 'text') {
+      if (!text?.trim()) { res.status(400).json({ error: 'text requerido' }); return; }
+      await sendHumanizedText(number, text.trim());
+
+      // Store sent messages in DB
+      const chat = await prisma.whatsAppChat.findFirst({ where: { OR: [{ jid }, { number }] } });
+      if (chat) {
+        const parts = text.split('|||').map(s => s.trim()).filter(Boolean);
+        for (const part of parts) {
+          await prisma.whatsAppMessage.create({
+            data: {
+              chatId: chat.id,
+              fromMe: true,
+              type: 'text',
+              text: part,
+              timestamp: new Date(),
+            },
+          });
+        }
+        await prisma.whatsAppChat.update({
+          where: { id: chat.id },
+          data: { lastText: parts[parts.length - 1].slice(0, 200), lastAt: new Date(), unread: 0 },
+        });
+      }
+    } else if (type === 'audio') {
+      if (!mediaBase64) { res.status(400).json({ error: 'mediaBase64 requerido' }); return; }
+      await fetch(`${EVOL_BASE}/message/sendWhatsAppAudio/${EVOL_INST}`, {
+        method: 'POST',
+        headers: evolHeaders(),
+        body: JSON.stringify({ number, audio: mediaBase64, encoding: true }),
+      });
+    } else {
+      // image / video / document
+      if (!mediaBase64) { res.status(400).json({ error: 'mediaBase64 requerido' }); return; }
+      const mediatype = type === 'image' ? 'image' : type === 'video' ? 'video' : 'document';
+      await fetch(`${EVOL_BASE}/message/sendMedia/${EVOL_INST}`, {
+        method: 'POST',
+        headers: evolHeaders(),
+        body: JSON.stringify({
+          number,
+          mediatype,
+          mimetype: mimeType,
+          caption: caption ?? '',
+          media: mediaBase64,
+          fileName: fileName ?? '',
+        }),
+      });
+    }
+
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+// ─── GET /api/whatsapp/media/:messageId ──────────────────────
+
+router.get('/media/:messageId', async (req: AuthRequest, res: Response) => {
+  const msg = await prisma.whatsAppMessage.findUnique({
+    where: { id: req.params.messageId },
+  });
+
+  if (!msg || !msg.rawMessage) {
+    res.status(404).json({ error: 'Media no encontrado' });
+    return;
+  }
+
+  if (!EVOL_BASE) { res.status(503).json({ error: 'Evolution API no configurada' }); return; }
+
+  try {
+    const result = await fetch(`${EVOL_BASE}/chat/getBase64FromMediaMessage/${EVOL_INST}`, {
+      method: 'POST',
+      headers: evolHeaders(),
+      body: JSON.stringify({ message: msg.rawMessage }),
+    });
+
+    if (!result.ok) {
+      res.status(502).json({ error: 'No se pudo obtener el media' });
+      return;
+    }
+
+    const data = await result.json() as { base64?: string; mimetype?: string };
+    if (!data.base64) { res.status(404).json({ error: 'Sin datos' }); return; }
+
+    const mimeType = data.mimetype ?? msg.mimeType ?? 'application/octet-stream';
+    const buf = Buffer.from(data.base64, 'base64');
+    res.setHeader('Content-Type', mimeType);
+    res.setHeader('Cache-Control', 'private, max-age=3600');
+    res.send(buf);
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+// ─── POST /api/whatsapp/suggest (manual) ─────────────────────
+
 router.post('/suggest', async (req: AuthRequest, res: Response) => {
   const { newMessage, context, clientName } = req.body as {
     newMessage: string;
@@ -219,40 +570,91 @@ router.post('/suggest', async (req: AuthRequest, res: Response) => {
     clientName?: string;
   };
 
-  if (!newMessage?.trim()) {
-    res.status(400).json({ error: 'newMessage es requerido' });
+  if (!newMessage?.trim()) { res.status(400).json({ error: 'newMessage requerido' }); return; }
+
+  try {
+    const history = context?.slice(-12)
+      .map(m => `${m.role === 'lady' ? 'Lady' : 'Cliente'}: ${m.text}`)
+      .join('\n') ?? '';
+
+    const prompt = `${clientName ? `El cliente se llama ${clientName}.\n` : ''}${history ? `Historial:\n${history}\n\n` : ''}Mensaje nuevo del cliente: "${newMessage}"\n\nResponde como Lady:`;
+    const suggestion = await callGemini(LADY_PROMPT, prompt);
+    res.json({ suggestion });
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+// ─── POST /api/whatsapp/import-history ───────────────────────
+
+router.post('/import-history', async (_req: AuthRequest, res: Response) => {
+  try {
+    // force re-import even if records exist
+    const exportPath = process.env.WHATSAPP_EXPORT_PATH;
+    if (!exportPath) { res.status(400).json({ error: 'WHATSAPP_EXPORT_PATH no configurada' }); return; }
+    const filePath = path.join(exportPath, 'mensajes_todos.json');
+    if (!fs.existsSync(filePath)) { res.status(404).json({ error: 'Archivo no encontrado' }); return; }
+
+    const raw = fs.readFileSync(filePath, 'utf-8');
+    const msgs = JSON.parse(raw) as Array<{
+      chat_jid: string; chat_number: string; chat_name: string; chat_type: string;
+      message_id: string; from_me: boolean; sender: string; timestamp: string;
+      message_type: string; text: string;
+    }>;
+
+    let count = 0;
+    for (const m of msgs) {
+      try {
+        const jid = m.chat_jid;
+        const isGroup = m.chat_type === 'group' || jid.endsWith('@g.us');
+        const msgType = m.message_type === 'conversation' ? 'text'
+          : m.message_type.replace('Message', '');
+        const ts = new Date(m.timestamp);
+        if (isNaN(ts.getTime())) continue;
+
+        await upsertChatAndMessage({
+          jid,
+          number: m.chat_number,
+          pushName: m.chat_name !== m.chat_number ? m.chat_name : undefined,
+          type: isGroup ? 'grupo' : 'contacto',
+          remoteId: m.message_id || undefined,
+          fromMe: m.from_me,
+          sender: m.sender,
+          msgType,
+          text: m.text || undefined,
+          timestamp: ts,
+        });
+        count++;
+      } catch { /* skip duplicates */ }
+    }
+
+    res.json({ imported: count });
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+// ─── POST /api/whatsapp/configure-webhook ────────────────────
+
+router.post('/configure-webhook', async (req: AuthRequest, res: Response) => {
+  const { webhookUrl } = req.body as { webhookUrl: string };
+  if (!webhookUrl || !EVOL_BASE) {
+    res.status(400).json({ error: 'webhookUrl y EVOLUTION_API_URL requeridos' });
     return;
   }
 
-  try {
-    let contextStr = '';
-    if (context && context.length > 0) {
-      const recent = context.slice(-10);
-      contextStr = '\nHistorial de la conversación:\n' + recent
-        .map(m => `${m.role === 'lady' ? 'Lady' : 'Cliente'}: ${m.text}`)
-        .join('\n');
-    }
+  const result = await fetch(`${EVOL_BASE}/webhook/set/${EVOL_INST}`, {
+    method: 'POST',
+    headers: evolHeaders(),
+    body: JSON.stringify({
+      url: webhookUrl,
+      webhook_by_events: true,
+      events: ['messages.upsert', 'messages.update'],
+    }),
+  });
 
-    const clientLabel = clientName && clientName !== 'Sin nombre'
-      ? `El cliente se llama ${clientName}.`
-      : '';
-
-    const userContent = `${clientLabel}${contextStr}
-
-Mensaje nuevo del cliente: "${newMessage}"
-
-Responde como Lady respondería en WhatsApp:`;
-
-    const suggestion = await callAI(LADY_SYSTEM_PROMPT, userContent);
-    res.json({ suggestion });
-  } catch (err) {
-    const msg = (err as Error).message;
-    if (msg.includes('GOOGLE_AI_KEY') || msg.includes('OPENROUTER')) {
-      res.status(503).json({ error: 'IA no disponible — configura GOOGLE_AI_KEY' });
-    } else {
-      res.status(500).json({ error: msg });
-    }
-  }
+  const data = await result.json();
+  res.json(data);
 });
 
 export default router;
