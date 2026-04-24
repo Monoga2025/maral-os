@@ -506,6 +506,16 @@ router.post('/send', async (req: AuthRequest, res: Response) => {
         headers: evolHeaders(),
         body: JSON.stringify({ number, audio: mediaBase64, encoding: true }),
       });
+      const chat = await prisma.whatsAppChat.findFirst({ where: { OR: [{ jid }, { number }] } });
+      if (chat) {
+        await prisma.whatsAppMessage.create({
+          data: { chatId: chat.id, fromMe: true, type: 'audio', mimeType: 'audio/ogg', timestamp: new Date() },
+        });
+        await prisma.whatsAppChat.update({
+          where: { id: chat.id },
+          data: { lastText: '[audio]', lastAt: new Date(), unread: 0 },
+        });
+      }
     } else {
       // image / video / document
       if (!mediaBase64) { res.status(400).json({ error: 'mediaBase64 requerido' }); return; }
@@ -522,6 +532,21 @@ router.post('/send', async (req: AuthRequest, res: Response) => {
           fileName: fileName ?? '',
         }),
       });
+      const chat = await prisma.whatsAppChat.findFirst({ where: { OR: [{ jid }, { number }] } });
+      if (chat) {
+        const label = type === 'image' ? '[imagen]' : type === 'video' ? '[video]' : `[doc: ${fileName ?? ''}]`;
+        await prisma.whatsAppMessage.create({
+          data: {
+            chatId: chat.id, fromMe: true, type,
+            text: caption || undefined, mimeType, fileName,
+            timestamp: new Date(),
+          },
+        });
+        await prisma.whatsAppChat.update({
+          where: { id: chat.id },
+          data: { lastText: label, lastAt: new Date(), unread: 0 },
+        });
+      }
     }
 
     res.json({ ok: true });

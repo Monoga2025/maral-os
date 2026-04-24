@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { MessageCircle, X, Send, Bot, User, Loader2, BookOpen } from 'lucide-react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 
 const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY ?? ''
 const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`
@@ -118,7 +118,10 @@ const QUICK_QUESTIONS = [
 ]
 
 export default function ChatBot() {
+  const location = useLocation()
   const [open, setOpen] = useState(false)
+
+  if (location.pathname.startsWith('/whatsapp')) return null
   const [messages, setMessages] = useState<Message[]>([
     {
       role: 'assistant',
