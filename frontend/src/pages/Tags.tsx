@@ -249,7 +249,7 @@ export default function Tags() {
                 Cancelar
               </Button>
               <Button
-                variant="danger"
+                variant="destructive"
                 onClick={() => deleteMutation.mutate(toDelete.id)}
                 disabled={deleteMutation.isPending}
               >
