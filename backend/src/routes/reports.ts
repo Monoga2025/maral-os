@@ -40,8 +40,8 @@ router.get('/sales', async (req: AuthRequest, res: Response) => {
     };
 
     if (from || to) {
-      orderWhere.createdAt = {};
-      const dateFilter = orderWhere.createdAt as Record<string, Date>;
+      orderWhere.updatedAt = {};
+      const dateFilter = orderWhere.updatedAt as Record<string, Date>;
       if (from) dateFilter.gte = new Date(from);
       if (to) dateFilter.lte = new Date(to);
     }

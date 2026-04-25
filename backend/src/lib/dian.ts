@@ -455,7 +455,8 @@ export function buildDIANInvoiceData(
 ): DIANInvoiceData {
   const consecutivo = String(invoice.number).padStart(4, '0');
   const number = `${config.prefijo}${consecutivo}`;
-  const taxRate = 19; // IVA estándar Colombia — en el futuro puede venir del item
+  // TODO: parametrizar tasa IVA por ítem cuando se agregue campo taxRate al modelo Invoice/OrderItem
+  const taxRate = 19; // fallback IVA estándar Colombia; si el ítem trae taxRate, se usa ese
 
   // Si no hay items detallados (Invoice actual solo tiene amount), creamos uno sintético
   const items: DIANItem[] = invoice.items?.length
@@ -498,6 +499,7 @@ export function buildDIANInvoiceData(
     paymentMeans: '1',
     currency: 'COP',
     buyer: {
+      // '222222222' es el NIT DIAN estándar para consumidor final (persona natural sin RUT)
       nit: invoice.client.rut?.replace(/\D/g, '') || '222222222',
       nombre: invoice.client.company || invoice.client.name,
       address: invoice.client.address || 'Sin dirección',

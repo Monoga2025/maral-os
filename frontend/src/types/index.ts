@@ -102,6 +102,8 @@ export interface Client {
   active: boolean
   notes?: string
   merlinCode?: string
+  interestTags?: string[]
+  optedOut?: boolean
   createdAt: string
   updatedAt: string
   lastOrderAt?: string
@@ -437,4 +439,182 @@ export interface WaMessage {
   fileName?: string
   timestamp: string
   aiSuggestion?: string
+}
+
+// Campaigns (Sales Machine Sprint 1)
+export type CampaignStatus = 'BORRADOR' | 'VALIDANDO' | 'LISTA' | 'EN_CURSO' | 'PAUSADA' | 'COMPLETADA' | 'CANCELADA'
+
+// ── Marco IA ──────────────────────────────────────────────────
+
+export interface MarcoStep {
+  order: number
+  type: 'TEXT' | 'IMAGE' | 'VIDEO' | 'AUDIO' | 'DOCUMENT'
+  content: string
+  imagePrompt?: string
+  imageTemplate?: string
+  imageAspect?: string
+  delaySeconds: number
+  principlesUsed: string[]
+  note?: string
+}
+
+export interface MarcoResult {
+  strategy: {
+    templateBase: string
+    framework: string
+    objective: string
+    audienceInsight: string
+    psychologyUsed: string[]
+    expectedReadRate: string
+    expectedResponseRate: string
+    expectedConversion: string
+  }
+  steps: MarcoStep[]
+  validation: {
+    score: number
+    checks: { principle: string; pass: boolean; note: string }[]
+    antiPatternsFound: string[]
+    improvements: string[]
+  }
+  productPhotosUsed: boolean
+  marcoNote: string
+}
+export type StepType = 'TEXT' | 'IMAGE' | 'VIDEO' | 'AUDIO' | 'DOCUMENT'
+export type RecipientStatus = 'PENDING' | 'SCHEDULED' | 'SENT' | 'DELIVERED' | 'READ' | 'REPLIED' | 'CONVERTED' | 'FAILED' | 'EXCLUDED'
+
+export interface ABVariant {
+  id: string
+  content: string
+  weight?: number
+}
+
+export interface CampaignStep {
+  id: string
+  campaignId: string
+  order: number
+  type: StepType
+  content?: string
+  mediaUrl?: string
+  mimeType?: string
+  fileName?: string
+  delaySeconds: number
+  renderedContent?: string
+  variants?: ABVariant[] | null
+  variantMetric?: Record<string, { sent: number; replied: number; converted: number }> | null
+}
+
+export interface CampaignMetric {
+  id: string
+  campaignId: string
+  sent: number
+  delivered: number
+  read: number
+  replied: number
+  converted: number
+  revenueCOP: number
+  updatedAt: string
+}
+
+export interface CampaignRecipient {
+  id: string
+  campaignId: string
+  clientId: string
+  status: RecipientStatus
+  currentStep: number
+  scheduledAt?: string
+  sentAt?: string
+  deliveredAt?: string
+  readAt?: string
+  repliedAt?: string
+  client?: Pick<Client, 'id' | 'name'> & { whatsapp?: string }
+}
+
+export interface Campaign {
+  id: string
+  name: string
+  objective?: string
+  status: CampaignStatus
+  createdById: string
+  audienceFilter?: Record<string, unknown>
+  startedAt?: string
+  completedAt?: string
+  createdAt: string
+  updatedAt: string
+  createdBy?: Pick<User, 'id' | 'name'>
+  steps?: CampaignStep[]
+  metrics?: CampaignMetric
+  recipients?: CampaignRecipient[]
+  _count?: { recipients: number }
+}
+
+export interface AudienceFilter {
+  segments?: ('IM' | 'DS' | 'CF')[]
+  cities?: string[]
+  interestTags?: string[]
+  hasOrderedInLastMonths?: number | null
+  hasNotOrderedInLastMonths?: number | null
+  minLifetimeValue?: number
+  excludeActiveQuotations?: boolean
+  excludeActiveOrders?: boolean
+  excludeOptedOut?: boolean
+  excludeRecentCampaign?: number
+}
+
+// Sprint 4: Conversión y seguimiento
+export type LeadTemperature = 'HOT' | 'WARM' | 'COLD' | 'OPTOUT' | 'OFFTOPIC'
+
+export interface AppNotification {
+  id: string
+  type: string
+  title: string
+  body: string
+  meta: Record<string, unknown> | null
+  createdAt: string
+}
+
+export interface CampaignLead {
+  id: string
+  campaignId: string
+  clientId: string
+  status: string
+  temperature: LeadTemperature | null
+  repliedAt?: string
+  convertedAt?: string
+  quotationId?: string
+  client: {
+    id: string
+    name: string
+    company?: string
+    whatsapp?: string
+    phone?: string
+    city?: string
+  }
+  campaign: {
+    id: string
+    name: string
+    objective?: string
+  }
+}
+
+// Sprint 3: Nano Banana
+export type ImageTemplate = 'promo' | 'comparativa' | 'lanzamiento' | 'testimonial' | 'educativo'
+export type AspectRatio = '1:1' | '4:5' | '16:9'
+
+export interface BrandGuardResult {
+  approved: boolean
+  issues: string[]
+  professionalScore: number
+}
+
+export interface GeneratedImage {
+  id: string
+  url: string
+  prompt: string
+  template?: string
+  aspectRatio: string
+  approvedByBrand: boolean
+  brandScore?: number
+  brandIssues?: string[]
+  usedInCampaigns: string[]
+  createdAt: string
 }

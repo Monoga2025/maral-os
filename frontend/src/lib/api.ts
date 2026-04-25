@@ -17,6 +17,17 @@ import type {
   Expense,
   WaChat,
   WaMessage,
+  Campaign,
+  CampaignStep,
+  AudienceFilter,
+  MarcoResult,
+  MarcoStep,
+  GeneratedImage,
+  BrandGuardResult,
+  ImageTemplate,
+  AspectRatio,
+  AppNotification,
+  CampaignLead,
 } from '../types'
 import type {
   CreateQuotationRequest,
@@ -61,6 +72,7 @@ export default api
 
 // Auth
 export const authApi = {
+  // Reservado — login por email deshabilitado. Usar loginCedula.
   login: (email: string, password: string) =>
     api.post<{ token: string; user: User }>('/auth/login', { email, password }),
   loginCedula: (userId: string, cedula: string) =>
@@ -83,6 +95,7 @@ export const clientsApi = {
     search?: string
     category?: string
     city?: string
+    tag?: string
     isActive?: boolean
     page?: number
     pageSize?: number
@@ -93,6 +106,7 @@ export const clientsApi = {
     api.put<Client>(`/clients/${id}`, data),
   delete: (id: string) => api.delete(`/clients/${id}`),
   getCities: () => api.get<string[]>('/clients/cities'),
+  getTags: () => api.get<string[]>('/clients/tags'),
 }
 
 // Products
@@ -163,6 +177,7 @@ export const aiApi = {
       '/ai/parse-expense-voice',
       { text },
     ),
+  autofill: (payload: Record<string, unknown>) => api.post('/ai/autofill', payload),
 }
 
 // Orders
@@ -286,6 +301,7 @@ export const reportsApi = {
 // Users
 export const usersApi = {
   getAll: () => api.get<User[]>('/users'),
+  assignable: () => api.get<User[]>('/users/assignable'),
   getById: (id: string) => api.get<User>(`/users/${id}`),
   create: (data: { name: string; email: string; password: string; role: string; whatsapp?: string; cedula?: string }) =>
     api.post<User>('/users', data),
@@ -351,6 +367,80 @@ export const expensesApi = {
     }),
 }
 
+// Campaigns (Sales Machine Sprint 1)
+export const campaignsApi = {
+  list: (params?: { status?: string; search?: string }) =>
+    api.get<Campaign[]>('/campaigns', { params }),
+  get: (id: string) =>
+    api.get<Campaign>(`/campaigns/${id}`),
+  create: (data: { name: string; objective?: string }) =>
+    api.post<Campaign>('/campaigns', data),
+  update: (id: string, data: { name?: string; objective?: string }) =>
+    api.put<Campaign>(`/campaigns/${id}`, data),
+  delete: (id: string) =>
+    api.delete<{ ok: boolean }>(`/campaigns/${id}`),
+
+  addStep: (id: string, data: Partial<CampaignStep>) =>
+    api.post<CampaignStep>(`/campaigns/${id}/steps`, data),
+  updateStep: (id: string, stepId: string, data: Partial<CampaignStep>) =>
+    api.put<CampaignStep>(`/campaigns/${id}/steps/${stepId}`, data),
+  deleteStep: (id: string, stepId: string) =>
+    api.delete<{ ok: boolean }>(`/campaigns/${id}/steps/${stepId}`),
+  reorderSteps: (id: string, stepIds: string[]) =>
+    api.post<CampaignStep[]>(`/campaigns/${id}/reorder-steps`, { stepIds }),
+
+  setAudience: (id: string, filters: AudienceFilter) =>
+    api.post<{
+      total: number
+      excluded: number
+      sample: { id: string; name: string; city?: string }[]
+      score?: { avg: number; distribution: { probable: number; possible: number; long: number }; suggestion: string }
+      prediction?: { responseRate: string; expectedConversions: string; estimatedRevenue: string; confidence: string } | null
+    }>(`/campaigns/${id}/audience`, { filters }),
+  preview: (id: string, clientId: string) =>
+    api.get<{ steps: CampaignStep[]; client: { id: string; name: string } }>(
+      `/campaigns/${id}/preview/${clientId}`,
+    ),
+
+  launch: (id: string) =>
+    api.post<{ ok: boolean; scheduled: number }>(`/campaigns/${id}/launch`, {}),
+  pause: (id: string) =>
+    api.post<{ ok: boolean }>(`/campaigns/${id}/pause`, {}),
+  resume: (id: string) =>
+    api.post<{ ok: boolean }>(`/campaigns/${id}/resume`, {}),
+  cancel: (id: string) =>
+    api.post<{ ok: boolean }>(`/campaigns/${id}/cancel`, {}),
+
+  live: (id: string) =>
+    api.get<{
+      campaign: Pick<Campaign, 'id' | 'name' | 'status' | 'startedAt' | 'completedAt'>
+      metrics: Campaign['metrics']
+      countsByStatus: { status: string; _count: number }[]
+      recentRecipients: Campaign['recipients']
+    }>(`/campaigns/${id}/live`),
+
+  marco: (id: string, payload: {
+    productDescription: string
+    objective: string
+    targetSegment: string[]
+    productPhotoUrls?: string[]
+    additionalContext?: string
+    vendorName?: 'John' | 'Lady'
+  }) => api.post<MarcoResult>(`/campaigns/${id}/marco`, payload),
+
+  applyMarco: (id: string, payload: { steps: MarcoStep[]; generateImages?: boolean }) =>
+    api.post<{ ok: boolean; stepsCreated: number; imageJobsQueued: number }>(`/campaigns/${id}/apply-marco`, payload),
+
+  analyzePhoto: (imageUrl: string) =>
+    api.post<{
+      productName: string
+      keyFeatures: string[]
+      differentiators: string[]
+      technicalSpecs: string[]
+      suggestedCampaignAngle: string
+    }>('/campaigns/analyze-photo', { imageUrl }),
+}
+
 // WhatsApp Assist
 export const whatsappApi = {
   getChats: () =>
@@ -378,4 +468,64 @@ export const whatsappApi = {
   configureWebhook: (webhookUrl: string) =>
     api.post('/whatsapp/configure-webhook', { webhookUrl }),
   getMediaUrl: (messageId: string) => `/api/whatsapp/media/${messageId}`,
+}
+
+// Sprint 3: Image Generation (Nano Banana)
+export const imageGenApi = {
+  generate: (data: {
+    prompt: string
+    referenceImages?: string[]
+    template?: ImageTemplate
+    aspectRatio?: AspectRatio
+    brandLock?: boolean
+    campaignId?: string
+  }) =>
+    api.post<{ id: string; url: string; brandGuard: BrandGuardResult }>('/image-gen/generate', data),
+
+  regenerate: (imageId: string) =>
+    api.post<{ id: string; url: string; brandGuard: BrandGuardResult }>(`/image-gen/regenerate/${imageId}`, {}),
+
+  variant: (imageId: string, additionalPrompt?: string) =>
+    api.post<{ id: string; url: string; brandGuard: BrandGuardResult }>(
+      `/image-gen/variant/${imageId}`,
+      { additionalPrompt },
+    ),
+
+  library: (params?: { template?: string; page?: number; limit?: number }) =>
+    api.get<{ data: GeneratedImage[]; pagination: { total: number; page: number; pages: number; limit: number } }>(
+      '/image-gen/library',
+      { params },
+    ),
+
+  delete: (imageId: string) =>
+    api.delete<{ ok: boolean }>(`/image-gen/${imageId}`),
+
+  aiSpend: () =>
+    api.get<{ totalUSD: number; totalCOP: number; byOperation: Record<string, number>; budgetCOP: number; overBudget: boolean }>(
+      '/image-gen/ai-spend',
+    ),
+}
+
+// Sprint 4: Notifications + Leads
+export const notificationsApi = {
+  getUnread: () =>
+    api.get<{ data: AppNotification[]; count: number }>('/notifications'),
+  markRead: (id: string) =>
+    api.patch<{ ok: boolean }>(`/notifications/${id}/read`),
+  markAllRead: () =>
+    api.patch<{ ok: boolean }>('/notifications/read-all'),
+  getLeads: (params?: { campaignId?: string; temperature?: string }) =>
+    api.get<{
+      HOT: CampaignLead[]
+      WARM: CampaignLead[]
+      COLD: CampaignLead[]
+      OPTOUT: CampaignLead[]
+      totals: Record<string, number>
+    }>('/notifications/leads', { params }),
+  markAttended: (recipientId: string) =>
+    api.patch<{ ok: boolean }>(`/notifications/leads/${recipientId}/attended`),
+  campaignReport: (campaignId: string) =>
+    api.get(`/notifications/campaign-report/${campaignId}`),
+  globalReport: () =>
+    api.get('/notifications/global-report'),
 }

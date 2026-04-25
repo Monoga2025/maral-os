@@ -51,7 +51,7 @@ router.get('/kpis', async (req: AuthRequest, res: Response) => {
       // Critical stock count
       prisma.$queryRaw<{ count: bigint }[]>`
         SELECT COUNT(*) as count FROM "Product"
-        WHERE active = true AND stock <= "minStock"
+        WHERE active = true AND "minStock" > 0 AND stock <= "minStock"
       `,
       // Unconfirmed orders older than 3 days
       prisma.order.count({
@@ -108,8 +108,6 @@ router.get('/kpis', async (req: AuthRequest, res: Response) => {
       pendingQuotations,
       overdueFollowUps: quotationsWithoutFollowup,
       overdueReceivables: overdueInvoices._sum.amount || 0,
-      salesLast6Months: [],
-      salesByLine: [],
       criticalStock: Number((criticalStockProducts[0] as { count: bigint })?.count ?? 0),
       unconfirmedOrders,
       quotationsWithoutFollowup,
@@ -269,7 +267,7 @@ router.get('/alerts', async (req: AuthRequest, res: Response) => {
       prisma.$queryRaw<{ id: string; reference: string; name: string; stock: number; minStock: number }[]>`
         SELECT id, reference, name, stock, "minStock"
         FROM "Product"
-        WHERE active = true AND stock <= "minStock"
+        WHERE active = true AND "minStock" > 0 AND stock <= "minStock"
         ORDER BY stock ASC
         LIMIT 10
       `,

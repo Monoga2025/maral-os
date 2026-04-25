@@ -30,6 +30,10 @@ model User {
   tasksAssigned     Task[]           @relation("TasksAssigned")
   expensesCreated   Expense[]        @relation("ExpensesCreated")
   expensesApproved  Expense[]        @relation("ExpensesApproved")
+  campaignsCreated  Campaign[]       @relation("CampaignsCreated")
+  generatedImages   GeneratedImage[] @relation("GeneratedImages")
+  aiUsageLogs       AIUsageLog[]     @relation("AIUsageLogs")
+  productionOrders  ProductionOrder[] @relation("ProductionAssigned")
 }
 
 enum Role {
@@ -42,7 +46,7 @@ enum Role {
 // ── Clients ──────────────────────────────────────────────────
 
 model Client {
-  id              String          @id @default(cuid())
+  id              String           @id @default(cuid())
   name            String
   company         String?
   rut             String?
@@ -52,24 +56,40 @@ model Client {
   whatsapp        String?
   email           String?
   address         String?
-  category        ClientCategory  @default(PROSPECTO)
+  category        ClientCategory   @default(PROSPECTO)
   howFound        String?
-  allowWhiteLabel Boolean         @default(false)
-  creditLimit     Float           @default(0)
-  paymentDays     Int             @default(0)
-  factoringStatus FactoringStatus @default(NO_APLICA)
+  allowWhiteLabel Boolean          @default(false)
+  creditLimit     Float            @default(0)
+  paymentDays     Int              @default(0)
+  factoringStatus FactoringStatus  @default(NO_APLICA)
   notes             String?
-  active            Boolean           @default(true)
-  isProvider        Boolean           @default(false)
-  purchaseFrequency PurchaseFrequency @default(NINGUNA)
+  active            Boolean            @default(true)
+  isProvider        Boolean            @default(false)
+  purchaseFrequency PurchaseFrequency  @default(NINGUNA)
   /// Código interno de Merlin (campo Tercero en VENMovimientos). Lo asigna sync_maral.py.
   merlinCode        String?
-  createdAt         DateTime          @default(now())
-  updatedAt         DateTime          @updatedAt
+  // ── Campaign segmentation fields (Sprint 0) ──────────────────
+  tags              String[]           @default([])
+  segment           CustomerSegment?
+  interestTags      String[]           @default([])
+  lifetimeValue     Decimal?           @db.Decimal(15, 2)
+  lastOrderAt       DateTime?
+  optedOut          Boolean            @default(false)
+  optedOutAt        DateTime?
+  optedOutReason    String?
+  bestContactWindow Json?
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
   quotations        Quotation[]
   orders            Order[]
   invoices          Invoice[]
   tasks             Task[]
+  campaignRecipients CampaignRecipient[]
+  dripEnrollments   DripEnrollment[]
+
+  @@index([segment])
+  @@index([lastOrderAt])
+  @@index([optedOut])
 }
 
 enum ClientCategory {
@@ -173,15 +193,17 @@ model Quotation {
   subtotal     Float
   tax          Float           @default(0)
   total        Float
-  notes           String?
-  followUpDate    DateTime?
-  shippingAddress String?
-  createdAt       DateTime        @default(now())
-  updatedAt       DateTime        @updatedAt
-  client          Client          @relation(fields: [clientId], references: [id], onDelete: Restrict)
-  seller          User            @relation(fields: [sellerId], references: [id], onDelete: Restrict)
-  items           QuotationItem[]
-  orders          Order[]
+  notes            String?
+  followUpDate     DateTime?
+  shippingAddress  String?
+  sourceCampaignId String?
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+  client           Client          @relation(fields: [clientId], references: [id], onDelete: Restrict)
+  seller           User            @relation(fields: [sellerId], references: [id], onDelete: Restrict)
+  sourceCampaign   Campaign?       @relation("QuotationsFromCampaign", fields: [sourceCampaignId], references: [id], onDelete: SetNull)
+  items            QuotationItem[]
+  orders           Order[]
 }
 
 enum QuotationStatus {
@@ -213,7 +235,7 @@ model QuotationItemComponent {
   componentId     String
   qty             Float
   quotationItem   QuotationItem @relation(fields: [quotationItemId], references: [id], onDelete: Cascade)
-  component       Product       @relation(fields: [componentId], references: [id])
+  component       Product       @relation(fields: [componentId], references: [id], onDelete: Restrict)
 
   @@unique([quotationItemId, componentId])
 }
@@ -239,12 +261,14 @@ model Order {
   dispatchDate     DateTime?
   notes            String?
   total            Float
+  sourceCampaignId String?
   /// Auditoría: último usuario que cambió el estado del pedido
   updatedById      String?
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
-  client           Client            @relation(fields: [clientId], references: [id])
+  client           Client            @relation(fields: [clientId], references: [id], onDelete: Restrict)
   quotation        Quotation?        @relation(fields: [quotationId], references: [id], onDelete: SetNull)
+  sourceCampaign   Campaign?         @relation("OrdersFromCampaign", fields: [sourceCampaignId], references: [id], onDelete: SetNull)
   updatedBy        User?             @relation("OrderUpdater", fields: [updatedById], references: [id])
   items            OrderItem[]
   photos           OrderPhoto[]
@@ -278,7 +302,7 @@ model OrderItem {
   picked      Boolean         @default(false)
   disposition ItemDisposition @default(PENDIENTE)
   order       Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  product     Product         @relation(fields: [productId], references: [id])
+  product     Product         @relation(fields: [productId], references: [id], onDelete: Restrict)
 }
 
 enum ItemDisposition {
@@ -316,6 +340,7 @@ model ProductionOrder {
   order        Order?           @relation(fields: [orderId], references: [id])
   product      Product          @relation(fields: [productId], references: [id])
   updatedBy    User?            @relation("ProductionUpdater", fields: [updatedById], references: [id])
+  assignedUser User?            @relation("ProductionAssigned", fields: [assignedTo], references: [id], onDelete: SetNull)
 }
 
 enum ProductionPhase {
@@ -397,7 +422,7 @@ model PurchaseItem {
   unitCost        Float
   received        Boolean       @default(false)
   purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
-  product         Product       @relation(fields: [productId], references: [id])
+  product         Product       @relation(fields: [productId], references: [id], onDelete: Restrict)
 }
 
 // ── Invoices ─────────────────────────────────────────────────
@@ -594,4 +619,213 @@ model WhatsAppMessage {
   timestamp    DateTime
   aiSuggestion String?
   createdAt    DateTime     @default(now())
+}
+
+// ── Campaign enums ────────────────────────────────────────────
+
+enum CustomerSegment {
+  IM
+  DS
+  CF
+}
+
+enum CampaignStatus {
+  BORRADOR
+  VALIDANDO
+  LISTA
+  EN_CURSO
+  PAUSADA
+  COMPLETADA
+  CANCELADA
+}
+
+enum StepType {
+  TEXT
+  IMAGE
+  VIDEO
+  AUDIO
+  DOCUMENT
+}
+
+enum RecipientStatus {
+  PENDING
+  SCHEDULED
+  SENT
+  DELIVERED
+  READ
+  REPLIED
+  CONVERTED
+  FAILED
+  EXCLUDED
+}
+
+enum LeadTemperature {
+  HOT
+  WARM
+  COLD
+  OPTOUT
+  OFFTOPIC
+}
+
+// ── Campaigns (Sprint 0) ──────────────────────────────────────
+
+model Campaign {
+  id             String              @id @default(cuid())
+  name           String
+  objective      String?
+  status         CampaignStatus      @default(BORRADOR)
+  createdById    String
+  audienceFilter Json?
+  startedAt      DateTime?
+  completedAt    DateTime?
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+  createdBy      User                @relation("CampaignsCreated", fields: [createdById], references: [id])
+  steps          CampaignStep[]
+  recipients     CampaignRecipient[]
+  metrics        CampaignMetric?
+  quotations     Quotation[]         @relation("QuotationsFromCampaign")
+  orders         Order[]             @relation("OrdersFromCampaign")
+
+  @@index([status])
+  @@index([createdById])
+}
+
+model CampaignStep {
+  id           String    @id @default(cuid())
+  campaignId   String
+  campaign     Campaign  @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  order        Int
+  type         StepType
+  content      String?
+  mediaUrl     String?
+  mimeType     String?
+  fileName     String?
+  delaySeconds Int       @default(10)
+  variants     Json?
+  variantMetric Json?
+
+  @@index([campaignId])
+}
+
+model CampaignRecipient {
+  id          String          @id @default(cuid())
+  campaignId  String
+  campaign    Campaign        @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  clientId    String
+  client      Client          @relation(fields: [clientId], references: [id])
+  status      RecipientStatus @default(PENDING)
+  temperature LeadTemperature?
+  currentStep Int             @default(0)
+  scheduledAt DateTime?
+  sentAt      DateTime?
+  deliveredAt DateTime?
+  readAt      DateTime?
+  repliedAt   DateTime?
+  convertedAt DateTime?
+  quotationId String?
+  revenueCOP  Decimal?        @db.Decimal(15, 2)
+  lastError   String?
+  createdAt   DateTime        @default(now())
+
+  @@unique([campaignId, clientId])
+  @@index([status])
+  @@index([temperature])
+  @@index([scheduledAt])
+}
+
+model CampaignMetric {
+  id         String   @id @default(cuid())
+  campaignId String   @unique
+  campaign   Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  sent       Int      @default(0)
+  delivered  Int      @default(0)
+  read       Int      @default(0)
+  replied    Int      @default(0)
+  converted  Int      @default(0)
+  revenueCOP Decimal  @default(0) @db.Decimal(15, 2)
+  updatedAt  DateTime @updatedAt
+}
+
+// ── Sprint 3: Nano Banana (Image Gen + AI Usage) ──────────────
+
+model GeneratedImage {
+  id              String   @id @default(cuid())
+  createdById     String
+  createdBy       User     @relation("GeneratedImages", fields: [createdById], references: [id])
+  url             String
+  prompt          String
+  template        String?
+  aspectRatio     String   @default("1:1")
+  referenceImages Json?
+  usedInCampaigns String[] @default([])
+  approvedByBrand Boolean  @default(false)
+  brandScore      Int?
+  brandIssues     Json?
+  metadata        Json?
+  createdAt       DateTime @default(now())
+
+  @@index([createdById])
+  @@index([createdAt])
+}
+
+model AIUsageLog {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation("AIUsageLogs", fields: [userId], references: [id])
+  operation    String
+  model        String
+  inputTokens  Int?
+  outputTokens Int?
+  costUSD      Decimal? @db.Decimal(10, 6)
+  metadata     Json?
+  createdAt    DateTime @default(now())
+
+  @@index([userId])
+  @@index([operation])
+  @@index([createdAt])
+}
+
+// ── Sprint 4: Conversión y seguimiento ───────────────────────
+
+model Notification {
+  id        String    @id @default(cuid())
+  userId    String?
+  type      String
+  title     String
+  body      String
+  meta      Json?
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+  @@index([readAt])
+  @@index([createdAt])
+}
+
+model DripSequence {
+  id          String           @id @default(cuid())
+  trigger     String           @unique
+  name        String
+  steps       Json
+  active      Boolean          @default(true)
+  createdAt   DateTime         @default(now())
+  enrollments DripEnrollment[]
+}
+
+model DripEnrollment {
+  id          String       @id @default(cuid())
+  sequenceId  String
+  sequence    DripSequence @relation(fields: [sequenceId], references: [id])
+  clientId    String
+  client      Client       @relation(fields: [clientId], references: [id])
+  campaignId  String?
+  currentStep Int          @default(0)
+  nextSendAt  DateTime
+  status      String       @default("ACTIVE")
+  createdAt   DateTime     @default(now())
+
+  @@unique([sequenceId, clientId])
+  @@index([nextSendAt])
+  @@index([status])
 }

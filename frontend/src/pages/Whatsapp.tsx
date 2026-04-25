@@ -1,6 +1,8 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { whatsappApi } from '../lib/api'
+import { useAuthStore } from '../store/auth'
 import type { WaChat, WaMessage } from '../types'
 import {
   MessageCircle, Send, Search, Users, RefreshCw,
@@ -971,14 +973,10 @@ export default function Whatsapp() {
   const [selectedChat, setSelectedChat] = useState<WaChat | null>(null)
   const [showSettings, setShowSettings] = useState(false)
   const [search, setSearch] = useState('')
+  const [searchParams] = useSearchParams()
+  const jid = searchParams.get('jid')
 
-  // Get auth token from localStorage
-  const token = (() => {
-    try {
-      const raw = localStorage.getItem('maral-auth') ?? ''
-      return JSON.parse(raw)?.state?.token ?? ''
-    } catch { return '' }
-  })()
+  const token = useAuthStore((s) => s.token) ?? ''
 
   const { data, isLoading } = useQuery({
     queryKey: ['wa-chats'],
@@ -999,13 +997,21 @@ export default function Whatsapp() {
   const configured = data?.data.configured ?? true
   const totalUnread = chats.reduce((sum, c) => sum + (c.unread ?? 0), 0)
 
+  // Open chat from query param ?jid=...
+  useEffect(() => {
+    if (jid && data?.data.data) {
+      const target = data.data.data.find(c => c.jid === jid)
+      if (target) setSelectedChat(target)
+    }
+  }, [jid, data?.data.data])
+
   // Update selected chat when data refreshes
   useEffect(() => {
     if (selectedChat && data?.data.data) {
       const updated = data.data.data.find(c => c.jid === selectedChat.jid)
       if (updated) setSelectedChat(updated)
     }
-  }, [data?.data.data])
+  }, [data?.data.data, selectedChat?.jid])
 
   return (
     <div className="flex h-[calc(100vh-4rem)] -m-6 overflow-hidden">

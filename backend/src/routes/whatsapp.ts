@@ -1,8 +1,12 @@
 import { Router, Request, Response } from 'express';
 import path from 'path';
 import fs from 'fs';
+import crypto from 'crypto';
 import { authenticate, AuthRequest } from '../middleware/auth';
 import { prisma } from '../lib/prisma';
+import { classifyLead } from '../lib/lead-classifier';
+import { notifyHotLead } from '../lib/notifier';
+import { enrollInDrip, cancelDripsForClient } from '../lib/drip-scheduler';
 
 const router = Router();
 
@@ -231,10 +235,20 @@ async function upsertChatAndMessage(params: {
     },
   });
 
+  const deterministicId = params.remoteId ?? crypto
+    .createHash('sha256')
+    .update([
+      params.jid,
+      String(params.timestamp.getTime()),
+      params.text ?? '',
+    ].join('|'))
+    .digest('hex')
+    .substring(0, 32);
+
   const message = await prisma.whatsAppMessage.upsert({
-    where: { remoteId: params.remoteId ?? `local_${Date.now()}_${Math.random()}` },
+    where: { remoteId: deterministicId },
     create: {
-      remoteId: params.remoteId,
+      remoteId: deterministicId,
       chatId: chat.id,
       fromMe: params.fromMe,
       sender: params.sender,
@@ -375,9 +389,105 @@ async function importFromExport() {
 // Auto-import on startup (non-blocking)
 importFromExport().then(n => { if (n > 0) console.log(`[WhatsApp] Importados ${n} mensajes del historial`); });
 
+// ─── T4.2: Lead temperature classifier ───────────────────────
+
+async function classifyAndUpdateLead(phoneNumber: string, messageText: string): Promise<void> {
+  // Find client by WhatsApp number
+  const client = await prisma.client.findFirst({
+    where: { whatsapp: { contains: phoneNumber } },
+    select: { id: true, name: true, optedOut: true },
+  });
+  if (!client) return;
+
+  // Find active campaign recipient for this client
+  const recipient = await prisma.campaignRecipient.findFirst({
+    where: {
+      clientId: client.id,
+      status: { in: ['SCHEDULED', 'SENT', 'DELIVERED', 'READ'] },
+      repliedAt: null, // idempotent: classify only once
+    },
+    include: { campaign: { select: { id: true, name: true, objective: true } } },
+    orderBy: { createdAt: 'desc' },
+  });
+  if (!recipient) return;
+
+  const result = await classifyLead(messageText, {
+    campaignObjective: recipient.campaign.objective ?? undefined,
+  });
+
+  // Update recipient with temperature and repliedAt
+  await prisma.campaignRecipient.update({
+    where: { id: recipient.id },
+    data: {
+      temperature: result.temperature as never,
+      repliedAt: new Date(),
+      status: 'REPLIED',
+    },
+  });
+
+  // Handle OPTOUT — mark client + cancel all drips
+  if (result.temperature === 'OPTOUT') {
+    await prisma.client.update({
+      where: { id: client.id },
+      data: { optedOut: true, optedOutAt: new Date(), optedOutReason: messageText.slice(0, 200) },
+    });
+    await cancelDripsForClient(client.id);
+    return;
+  }
+
+  // HOT → notify + cancel any scheduled drips (no more automated follow-ups)
+  if (result.temperature === 'HOT') {
+    await notifyHotLead({
+      clientId: client.id,
+      clientName: client.name,
+      campaignId: recipient.campaign.id,
+      campaignName: recipient.campaign.name,
+      recipientId: recipient.id,
+      intent: result.intent,
+    });
+    await cancelDripsForClient(client.id);
+    // Enroll in HOT_NOT_ATTENDED alert drip
+    await enrollInDrip({
+      trigger: 'HOT_NOT_ATTENDED_1H',
+      clientId: client.id,
+      campaignId: recipient.campaign.id,
+    });
+    return;
+  }
+
+  // WARM → enroll in 3-day reactivation drip
+  if (result.temperature === 'WARM') {
+    await enrollInDrip({
+      trigger: 'WARM_NO_CONVERT_3D',
+      clientId: client.id,
+      campaignId: recipient.campaign.id,
+    });
+    return;
+  }
+
+  // COLD → enroll in 7-day follow-up drip
+  if (result.temperature === 'COLD') {
+    await enrollInDrip({
+      trigger: 'COLD_FOLLOWUP_7D',
+      clientId: client.id,
+      campaignId: recipient.campaign.id,
+    });
+  }
+}
+
 // ─── PUBLIC: Webhook (no auth) ────────────────────────────────
 
 router.post('/webhook', async (req: Request, res: Response) => {
+  const secret = process.env.EVOLUTION_WEBHOOK_SECRET;
+  if (secret) {
+    const sig = (req.headers['x-evolution-signature'] || req.headers['x-hub-signature-256'] || '') as string;
+    if (!sig) return res.status(401).json({ error: 'Firma de webhook requerida' });
+    const expected = crypto.createHmac('sha256', secret).update(JSON.stringify(req.body)).digest('hex');
+    if (sig !== `sha256=${expected}` && sig !== expected) {
+      return res.status(401).json({ error: 'Firma de webhook inválida' });
+    }
+  }
+
   res.sendStatus(200); // respond immediately
 
   try {
@@ -423,6 +533,11 @@ router.post('/webhook', async (req: Request, res: Response) => {
       if (chatRecord) {
         generateAndStoreSuggestion(message.id, chatRecord.id, parsed.text);
       }
+
+      // T4.2 — classify lead temperature if client is in an active campaign
+      classifyAndUpdateLead(number, parsed.text).catch((e) =>
+        console.error('[WhatsApp webhook] lead classify error:', e)
+      );
     }
   } catch (err) {
     console.error('[WhatsApp webhook]', err);
@@ -663,10 +778,11 @@ router.get('/media/:messageId', async (req: AuthRequest, res: Response) => {
 // ─── POST /api/whatsapp/suggest (manual) ─────────────────────
 
 router.post('/suggest', async (req: AuthRequest, res: Response) => {
-  const { newMessage, context, clientName } = req.body as {
+  const { newMessage, context, clientName, clientId } = req.body as {
     newMessage: string;
     context?: { role: 'cliente' | 'lady'; text: string }[];
     clientName?: string;
+    clientId?: string;
   };
 
   if (!newMessage?.trim()) { res.status(400).json({ error: 'newMessage requerido' }); return; }
@@ -676,9 +792,24 @@ router.post('/suggest', async (req: AuthRequest, res: Response) => {
       .map(m => `${m.role === 'lady' ? 'Lady' : 'Cliente'}: ${m.text}`)
       .join('\n') ?? '';
 
-    const prompt = `${clientName ? `El cliente se llama ${clientName}.\n` : ''}${history ? `Historial:\n${history}\n\n` : ''}Mensaje nuevo del cliente: "${newMessage}"\n\nResponde como Lady:`;
+    // T4.7 — inject campaign context if client is in an active campaign
+    let campaignContext = '';
+    let leadTemperature: string | null = null;
+    if (clientId) {
+      const activeRecipient = await prisma.campaignRecipient.findFirst({
+        where: { clientId, status: { in: ['SENT', 'DELIVERED', 'READ', 'REPLIED'] } },
+        include: { campaign: { select: { name: true, objective: true } } },
+        orderBy: { createdAt: 'desc' },
+      });
+      if (activeRecipient) {
+        leadTemperature = activeRecipient.temperature;
+        campaignContext = `\n[CONTEXTO DE CAMPAÑA] Este cliente respondió a la campaña "${activeRecipient.campaign.name}"${activeRecipient.campaign.objective ? ` (objetivo: ${activeRecipient.campaign.objective})` : ''}. Su temperatura de lead es: ${activeRecipient.temperature ?? 'sin clasificar'}. ${activeRecipient.temperature === 'HOT' ? '¡LEAD CALIENTE — hay intención de compra! Ofrece cotización o siguiente paso concreto.' : ''}\n`;
+      }
+    }
+
+    const prompt = `${clientName ? `El cliente se llama ${clientName}.\n` : ''}${campaignContext}${history ? `Historial:\n${history}\n\n` : ''}Mensaje nuevo del cliente: "${newMessage}"\n\nResponde como Lady:`;
     const suggestion = await callOpenRouter(LADY_PROMPT, prompt);
-    res.json({ suggestion });
+    res.json({ suggestion, leadTemperature });
   } catch (err) {
     res.status(500).json({ error: (err as Error).message });
   }

@@ -180,6 +180,7 @@ export default function QuotationForm() {
 
   const [editingPriceId, setEditingPriceId] = useState<string | null>(null)
   const [finalPriceInputs, setFinalPriceInputs] = useState<Record<string, string>>({})
+  const [suggestedDiscount, setSuggestedDiscount] = useState(0)
 
   const [kitEditorProduct, setKitEditorProduct] = useState<Product | null>(null)
   const [kitEditorComponents, setKitEditorComponents] = useState<ProductComponent[]>([])
@@ -273,22 +274,24 @@ export default function QuotationForm() {
               : i
           )
         }
+        const price = product.priceList ?? product.price ?? 0
+        const disc = suggestedDiscount
         return [
           ...prev,
           {
             productId: product.id,
             product,
             quantity: 1,
-            unitPrice: product.priceList ?? product.price ?? 0,
-            discount: 0,
-            subtotal: product.priceList ?? product.price ?? 0,
+            unitPrice: price,
+            discount: disc,
+            subtotal: price * (1 - disc / 100),
             kitComponents,
           },
         ]
       })
       setProductSearch('')
     },
-    []
+    [suggestedDiscount]
   )
 
   const handleSelectProduct = useCallback(
@@ -593,6 +596,16 @@ export default function QuotationForm() {
                         // Pre-fill shipping address with client address if field is empty
                         if (!watch('shippingAddress') && client.address) {
                           setValue('shippingAddress', client.address)
+                        }
+                        // Notify discount hint for categorized clients
+                        const disc = CATEGORY_DISCOUNTS[client.category]
+                        if (disc) {
+                          setSuggestedDiscount(disc.pct)
+                          toast(`Descuento sugerido para ${disc.label} (${disc.code}): ${disc.pct}%`, {
+                            duration: 5000,
+                          })
+                        } else {
+                          setSuggestedDiscount(0)
                         }
                       }}
                     >

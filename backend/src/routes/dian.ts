@@ -238,8 +238,9 @@ router.post('/invoices/:invoiceId/send', requireRole('GERENTE'), async (req: Aut
     // TODO Fase B: firmar el XML con XAdES antes de enviar
     // Por ahora enviamos sin firma (modo prueba local)
     if (!config.testingMode) {
-      res.status(400).json({
-        error: 'El envío a producción requiere firma digital (Fase B). Active modo pruebas.',
+      res.status(501).json({
+        error: 'Envío DIAN no disponible. La firma XAdES-BES (Fase B) está pendiente de implementación.',
+        phase: 'B',
       });
       return;
     }

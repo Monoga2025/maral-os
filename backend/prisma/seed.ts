@@ -6,6 +6,20 @@ async function main() {
   console.log('🌱 Starting MARAL OS seed...\n');
   // ── Clean up existing data ──────────────────────────────
   console.log('Cleaning existing data...');
+  await prisma.campaignRecipient.deleteMany();
+  await prisma.campaignMetric.deleteMany();
+  await prisma.campaignStep.deleteMany();
+  await prisma.campaign.deleteMany();
+  await prisma.dripEnrollment.deleteMany();
+  await prisma.dripSequence.deleteMany();
+  await prisma.notification.deleteMany();
+  await prisma.aIUsageLog.deleteMany();
+  await prisma.generatedImage.deleteMany();
+  await prisma.dIANInvoice.deleteMany();
+  await prisma.merlinSyncQueue.deleteMany();
+  await prisma.whatsAppMessage.deleteMany();
+  await prisma.whatsAppChat.deleteMany();
+  await prisma.dIANConfiguration.deleteMany();
   await prisma.activityLog.deleteMany();
   await prisma.inventoryMovement.deleteMany();
   await prisma.orderPhoto.deleteMany();
@@ -1143,6 +1157,68 @@ async function main() {
     await prisma.activityLog.create({ data: entry });
   }
   console.log(`  ✓ ${logEntries.length} registros de actividad creados\n`);
+  // ── Tasks ────────────────────────────────────────────────
+  console.log('Creating tasks...');
+  await prisma.task.create({
+    data: {
+      title: 'Llamar a cliente Ferretería López',
+      priority: 'URGENTE',
+      status: 'PENDIENTE',
+      createdById: gerente.id,
+      assignedToId: gerente.id,
+      dueDate: new Date(Date.now() + 1 * 24 * 60 * 60 * 1000),
+    },
+  });
+  await prisma.task.create({
+    data: {
+      title: 'Revisar inventario de cámaras IP',
+      priority: 'NORMAL',
+      status: 'EN_PROGRESO',
+      createdById: gerente.id,
+      assignedToId: logistica.id,
+    },
+  });
+  await prisma.task.create({
+    data: {
+      title: 'Enviar propuesta técnica Municipio Curití',
+      priority: 'NORMAL',
+      status: 'COMPLETADA',
+      createdById: gerente.id,
+      assignedToId: vendedora.id,
+      completedAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
+    },
+  });
+  console.log('  ✓ 3 tareas creadas\n');
+  // ── Expenses ─────────────────────────────────────────────
+  console.log('Creating expenses...');
+  await prisma.expense.create({
+    data: {
+      date: new Date('2026-04-10'),
+      concept: 'Gasolina visita clientes Bucaramanga',
+      amount: 85000,
+      type: 'CAJA_MENOR',
+      createdById: gerente.id,
+    },
+  });
+  await prisma.expense.create({
+    data: {
+      date: new Date('2026-04-15'),
+      concept: 'Almuerzo reunión con distribuidor',
+      amount: 120000,
+      type: 'TARJETA',
+      createdById: vendedora.id,
+    },
+  });
+  await prisma.expense.create({
+    data: {
+      date: new Date('2026-04-20'),
+      concept: 'Cables y conectores instalación',
+      amount: 45000,
+      type: 'CAJA_MENOR',
+      createdById: logistica.id,
+    },
+  });
+  console.log('  ✓ 3 gastos creados\n');
   // ── Summary ──────────────────────────────────────────────
   console.log('═══════════════════════════════════════════');
   console.log('  MARAL OS — Seed completado exitosamente');

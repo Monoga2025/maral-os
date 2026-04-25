@@ -37,11 +37,11 @@ function fmtNIT(raw: string): string {
   return d.length === 10 ? `${d.slice(0,3)}.${d.slice(3,6)}.${d.slice(6,9)}-${d.slice(9)}` : raw;
 }
 const COMPANY = {
-  name:    process.env.COMPANY_NAME    ?? 'MARAL TECNOLOGÍA Y COMUNICACIONES S.A.S.',
+  name:    process.env.COMPANY_NAME    ?? 'MARAL TECNOLOGIA Y COMUNICACIONES S.A.S.',
   nit:     fmtNIT(process.env.COMPANY_NIT ?? '9018894798'),
-  address: process.env.COMPANY_ADDRESS ?? 'Calle 3 # 6 A - 22 Bodega 101',
-  city:    'Curití - Santander, Colombia',
-  phone:   process.env.COMPANY_PHONE   ?? '3167760692',
+  address: process.env.COMPANY_ADDRESS ?? 'Calle 3 # 6 A - 22 (Bodega 101)',
+  city:    process.env.COMPANY_CITY    ?? 'Curití - Santander, Colombia',
+  phone:   process.env.COMPANY_PHONE   ?? '3177606126',
   email:   process.env.COMPANY_EMAIL   ?? 'ventas@industriasmaral.com',
   website: process.env.COMPANY_WEBSITE ?? 'www.industriasmaral.com',
 };
@@ -101,6 +101,7 @@ const quotationSchema = z.object({
   followUpDate: z.string().datetime().optional(),
   shippingAddress: z.string().optional(),
   taxPercent: z.number().min(0).max(100).optional().default(0),
+  sourceCampaignId: z.string().optional(),
   items: z.array(quotationItemSchema).min(1, 'Al menos un ítem requerido'),
 });
 
@@ -269,7 +270,7 @@ router.post('/', async (req: AuthRequest, res: Response) => {
       return;
     }
 
-    const { items, taxPercent = 0, sellerId, followUpDate, ...rest } = validation.data;
+    const { items, taxPercent = 0, sellerId, followUpDate, sourceCampaignId, ...rest } = validation.data;
     const effectiveSellerId = sellerId || req.user!.userId;
 
     const { subtotal, tax, total } = calculateTotals(items, taxPercent);
@@ -282,6 +283,7 @@ router.post('/', async (req: AuthRequest, res: Response) => {
         tax,
         total,
         followUpDate: followUpDate ? new Date(followUpDate) : undefined,
+        sourceCampaignId: sourceCampaignId ?? null,
         items: {
           create: items.map((item) => {
             const discounted = item.unitPrice * (1 - (item.discount || 0) / 100);
@@ -321,6 +323,14 @@ router.post('/', async (req: AuthRequest, res: Response) => {
         metadata: { number: quotation.number, total },
       },
     });
+
+    // T4.5 — link quotation back to campaign recipient
+    if (sourceCampaignId) {
+      await prisma.campaignRecipient.updateMany({
+        where: { clientId: quotation.clientId, campaignId: sourceCampaignId, quotationId: null },
+        data: { quotationId: quotation.id, convertedAt: new Date(), status: 'CONVERTED' },
+      });
+    }
 
     res.status(201).json(quotation);
   } catch (error) {
@@ -435,8 +445,8 @@ router.delete('/:id', async (req: AuthRequest, res: Response) => {
       return;
     }
 
-    if (existing.status !== 'BORRADOR') {
-      res.status(400).json({ error: 'Solo se pueden eliminar cotizaciones en estado BORRADOR' });
+    if (!['BORRADOR', 'RECHAZADA'].includes(existing.status)) {
+      res.status(400).json({ error: 'Solo se pueden eliminar cotizaciones en estado BORRADOR o RECHAZADA' });
       return;
     }
 
@@ -779,7 +789,7 @@ table.products tbody tr:last-child td{border-bottom:none;}
     <div class="signature-left">
       <div class="signature-name">${escape(sig.name)}</div>
       <div class="signature-line">${escape(sig.title)}</div>
-      <div class="signature-line signature-company">MARAL TECNOLOGIA Y COMUNICACIONES S.A.S.</div>
+      <div class="signature-line signature-company">${escape(COMPANY.name)}</div>
       <div class="signature-line">${escape(sig.phone)} &nbsp;·&nbsp; ${escape(sig.email)}</div>
       <div class="signature-line signature-tagline">Apoyando el mercado de las telecomunicaciones desde 2003</div>
     </div>
@@ -791,7 +801,7 @@ table.products tbody tr:last-child td{border-bottom:none;}
   </div>
 
   <div class="strip">
-    ${escape(COMPANY.address)} &nbsp;-&nbsp; ${escape(COMPANY.phone)} &nbsp;-&nbsp; ${escape(COMPANY.email)} &nbsp;-&nbsp; ${escape(COMPANY.website)} &nbsp;-&nbsp; Curití - Santander - Colombia
+    ${escape(COMPANY.address)} &nbsp;-&nbsp; ${escape(COMPANY.phone)} &nbsp;-&nbsp; ${escape(COMPANY.email)} &nbsp;-&nbsp; ${escape(COMPANY.website)} &nbsp;-&nbsp; ${escape(COMPANY.city)}
   </div>
 
   <div class="shipping-section">
@@ -799,13 +809,13 @@ table.products tbody tr:last-child td{border-bottom:none;}
     <div class="shipping-card">
       <div class="remite-box">
         <span class="sh-badge">Remite</span>
-        <div class="sh-company">MARAL TECNOLOGIA Y COMUNICACIONES S.A.S.</div>
+        <div class="sh-company">${escape(COMPANY.name)}</div>
         <div class="sh-meta">
           ${escape(COMPANY.nit)}<br>
           ${escape(COMPANY.address)}<br>
           ${escape(COMPANY.phone)}<br>
           ${escape(COMPANY.email)}<br>
-          Curití - Santander
+          ${escape(COMPANY.city)}
         </div>
       </div>
       <div class="cut-label">— — — — — — — — — — CORTAR AQUÍ — — — — — — — — — —</div>
@@ -1012,8 +1022,9 @@ function drawQuotationPDF(doc: PDFKit.PDFDocument, q: any): void {
     const finalPrice = item.unitPrice * (1 - (item.discount || 0) / 100);
 
     // Calculate how many lines the description needs
+    // Helvetica at 7.5pt: average char width ~4.2pt; use conservative 4.0pt for safety
     const descW = cols[2].w - 6;
-    const charsPerLine = Math.floor(descW / 4.3); // ~4.3pt per char at 7.5pt
+    const charsPerLine = Math.floor(descW / 4.0);
     const descLines = Math.ceil(prod.name.length / charsPerLine);
     const ROW_HEIGHT = Math.max(MIN_ROW_H, descLines * 10 + 8);
 
@@ -1037,10 +1048,10 @@ function drawQuotationPDF(doc: PDFKit.PDFDocument, q: any): void {
     doc.fillColor(C.black).font('Helvetica').fontSize(7.5)
        .text(prod.reference || '—', cols[1].x + 3, ty,
              { width: cols[1].w - 6, align: 'left', lineBreak: false, ellipsis: true });
-    // Desc — wraps instead of ellipsis
+    // Desc — wraps; height clamps to ROW_HEIGHT so it never bleeds into next row
     doc.fillColor(C.black).font('Helvetica').fontSize(7.5)
        .text(prod.name, cols[2].x + 3, ty,
-             { width: descW, align: 'left', lineBreak: true });
+             { width: descW, align: 'left', lineBreak: true, height: ROW_HEIGHT - 8 });
     // Und
     doc.fillColor(C.tgray).font('Helvetica').fontSize(7.5)
        .text(prod.unit || 'UN', cols[3].x + 3, ty,
@@ -1140,7 +1151,7 @@ function drawQuotationPDF(doc: PDFKit.PDFDocument, q: any): void {
   doc.fillColor(C.tgray).font('Helvetica').fontSize(8)
      .text(sig.title, ML, y + 12, { lineBreak: false });
   doc.fillColor(C.dark).font('Helvetica-Bold').fontSize(8)
-     .text('MARAL TECNOLOGIA Y COMUNICACIONES S.A.S.', ML, y + 24, { lineBreak: false });
+     .text(COMPANY.name, ML, y + 24, { lineBreak: false });
   doc.fillColor(C.tgray).font('Helvetica').fontSize(8)
      .text(`${sig.phone}   ·   ${sig.email}`, ML, y + 36, { lineBreak: false });
   doc.fillColor(C.tgray).font('Helvetica').fontSize(7.5)
@@ -1206,7 +1217,7 @@ function drawShippingLabel(
 
   // Nombre
   doc.fillColor(C.dark).font('Helvetica-Bold').fontSize(10)
-     .text('MARAL TECNOLOGIA Y COMUNICACIONES S.A.S.', remX, y + 26, { width: remW, lineBreak: false, ellipsis: true });
+     .text(COMPANY.name, remX, y + 26, { width: remW, lineBreak: false, ellipsis: true });
   // NIT
   doc.fillColor(C.tgray).font('Helvetica').fontSize(8.5)
      .text(COMPANY.nit, remX, y + 39, { lineBreak: false });
@@ -1221,7 +1232,7 @@ function drawShippingLabel(
      .text(COMPANY.email, remX, y + 72, { width: remW, lineBreak: false, ellipsis: true });
   // Ciudad
   doc.fillColor(C.tgray).font('Helvetica').fontSize(8.5)
-     .text('Curití - Santander', remX, y + 83, { lineBreak: false });
+     .text(COMPANY.city, remX, y + 83, { lineBreak: false });
 
   // Unused remR — keep for potential future right-column use
   void remR;

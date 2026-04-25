@@ -210,7 +210,7 @@ router.get('/alerts', async (req: AuthRequest, res: Response) => {
     >`
       SELECT id, reference, name, stock, "minStock", unit, category
       FROM "Product"
-      WHERE active = true AND stock <= "minStock"
+      WHERE active = true AND "minStock" > 0 AND stock <= "minStock"
       ORDER BY stock ASC
     `;
 

@@ -1,9 +1,17 @@
-import { Router, Response } from 'express';
+import { Router, Response, Request, NextFunction } from 'express';
 import prisma from '../lib/prisma';
 import { authenticate, AuthRequest } from '../middleware/auth';
 
 const router = Router();
-router.use(authenticate);
+
+// Middleware para rutas del agente Python: verifica X-Sync-Secret.
+// Si SYNC_SECRET no está configurado, acepta la request (desarrollo local).
+function syncSecret(req: Request, res: Response, next: NextFunction) {
+  const secret = process.env.SYNC_SECRET;
+  if (!secret) return next();
+  if (req.headers['x-sync-secret'] === secret) return next();
+  res.status(401).json({ error: 'Unauthorized' });
+}
 
 // ── State ─────────────────────────────────────────────────────────────────────
 
@@ -24,13 +32,13 @@ let syncStatus: SyncStatusData = {
 
 // ── GET /api/sync/status ──────────────────────────────────────────────────────
 
-router.get('/status', (_req: AuthRequest, res: Response) => {
+router.get('/status', authenticate, (_req: AuthRequest, res: Response) => {
   res.json(syncStatus);
 });
 
 // ── POST /api/sync/request — UI calls this when user clicks "Sincronizar" ────
 
-router.post('/request', (_req: AuthRequest, res: Response) => {
+router.post('/request', authenticate, (_req: AuthRequest, res: Response) => {
   if (syncStatus.status === 'running' || syncStatus.status === 'pending') {
     res.status(409).json({ error: 'Ya hay una sincronización en curso' });
     return;
@@ -47,7 +55,7 @@ router.post('/request', (_req: AuthRequest, res: Response) => {
 
 // ── GET /api/sync/pending — local agent polls this ───────────────────────────
 
-router.get('/pending', (_req: AuthRequest, res: Response) => {
+router.get('/pending', syncSecret, (_req: AuthRequest, res: Response) => {
   const isPending = syncStatus.status === 'pending';
 
   if (isPending) {
@@ -64,7 +72,7 @@ router.get('/pending', (_req: AuthRequest, res: Response) => {
 
 // ── POST /api/sync/complete — local agent posts results ───────────────────────
 
-router.post('/complete', (req: AuthRequest, res: Response) => {
+router.post('/complete', syncSecret, (req: AuthRequest, res: Response) => {
   const { success, clientsSynced, productsSynced, message } = req.body;
 
   syncStatus = {
@@ -82,7 +90,7 @@ router.post('/complete', (req: AuthRequest, res: Response) => {
 
 // GET /api/sync/merlin-pending — el agente local llama esto cada N segundos
 // Devuelve la primera factura PENDING con todos los datos necesarios para escribir en Merlin
-router.get('/merlin-pending', async (_req: AuthRequest, res: Response) => {
+router.get('/merlin-pending', syncSecret, async (_req: AuthRequest, res: Response) => {
   try {
     const item = await prisma.merlinSyncQueue.findFirst({
       where: { status: 'PENDING' },
@@ -138,7 +146,7 @@ router.get('/merlin-pending', async (_req: AuthRequest, res: Response) => {
 });
 
 // POST /api/sync/merlin-done — el agente reporta éxito
-router.post('/merlin-done', async (req: AuthRequest, res: Response) => {
+router.post('/merlin-done', syncSecret, async (req: AuthRequest, res: Response) => {
   try {
     const { queueId, merlinRef } = req.body as { queueId: string; merlinRef: string };
 
@@ -173,7 +181,7 @@ router.post('/merlin-done', async (req: AuthRequest, res: Response) => {
 });
 
 // POST /api/sync/merlin-error — el agente reporta fallo
-router.post('/merlin-error', async (req: AuthRequest, res: Response) => {
+router.post('/merlin-error', syncSecret, async (req: AuthRequest, res: Response) => {
   try {
     const { queueId, error: errorMsg } = req.body as { queueId: string; error: string };
 
@@ -196,7 +204,7 @@ router.post('/merlin-error', async (req: AuthRequest, res: Response) => {
 });
 
 // GET /api/sync/merlin-queue — estado de la cola para la UI
-router.get('/merlin-queue', async (_req: AuthRequest, res: Response) => {
+router.get('/merlin-queue', authenticate, async (_req: AuthRequest, res: Response) => {
   try {
     const [pending, processing, done, errors] = await Promise.all([
       prisma.merlinSyncQueue.count({ where: { status: 'PENDING' } }),

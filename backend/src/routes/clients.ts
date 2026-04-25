@@ -26,6 +26,9 @@ const clientSchema = z.object({
   isProvider: z.boolean().optional(),
   notes: z.string().optional(),
   merlinCode: z.string().optional(),
+  interestTags: z.array(z.string().min(1).max(30)).optional(),
+  optedOut: z.boolean().optional(),
+  segment: z.enum(['IM', 'DS', 'CF']).optional().nullable(),
 });
 
 // GET /api/clients
@@ -36,6 +39,7 @@ router.get('/', async (req: AuthRequest, res: Response) => {
     const search = req.query.search as string;
     const category = req.query.category as string;
     const city = req.query.city as string;
+    const tag = req.query.tag as string;
     const active = req.query.active !== 'false';
 
     const where: Record<string, unknown> = { active, isProvider: false };
@@ -55,6 +59,10 @@ router.get('/', async (req: AuthRequest, res: Response) => {
 
     if (city) {
       where.city = { contains: city, mode: 'insensitive' };
+    }
+
+    if (tag) {
+      where.interestTags = { has: tag };
     }
 
     const [clients, total] = await Promise.all([
@@ -77,6 +85,8 @@ router.get('/', async (req: AuthRequest, res: Response) => {
           creditLimit: true,
           paymentDays: true,
           purchaseFrequency: true,
+          interestTags: true,
+          optedOut: true,
           active: true,
           createdAt: true,
           _count: { select: { orders: true, quotations: true } },
@@ -125,6 +135,21 @@ router.get('/cities', async (_req: AuthRequest, res: Response) => {
   }
 });
 
+// GET /api/clients/tags — all distinct interest tags
+router.get('/tags', async (_req: AuthRequest, res: Response) => {
+  try {
+    const clients = await prisma.client.findMany({
+      where: { active: true, isProvider: false },
+      select: { interestTags: true },
+    });
+    const tagSet = new Set<string>();
+    clients.forEach((c) => c.interestTags.forEach((t) => tagSet.add(t)));
+    res.json(Array.from(tagSet).sort());
+  } catch (error) {
+    res.status(500).json({ error: 'Error al obtener etiquetas' });
+  }
+});
+
 // GET /api/clients/:id
 router.get('/:id', async (req: AuthRequest, res: Response) => {
   try {
@@ -154,22 +179,20 @@ router.get('/:id', async (req: AuthRequest, res: Response) => {
       return;
     }
 
-    // Calculate stats
-    const totalOrders = await prisma.order.count({ where: { clientId: req.params.id } });
-    const totalSpentAgg = await prisma.order.aggregate({
-      where: { clientId: req.params.id, status: { not: 'CANCELADO' } },
-      _sum: { total: true },
-    });
+    // Calculate stats (parallel queries)
+    const [totalOrders, totalSpentAgg, creditUsedAgg] = await Promise.all([
+      prisma.order.count({ where: { clientId: req.params.id } }),
+      prisma.order.aggregate({
+        where: { clientId: req.params.id, status: { not: 'CANCELADO' } },
+        _sum: { total: true },
+      }),
+      prisma.invoice.aggregate({
+        where: { clientId: req.params.id, status: { in: ['VIGENTE', 'VENCIDA'] } },
+        _sum: { amount: true },
+      }),
+    ]);
     const totalSpent = totalSpentAgg._sum.total || 0;
-    const lastOrder = await prisma.order.findFirst({
-      where: { clientId: req.params.id },
-      orderBy: { createdAt: 'desc' },
-      select: { createdAt: true, status: true },
-    });
-    const creditUsedAgg = await prisma.invoice.aggregate({
-      where: { clientId: req.params.id, status: { in: ['VIGENTE', 'VENCIDA'] } },
-      _sum: { amount: true },
-    });
+    const lastOrder = client.orders[0] ?? null;
     const creditUsed = Number(creditUsedAgg._sum.amount ?? 0);
 
     res.json({

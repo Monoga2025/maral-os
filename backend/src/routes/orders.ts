@@ -79,6 +79,7 @@ const orderSchema = z.object({
   freightPayment: z.string().optional().default(''),
   type: z.enum(['PEDIDO', 'GARANTIA', 'MUESTRA']).optional().default('PEDIDO'),
   notes: z.string().optional(),
+  sourceCampaignId: z.string().optional(),
   items: z.array(orderItemSchema).min(1, 'Al menos un ítem requerido'),
 });
 
@@ -224,13 +225,14 @@ router.post('/', async (req: AuthRequest, res: Response) => {
       return;
     }
 
-    const { items, ...rest } = validation.data;
+    const { items, sourceCampaignId, ...rest } = validation.data;
     const total = items.reduce((sum, item) => sum + item.qty * item.unitPrice, 0);
 
     const order = await prisma.order.create({
       data: {
         ...rest,
         total,
+        sourceCampaignId: sourceCampaignId ?? null,
         items: {
           create: items.map((item) => ({
             productId: item.productId,
@@ -366,6 +368,37 @@ router.patch('/:id/status', async (req: AuthRequest, res: Response) => {
       evolutionApi.notifyProductionReady(sellerPhone, sellerUser?.name ?? '', order.number, clientName);
     } else if (status === 'ENTREGADO') {
       evolutionApi.notifyOrderStatusChange(recipientPhone, recipientName, order.number, 'ENTREGADO');
+
+      // T4.5 — update campaign metrics if this order came from a campaign
+      if (order.sourceCampaignId) {
+        const [recipient] = await Promise.all([
+          prisma.campaignRecipient.findFirst({
+            where: { clientId: order.clientId, campaignId: order.sourceCampaignId },
+          }),
+        ]);
+        if (recipient) {
+          await prisma.campaignRecipient.update({
+            where: { id: recipient.id },
+            data: {
+              convertedAt: recipient.convertedAt ?? new Date(),
+              revenueCOP: order.total,
+              status: 'CONVERTED',
+            },
+          });
+        }
+        await prisma.campaignMetric.upsert({
+          where: { campaignId: order.sourceCampaignId },
+          update: {
+            converted: { increment: 1 },
+            revenueCOP: { increment: order.total },
+          },
+          create: {
+            campaignId: order.sourceCampaignId,
+            converted: 1,
+            revenueCOP: order.total,
+          },
+        });
+      }
     }
 
     res.json(order);
