@@ -150,6 +150,26 @@ router.get('/tags', async (_req: AuthRequest, res: Response) => {
   }
 });
 
+// PATCH /api/clients/bulk-segment — asignar segmento a múltiples clientes en lote
+router.patch('/bulk-segment', async (req: AuthRequest, res: Response) => {
+  try {
+    const { ids, segment } = z.object({
+      ids: z.array(z.string()).min(1).max(500),
+      segment: z.enum(['IM', 'DS', 'CF']).nullable(),
+    }).parse(req.body);
+
+    const result = await prisma.client.updateMany({
+      where: { id: { in: ids }, active: true },
+      data: { segment },
+    });
+
+    res.json({ updated: result.count, segment });
+  } catch (error) {
+    if (error instanceof z.ZodError) return res.status(400).json({ error: error.errors });
+    res.status(500).json({ error: 'Error al actualizar segmentos' });
+  }
+});
+
 // GET /api/clients/:id
 router.get('/:id', async (req: AuthRequest, res: Response) => {
   try {

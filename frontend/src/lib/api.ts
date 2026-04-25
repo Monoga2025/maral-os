@@ -107,6 +107,8 @@ export const clientsApi = {
   delete: (id: string) => api.delete(`/clients/${id}`),
   getCities: () => api.get<string[]>('/clients/cities'),
   getTags: () => api.get<string[]>('/clients/tags'),
+  bulkSegment: (ids: string[], segment: 'IM' | 'DS' | 'CF' | null) =>
+    api.patch<{ updated: number }>('/clients/bulk-segment', { ids, segment }),
 }
 
 // Products

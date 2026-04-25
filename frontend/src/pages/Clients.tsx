@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import {
   Plus,
@@ -8,7 +8,10 @@ import {
   MessageCircle,
   Eye,
   Filter,
+  Tag,
+  X,
 } from 'lucide-react'
+import { toast } from 'sonner'
 import { clientsApi } from '../lib/api'
 import { formatDate, formatCOP } from '../lib/utils'
 import { Button } from '../components/ui/Button'
@@ -30,6 +33,20 @@ import { TableSkeleton } from '../components/ui/LoadingSkeleton'
 import { Card } from '../components/ui/Card'
 import type { ClientCategory, PurchaseFrequency } from '../types'
 
+type Segment = 'IM' | 'DS' | 'CF'
+
+const SEGMENT_LABELS: Record<Segment, string> = {
+  IM: 'Importador (IM)',
+  DS: 'Distribuidor (DS)',
+  CF: 'Cliente Final (CF)',
+}
+
+const SEGMENT_COLORS: Record<Segment, string> = {
+  IM: 'bg-blue-100 text-blue-700 border-blue-200',
+  DS: 'bg-purple-100 text-purple-700 border-purple-200',
+  CF: 'bg-green-100 text-green-700 border-green-200',
+}
+
 const FREQ_LABELS: Record<PurchaseFrequency, string> = {
   FRECUENTE: 'Frecuente',
   INTERMITENTE: 'Intermitente',
@@ -42,6 +59,16 @@ const FREQ_COLORS: Record<PurchaseFrequency, string> = {
   INTERMITENTE: 'bg-yellow-100 text-yellow-700',
   ESPORADICA: 'bg-orange-100 text-orange-700',
   NINGUNA: 'text-gray-400',
+}
+
+function SegmentBadge({ segment }: { segment?: string | null }) {
+  if (!segment) return <span className="text-gray-400 text-xs">—</span>
+  const s = segment as Segment
+  return (
+    <span className={`text-xs font-semibold px-2 py-0.5 rounded-full border ${SEGMENT_COLORS[s] ?? 'bg-gray-100 text-gray-600'}`}>
+      {s}
+    </span>
+  )
 }
 
 function LastOrdersDots({ dates }: { dates?: string[] }) {
@@ -63,16 +90,24 @@ function LastOrdersDots({ dates }: { dates?: string[] }) {
 
 export default function Clients() {
   const navigate = useNavigate()
+  const qc = useQueryClient()
+
   const [search, setSearch] = useState('')
   const [category, setCategory] = useState('')
   const [city, setCity] = useState('')
+  const [tag, setTag] = useState('')
+  const [segmentFilter, setSegmentFilter] = useState('')
   const [page, setPage] = useState(1)
 
+  // Bulk selection
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [bulkSegment, setBulkSegment] = useState<string>('')
+
   const { data, isLoading } = useQuery({
-    queryKey: ['clients', { search, category, city, page }],
+    queryKey: ['clients', { search, category, city, tag, segmentFilter, page }],
     queryFn: () =>
       clientsApi
-        .getAll({ search: search || undefined, category: category || undefined, city: city || undefined, page, pageSize: 20 })
+        .getAll({ search: search || undefined, category: category || undefined, city: city || undefined, tag: tag || undefined, page, pageSize: 20 })
         .then((r) => r.data),
     staleTime: 30_000,
   })
@@ -82,6 +117,60 @@ export default function Clients() {
     queryFn: () => clientsApi.getCities().then((r) => r.data as string[]),
     staleTime: 300_000,
   })
+
+  const { data: allTags } = useQuery({
+    queryKey: ['client-tags'],
+    queryFn: () => clientsApi.getTags().then((r) => r.data as string[]),
+    staleTime: 300_000,
+  })
+
+  const bulkSegmentMutation = useMutation({
+    mutationFn: ({ ids, segment }: { ids: string[]; segment: Segment | null }) =>
+      clientsApi.bulkSegment(ids, segment),
+    onSuccess: (res) => {
+      toast.success(`${res.data.updated} clientes actualizados`)
+      setSelectedIds(new Set())
+      setBulkSegment('')
+      qc.invalidateQueries({ queryKey: ['clients'] })
+    },
+    onError: () => toast.error('Error al actualizar segmentos'),
+  })
+
+  const clients = data?.data ?? []
+  const pageIds = clients.map((c) => c.id)
+
+  const allPageSelected = pageIds.length > 0 && pageIds.every((id) => selectedIds.has(id))
+  const someSelected = selectedIds.size > 0
+
+  const toggleAll = () => {
+    if (allPageSelected) {
+      setSelectedIds((prev) => {
+        const next = new Set(prev)
+        pageIds.forEach((id) => next.delete(id))
+        return next
+      })
+    } else {
+      setSelectedIds((prev) => {
+        const next = new Set(prev)
+        pageIds.forEach((id) => next.add(id))
+        return next
+      })
+    }
+  }
+
+  const toggleOne = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
+  }
+
+  const applyBulkSegment = () => {
+    const ids = Array.from(selectedIds)
+    const segment = bulkSegment === 'NINGUNA' ? null : (bulkSegment as Segment)
+    bulkSegmentMutation.mutate({ ids, segment })
+  }
 
   const handleWhatsApp = (phone: string, e: React.MouseEvent) => {
     e.stopPropagation()
@@ -120,21 +209,11 @@ export default function Clients() {
               data-tour="client-search"
               placeholder="Buscar por nombre, empresa, RUT..."
               value={search}
-              onChange={(e) => {
-                setSearch(e.target.value)
-                setPage(1)
-              }}
+              onChange={(e) => { setSearch(e.target.value); setPage(1) }}
               prefix={<Search className="h-4 w-4" />}
             />
           </div>
-          <Select
-            value={category}
-            onChange={(e) => {
-              setCategory(e.target.value)
-              setPage(1)
-            }}
-            className="w-48"
-          >
+          <Select value={category} onChange={(e) => { setCategory(e.target.value); setPage(1) }} className="w-48">
             <option value="">Todas las categorías</option>
             <option value="IMPORTADOR">Importador (IM)</option>
             <option value="DISTRIBUIDOR">Distribuidor (DS)</option>
@@ -144,45 +223,101 @@ export default function Clients() {
             <option value="FUNDADOR_HISTORICO">Fundador Histórico</option>
             <option value="FUNDADOR_MARAL">Fundador Maral</option>
           </Select>
-          <Select
-            value={city}
-            onChange={(e) => {
-              setCity(e.target.value)
-              setPage(1)
-            }}
-            className="w-40"
-          >
+          <Select value={segmentFilter} onChange={(e) => { setSegmentFilter(e.target.value); setPage(1) }} className="w-44">
+            <option value="">Todos los segmentos</option>
+            <option value="IM">IM — Importador</option>
+            <option value="DS">DS — Distribuidor</option>
+            <option value="CF">CF — Cliente Final</option>
+          </Select>
+          <Select value={city} onChange={(e) => { setCity(e.target.value); setPage(1) }} className="w-40">
             <option value="">Todas las ciudades</option>
             {(cities ?? []).map((c) => (
               <option key={c} value={c}>{c}</option>
             ))}
           </Select>
+          <Select value={tag} onChange={(e) => { setTag(e.target.value); setPage(1) }} className="w-44">
+            <option value="">Todas las etiquetas</option>
+            {(allTags ?? []).map((t) => (
+              <option key={t} value={t}>{t}</option>
+            ))}
+          </Select>
         </div>
       </Card>
+
+      {/* Bulk action bar */}
+      {someSelected && (
+        <div className="flex items-center gap-3 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3">
+          <span className="text-sm font-semibold text-blue-800">
+            {selectedIds.size} cliente{selectedIds.size !== 1 ? 's' : ''} seleccionado{selectedIds.size !== 1 ? 's' : ''}
+          </span>
+          <div className="flex items-center gap-2 ml-auto">
+            <Tag className="h-4 w-4 text-blue-600" />
+            <select
+              value={bulkSegment}
+              onChange={(e) => setBulkSegment(e.target.value)}
+              className="rounded-lg border border-blue-300 bg-white px-3 py-1.5 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">Asignar segmento…</option>
+              <option value="IM">IM — Importador (36% dto.)</option>
+              <option value="DS">DS — Distribuidor (26% dto.)</option>
+              <option value="CF">CF — Cliente Final (10% dto.)</option>
+              <option value="NINGUNA">Sin segmento</option>
+            </select>
+            <Button
+              size="sm"
+              disabled={!bulkSegment || bulkSegmentMutation.isPending}
+              onClick={applyBulkSegment}
+            >
+              {bulkSegmentMutation.isPending ? 'Aplicando…' : 'Aplicar'}
+            </Button>
+            <button
+              type="button"
+              onClick={() => setSelectedIds(new Set())}
+              className="ml-1 rounded-lg p-1.5 text-blue-500 hover:bg-blue-100 transition-colors"
+              title="Cancelar selección"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Table */}
       <Card data-tour="client-list" className="overflow-hidden">
         {isLoading ? (
           <TableSkeleton rows={8} />
-        ) : !data?.data?.length ? (
+        ) : !clients.length ? (
           <EmptyState
             icon={<Users className="h-8 w-8" />}
             title="No se encontraron clientes"
             description="Ajusta los filtros o crea un nuevo cliente"
-            action={{
-              label: 'Nuevo Cliente',
-              onClick: () => navigate('/clientes/nuevo'),
-            }}
+            action={{ label: 'Nuevo Cliente', onClick: () => navigate('/clientes/nuevo') }}
           />
         ) : (
           <>
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-10">
+                    <input
+                      type="checkbox"
+                      checked={allPageSelected}
+                      onChange={toggleAll}
+                      className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                      title={allPageSelected ? 'Deseleccionar todos' : 'Seleccionar todos en esta página'}
+                    />
+                  </TableHead>
                   <TableHead>Contacto</TableHead>
                   <TableHead>Empresa</TableHead>
                   <TableHead>Ciudad</TableHead>
                   <TableHead>Categoría</TableHead>
+                  <TableHead>
+                    <span className="flex items-center gap-1">
+                      <Tag className="h-3.5 w-3.5 text-gray-400" />
+                      Segmento
+                    </span>
+                  </TableHead>
+                  <TableHead><Tag className="h-3.5 w-3.5 inline mr-1 text-gray-400" />Etiquetas</TableHead>
                   <TableHead>Frecuencia</TableHead>
                   <TableHead>Últimos pedidos</TableHead>
                   <TableHead>Crédito</TableHead>
@@ -190,14 +325,23 @@ export default function Clients() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {data.data.map((client) => {
+                {clients.map((client) => {
                   const freq = (client.purchaseFrequency ?? 'NINGUNA') as PurchaseFrequency
+                  const isSelected = selectedIds.has(client.id)
                   return (
                     <TableRow
                       key={client.id}
-                      className="cursor-pointer"
+                      className={`cursor-pointer ${isSelected ? 'bg-blue-50' : ''}`}
                       onClick={() => navigate(`/clientes/${client.id}`)}
                     >
+                      <TableCell onClick={(e) => { e.stopPropagation(); toggleOne(client.id) }}>
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => toggleOne(client.id)}
+                          className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                        />
+                      </TableCell>
                       <TableCell>
                         <div>
                           <p className="font-semibold text-gray-900">{client.name}</p>
@@ -214,6 +358,21 @@ export default function Clients() {
                       </TableCell>
                       <TableCell>
                         <ClientCategoryBadge category={client.category as ClientCategory} />
+                      </TableCell>
+                      <TableCell>
+                        <SegmentBadge segment={(client as any).segment} />
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex flex-wrap gap-1">
+                          {(client.interestTags ?? []).slice(0, 3).map((t) => (
+                            <span key={t} className="text-xs bg-blue-50 text-blue-700 border border-blue-200 px-1.5 py-0.5 rounded-full font-medium">
+                              {t}
+                            </span>
+                          ))}
+                          {(client.interestTags ?? []).length > 3 && (
+                            <span className="text-xs text-gray-400">+{(client.interestTags ?? []).length - 3}</span>
+                          )}
+                        </div>
                       </TableCell>
                       <TableCell>
                         {freq !== 'NINGUNA' ? (
@@ -239,12 +398,7 @@ export default function Clients() {
                         <div className="flex items-center justify-end gap-1.5">
                           {(client.whatsapp ?? client.phone) && (
                             <button
-                              onClick={(e) =>
-                                handleWhatsApp(
-                                  client.whatsapp ?? client.phone ?? '',
-                                  e
-                                )
-                              }
+                              onClick={(e) => handleWhatsApp(client.whatsapp ?? client.phone ?? '', e)}
                               className="flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200 text-green-600 hover:bg-green-50 hover:border-green-200 transition-colors"
                               title="WhatsApp"
                             >
@@ -252,10 +406,7 @@ export default function Clients() {
                             </button>
                           )}
                           <button
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              navigate(`/clientes/${client.id}`)
-                            }}
+                            onClick={(e) => { e.stopPropagation(); navigate(`/clientes/${client.id}`) }}
                             className="flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200 text-blue-600 hover:bg-blue-50 hover:border-blue-200 transition-colors"
                             title="Ver detalle"
                           >
@@ -270,8 +421,8 @@ export default function Clients() {
             </Table>
             <Pagination
               page={page}
-              totalPages={data.pagination.pages}
-              total={data.pagination.total}
+              totalPages={data!.pagination.pages}
+              total={data!.pagination.total}
               pageSize={20}
               onPageChange={setPage}
             />
