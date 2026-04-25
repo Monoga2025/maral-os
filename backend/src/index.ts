@@ -28,6 +28,7 @@ import campaignRoutes from './routes/campaigns';
 import imageGenRoutes from './routes/image-gen';
 import notificationRoutes from './routes/notifications';
 import tagRoutes from './routes/tags';
+import segmentRoutes from './routes/segments';
 import { startSender } from './lib/campaign-sender';
 import { startDripWorker, seedDripSequences } from './lib/drip-scheduler';
 import { startBestTimeJob } from './lib/best-time';
@@ -106,6 +107,7 @@ app.use('/api/campaigns', campaignRoutes);
 app.use('/api/image-gen', imageGenRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/tags', tagRoutes);
+app.use('/api/segments', segmentRoutes);
 
 // ── Serve frontend in production ────────────────────────────
 if (process.env.NODE_ENV === 'production') {

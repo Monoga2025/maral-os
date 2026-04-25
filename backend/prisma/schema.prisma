@@ -70,7 +70,7 @@ model Client {
   merlinCode        String?
   // ── Campaign segmentation fields (Sprint 0) ──────────────────
   tags              String[]           @default([])
-  segment           CustomerSegment?
+  segment           String?
   interestTags      String[]           @default([])
   lifetimeValue     Decimal?           @db.Decimal(15, 2)
   lastOrderAt       DateTime?
@@ -642,13 +642,21 @@ model WhatsAppMessage {
   createdAt    DateTime     @default(now())
 }
 
-// ── Campaign enums ────────────────────────────────────────────
+// ── Segment model (managed via /api/segments) ─────────────────
 
-enum CustomerSegment {
-  IM
-  DS
-  CF
+model Segment {
+  id          String   @id @default(cuid())
+  code        String   @unique
+  name        String
+  discount    Float    @default(0)
+  color       String   @default("#3B82F6")
+  description String?
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }
+
+// ── Campaign enums ────────────────────────────────────────────
 
 enum CampaignStatus {
   BORRADOR

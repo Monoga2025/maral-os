@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" \"https://monoga-backend.psvi0v.easypanel.host/health\")",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" \"https://maral-os-backend.psvi0v.easypanel.host/health\")",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" \"https://maral-os-backend.psvi0v.easypanel.host/api/whatsapp/webhook\" -X POST -H \"Content-Type: application/json\" -d '{\"event\":\"test\"}')"
+    ]
+  }
+}

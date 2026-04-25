@@ -380,7 +380,7 @@ export default function Clients() {
                       className={`cursor-pointer ${isSelected ? 'bg-blue-50' : ''}`}
                       onClick={() => navigate(`/clientes/${client.id}`)}
                     >
-                      <TableCell onClick={(e) => { e.stopPropagation(); toggleOne(client.id) }}>
+                      <TableCell onClick={(e) => e.stopPropagation()}>
                         <input
                           type="checkbox"
                           checked={isSelected}

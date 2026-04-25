@@ -548,7 +548,8 @@ export interface Campaign {
 }
 
 export interface AudienceFilter {
-  segments?: ('IM' | 'DS' | 'CF')[]
+  segments?: string[]
+  tagIds?: string[]
   cities?: string[]
   interestTags?: string[]
   hasOrderedInLastMonths?: number | null

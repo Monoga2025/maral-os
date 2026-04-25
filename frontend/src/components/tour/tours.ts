@@ -427,4 +427,72 @@ export const TOURS: Record<string, Tour> = {
       },
     ],
   },
+
+  campanas: {
+    id: 'campanas',
+    title: 'Tour de Campañas WhatsApp',
+    steps: [
+      {
+        target: 'center',
+        title: 'Campañas de WhatsApp',
+        content: 'Aquí creas y lanzas secuencias automáticas de mensajes a tus clientes. Puedes segmentar por tipo de cliente, intereses y actividad reciente.',
+        placement: 'auto',
+      },
+      {
+        target: 'campaigns-new',
+        title: 'Nueva campaña',
+        content: 'Empieza aquí. Le das nombre, escribes los mensajes paso a paso, y configuras a quién va dirigida.',
+        placement: 'bottom',
+        highlightPadding: 8,
+      },
+      {
+        target: 'campaigns-filters',
+        title: 'Filtros',
+        content: 'Busca por nombre o filtra por estado: Borrador, En curso, Pausada, Completada.',
+        placement: 'bottom',
+        highlightPadding: 8,
+      },
+      {
+        target: 'campaigns-table',
+        title: 'Lista de campañas',
+        content: 'Cada fila muestra destinatarios, mensajes enviados y tasa de respuesta. Haz clic en una campaña para editarla o ver el estado en vivo.',
+        placement: 'top',
+        highlightPadding: 8,
+      },
+    ],
+  },
+
+  composer: {
+    id: 'composer',
+    title: 'Tour del Composer de campaña',
+    steps: [
+      {
+        target: 'center',
+        title: 'El Composer',
+        content: 'Esta es la herramienta para diseñar tu campaña. Tienes tres paneles: pasos (izquierda), preview (centro) y audiencia (derecha).',
+        placement: 'auto',
+      },
+      {
+        target: 'composer-steps',
+        title: 'Pasos de la campaña',
+        content: 'Agrega mensajes de texto, imágenes, videos, audios o documentos. Cada paso tiene un delay — cuántos segundos esperar antes de enviarlo.',
+        placement: 'right',
+        highlightPadding: 8,
+      },
+      {
+        target: 'composer-preview',
+        title: 'Preview en tiempo real',
+        content: 'Así verá el cliente los mensajes en WhatsApp. Las variables como {primerNombre} se reemplazarán con el dato real de cada cliente.',
+        placement: 'left',
+        highlightPadding: 8,
+      },
+      {
+        target: 'composer-audience',
+        title: 'Audiencia y lanzamiento',
+        content: 'Filtra por segmento (Importador, Distribuidor, Cliente Final) y por intereses. Calcula la audiencia y cuando estés listo, lanza la campaña.',
+        placement: 'left',
+        highlightPadding: 8,
+      },
+    ],
+  },
 }

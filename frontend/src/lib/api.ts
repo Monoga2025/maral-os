@@ -125,6 +125,16 @@ export const tagsApi = {
   getClients: (id: string) => api.get(`/tags/${id}/clients`),
 }
 
+// Segments
+export const segmentsApi = {
+  getAll: () => api.get<any[]>('/segments'),
+  create: (data: { code: string; name: string; discount?: number; color?: string; description?: string; sortOrder?: number }) =>
+    api.post('/segments', data),
+  update: (id: string, data: { code?: string; name?: string; discount?: number; color?: string; description?: string; sortOrder?: number }) =>
+    api.put(`/segments/${id}`, data),
+  delete: (id: string) => api.delete(`/segments/${id}`),
+}
+
 // Products
 export const productsApi = {
   getAll: (params?: {

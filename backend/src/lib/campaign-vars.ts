@@ -1,8 +1,8 @@
-import { Client, CustomerSegment } from '@prisma/client'
+import { Client } from '@prisma/client'
 import { formatDistanceToNow } from 'date-fns'
 import { es } from 'date-fns/locale'
 
-const SEGMENT_DISCOUNT: Record<CustomerSegment, string> = {
+const SEGMENT_DISCOUNT: Record<string, string> = {
   IM: '36%',
   DS: '26%',
   CF: '10%',

@@ -1,5 +1,6 @@
 import { useParams, useNavigate } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useState, useRef } from 'react'
 import {
   ArrowLeft,
   MessageCircle,
@@ -11,6 +12,9 @@ import {
   Building2,
   CreditCard,
   Pencil,
+  Tag,
+  X,
+  BellOff,
 } from 'lucide-react'
 import { clientsApi, quotationsApi, ordersApi } from '../lib/api'
 import { formatCOP, formatDate } from '../lib/utils'
@@ -29,9 +33,15 @@ import {
 import { PageSkeleton } from '../components/ui/LoadingSkeleton'
 import type { QuotationStatus, OrderStatus } from '../types'
 
+const PRESET_TAGS = ['DIPOLOS', 'VHF', 'ANTENAS', 'UHF', 'REPETIDORES', 'ACCESORIOS']
+
 export default function ClientDetail() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
+  const [tagInput, setTagInput] = useState('')
+  const [showSuggestions, setShowSuggestions] = useState(false)
+  const tagInputRef = useRef<HTMLInputElement>(null)
 
   const { data: client, isLoading } = useQuery({
     queryKey: ['client', id],
@@ -52,6 +62,36 @@ export default function ClientDetail() {
       ordersApi.getAll({ clientId: id!, pageSize: 50 }).then((r) => r.data),
     enabled: !!id,
   })
+
+  const tagsMutation = useMutation({
+    mutationFn: (tags: string[]) =>
+      clientsApi.update(id!, { interestTags: tags } as any),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['client', id] })
+      queryClient.invalidateQueries({ queryKey: ['client-tags'] })
+    },
+  })
+
+  const optOutMutation = useMutation({
+    mutationFn: (optedOut: boolean) =>
+      clientsApi.update(id!, { optedOut } as any),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['client', id] }),
+  })
+
+  const addTag = (tag: string) => {
+    const normalized = tag.trim().toUpperCase()
+    if (!normalized) return
+    const current = client?.interestTags ?? []
+    if (current.includes(normalized)) return
+    tagsMutation.mutate([...current, normalized])
+    setTagInput('')
+    setShowSuggestions(false)
+  }
+
+  const removeTag = (tag: string) => {
+    const current = client?.interestTags ?? []
+    tagsMutation.mutate(current.filter((t) => t !== tag))
+  }
 
   if (isLoading || !client) return <PageSkeleton />
 
@@ -217,6 +257,107 @@ export default function ClientDetail() {
         </TabsList>
 
         <TabsContent value="resumen">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+            {/* Campaign tags card */}
+            <Card className="md:col-span-2">
+              <CardHeader>
+                <CardTitle className="flex items-center justify-between gap-2">
+                  <span className="flex items-center gap-2">
+                    <Tag className="h-4 w-4 text-gray-500" />
+                    Etiquetas de campaña
+                  </span>
+                  <button
+                    onClick={() => optOutMutation.mutate(!client.optedOut)}
+                    disabled={optOutMutation.isPending}
+                    className={`flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full transition-colors ${
+                      client.optedOut
+                        ? 'bg-red-100 text-red-700 hover:bg-red-200'
+                        : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                    }`}
+                    title={client.optedOut ? 'Excluido de campañas — click para incluir' : 'Incluido en campañas — click para excluir'}
+                  >
+                    <BellOff className="h-3 w-3" />
+                    {client.optedOut ? 'Excluido de campañas' : 'Incluir en campañas'}
+                  </button>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex flex-wrap items-center gap-2 min-h-[36px]">
+                  {(client.interestTags ?? []).map((t) => (
+                    <span
+                      key={t}
+                      className="flex items-center gap-1 bg-blue-50 text-blue-700 border border-blue-200 text-xs font-semibold px-2.5 py-1 rounded-full"
+                    >
+                      {t}
+                      <button
+                        onClick={() => removeTag(t)}
+                        className="ml-0.5 text-blue-400 hover:text-blue-700 transition-colors"
+                        disabled={tagsMutation.isPending}
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </span>
+                  ))}
+
+                  {/* Add tag input */}
+                  <div className="relative">
+                    <div className="flex items-center gap-1 border border-dashed border-gray-300 rounded-full px-2.5 py-1 hover:border-blue-400 transition-colors">
+                      <Plus className="h-3 w-3 text-gray-400" />
+                      <input
+                        ref={tagInputRef}
+                        value={tagInput}
+                        onChange={(e) => {
+                          setTagInput(e.target.value.toUpperCase())
+                          setShowSuggestions(true)
+                        }}
+                        onFocus={() => setShowSuggestions(true)}
+                        onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') addTag(tagInput)
+                          if (e.key === 'Escape') {
+                            setTagInput('')
+                            setShowSuggestions(false)
+                          }
+                        }}
+                        placeholder="Agregar etiqueta"
+                        className="text-xs w-28 bg-transparent outline-none placeholder-gray-400 text-gray-700"
+                      />
+                    </div>
+                    {showSuggestions && (
+                      <div className="absolute top-full left-0 mt-1 z-10 bg-white border border-gray-200 rounded-lg shadow-lg py-1 min-w-[140px]">
+                        {PRESET_TAGS.filter(
+                          (t) =>
+                            (!tagInput || t.includes(tagInput)) &&
+                            !(client.interestTags ?? []).includes(t)
+                        ).map((t) => (
+                          <button
+                            key={t}
+                            onMouseDown={() => addTag(t)}
+                            className="w-full text-left text-xs px-3 py-1.5 hover:bg-blue-50 hover:text-blue-700 text-gray-700"
+                          >
+                            {t}
+                          </button>
+                        ))}
+                        {tagInput && !PRESET_TAGS.includes(tagInput) && (
+                          <button
+                            onMouseDown={() => addTag(tagInput)}
+                            className="w-full text-left text-xs px-3 py-1.5 hover:bg-blue-50 hover:text-blue-700 text-gray-500 border-t border-gray-100"
+                          >
+                            + Crear "{tagInput}"
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+                {(client.interestTags ?? []).length === 0 && (
+                  <p className="text-xs text-gray-400 mt-2">
+                    Sin etiquetas. Agrega "DIPOLOS" para incluir en la campaña VHF.
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+          </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Card>
               <CardHeader>

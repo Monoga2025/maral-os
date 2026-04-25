@@ -28,7 +28,7 @@ const clientSchema = z.object({
   merlinCode: z.string().optional(),
   interestTags: z.array(z.string().min(1).max(30)).optional(),
   optedOut: z.boolean().optional(),
-  segment: z.enum(['IM', 'DS', 'CF']).optional().nullable(),
+  segment: z.string().min(1).max(10).optional().nullable(),
 });
 
 // GET /api/clients
@@ -160,7 +160,7 @@ router.patch('/bulk-segment', async (req: AuthRequest, res: Response) => {
   try {
     const { ids, segment } = z.object({
       ids: z.array(z.string()).min(1).max(500),
-      segment: z.enum(['IM', 'DS', 'CF']).nullable(),
+      segment: z.string().min(1).max(10).nullable(),
     }).parse(req.body);
 
     const result = await prisma.client.updateMany({

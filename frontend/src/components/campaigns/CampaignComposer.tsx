@@ -6,7 +6,7 @@ import {
   FileText, Image, Video, Mic, File, ArrowLeft, Rocket, X, Sparkles, FlaskConical, BarChart2, Brain
 } from 'lucide-react'
 import { toast } from 'sonner'
-import { campaignsApi } from '../../lib/api'
+import { campaignsApi, tagsApi } from '../../lib/api'
 import type { Campaign, CampaignStep, StepType, AudienceFilter, MarcoStep } from '../../types'
 import ImageGenStudio from './ImageGenStudio'
 import MarcoPanel from './MarcoPanel'
@@ -250,6 +250,12 @@ export default function CampaignComposer() {
     queryKey: ['campaign', id],
     queryFn: () => campaignsApi.get(id!).then((r) => r.data),
     enabled: !isNew && !!id,
+  })
+
+  const { data: allTagEntities = [] } = useQuery<{ id: string; name: string; color: string }[]>({
+    queryKey: ['tags'],
+    queryFn: () => tagsApi.getAll().then((r) => r.data),
+    staleTime: 60_000,
   })
 
   useEffect(() => {
@@ -549,6 +555,39 @@ export default function CampaignComposer() {
                 })}
               </div>
             </div>
+
+            {/* Tag filter */}
+            {allTagEntities.length > 0 && (
+              <div>
+                <p className="text-xs font-medium text-gray-700 mb-2">Etiquetas (al menos una)</p>
+                <div className="flex flex-wrap gap-1">
+                  {allTagEntities.map((tag) => {
+                    const active = (filters.tagIds || []).includes(tag.id)
+                    return (
+                      <button
+                        key={tag.id}
+                        disabled={!!isReadOnly}
+                        onClick={() => {
+                          const ids = filters.tagIds || []
+                          setFilters({
+                            ...filters,
+                            tagIds: active ? ids.filter((t) => t !== tag.id) : [...ids, tag.id],
+                          })
+                        }}
+                        className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${
+                          active
+                            ? 'text-white border-transparent'
+                            : 'bg-white text-gray-600 border-gray-300 hover:border-gray-500'
+                        }`}
+                        style={active ? { backgroundColor: tag.color, borderColor: tag.color } : undefined}
+                      >
+                        {tag.name}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
 
             {/* Order filters */}
             <div>

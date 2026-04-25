@@ -29,7 +29,8 @@ const stepSchema = z.object({
 
 const audienceBodySchema = z.object({
   filters: z.object({
-    segments: z.array(z.enum(['IM', 'DS', 'CF'])).optional(),
+    segments: z.array(z.string()).optional(),
+    tagIds: z.array(z.string()).optional(),
     cities: z.array(z.string()).optional(),
     interestTags: z.array(z.string()).optional(),
     hasOrderedInLastMonths: z.number().nullable().optional(),

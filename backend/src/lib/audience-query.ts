@@ -1,8 +1,8 @@
 import prisma from './prisma'
-import { CustomerSegment } from '@prisma/client'
 
 export interface AudienceFilter {
-  segments?: CustomerSegment[]
+  segments?: string[]
+  tagIds?: string[]
   cities?: string[]
   interestTags?: string[]
   hasOrderedInLastMonths?: number | null
@@ -17,6 +17,7 @@ export interface AudienceFilter {
 export async function resolveAudience(filters: AudienceFilter) {
   const {
     segments,
+    tagIds,
     cities,
     interestTags,
     hasOrderedInLastMonths,
@@ -34,6 +35,8 @@ export async function resolveAudience(filters: AudienceFilter) {
   if (excludeOptedOut) AND.push({ optedOut: false })
 
   if (segments && segments.length > 0) AND.push({ segment: { in: segments } })
+
+  if (tagIds && tagIds.length > 0) AND.push({ clientTags: { some: { tagId: { in: tagIds } } } })
 
   if (cities && cities.length > 0) AND.push({ city: { in: cities } })
 
