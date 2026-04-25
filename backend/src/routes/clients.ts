@@ -86,6 +86,7 @@ router.get('/', async (req: AuthRequest, res: Response) => {
           paymentDays: true,
           purchaseFrequency: true,
           interestTags: true,
+          segment: true,
           optedOut: true,
           active: true,
           createdAt: true,
@@ -95,6 +96,9 @@ router.get('/', async (req: AuthRequest, res: Response) => {
             take: 3,
             select: { createdAt: true, status: true },
           },
+          clientTags: {
+            include: { tag: { select: { id: true, name: true, color: true } } },
+          },
         },
       }),
       prisma.client.count({ where }),
@@ -102,11 +106,12 @@ router.get('/', async (req: AuthRequest, res: Response) => {
 
     // Map orders to lastOrders array of dates
     const data = clients.map((c) => {
-      const { orders, ...rest } = c;
+      const { orders, clientTags, ...rest } = c;
       return {
         ...rest,
         lastOrderAt: orders[0]?.createdAt ?? null,
         lastOrders: orders.map((o) => o.createdAt),
+        tags: clientTags.map((ct) => ct.tag),
       };
     });
 

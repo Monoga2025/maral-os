@@ -12,7 +12,7 @@ import {
   X,
 } from 'lucide-react'
 import { toast } from 'sonner'
-import { clientsApi } from '../lib/api'
+import { clientsApi, tagsApi } from '../lib/api'
 import { formatDate, formatCOP } from '../lib/utils'
 import { Button } from '../components/ui/Button'
 import { TourButton } from '../components/tour/TourButton'
@@ -102,6 +102,7 @@ export default function Clients() {
   // Bulk selection
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [bulkSegment, setBulkSegment] = useState<string>('')
+  const [bulkTagId, setBulkTagId] = useState<string>('')
 
   const { data, isLoading } = useQuery({
     queryKey: ['clients', { search, category, city, tag, segmentFilter, page }],
@@ -124,6 +125,12 @@ export default function Clients() {
     staleTime: 300_000,
   })
 
+  const { data: allTagEntities = [] } = useQuery<{ id: string; name: string; color: string }[]>({
+    queryKey: ['tags'],
+    queryFn: () => tagsApi.getAll().then((r) => r.data),
+    staleTime: 60_000,
+  })
+
   const bulkSegmentMutation = useMutation({
     mutationFn: ({ ids, segment }: { ids: string[]; segment: Segment | null }) =>
       clientsApi.bulkSegment(ids, segment),
@@ -134,6 +141,18 @@ export default function Clients() {
       qc.invalidateQueries({ queryKey: ['clients'] })
     },
     onError: () => toast.error('Error al actualizar segmentos'),
+  })
+
+  const bulkTagMutation = useMutation({
+    mutationFn: ({ ids, tagId }: { ids: string[]; tagId: string }) =>
+      tagsApi.bulkAssign(ids, [tagId], 'add'),
+    onSuccess: () => {
+      toast.success(`Etiqueta asignada a ${selectedIds.size} clientes`)
+      setSelectedIds(new Set())
+      setBulkTagId('')
+      qc.invalidateQueries({ queryKey: ['clients'] })
+    },
+    onError: () => toast.error('Error al asignar etiqueta'),
   })
 
   const clients = data?.data ?? []
@@ -250,26 +269,53 @@ export default function Clients() {
           <span className="text-sm font-semibold text-blue-800">
             {selectedIds.size} cliente{selectedIds.size !== 1 ? 's' : ''} seleccionado{selectedIds.size !== 1 ? 's' : ''}
           </span>
-          <div className="flex items-center gap-2 ml-auto">
-            <Tag className="h-4 w-4 text-blue-600" />
-            <select
-              value={bulkSegment}
-              onChange={(e) => setBulkSegment(e.target.value)}
-              className="rounded-lg border border-blue-300 bg-white px-3 py-1.5 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="">Asignar segmento…</option>
-              <option value="IM">IM — Importador (36% dto.)</option>
-              <option value="DS">DS — Distribuidor (26% dto.)</option>
-              <option value="CF">CF — Cliente Final (10% dto.)</option>
-              <option value="NINGUNA">Sin segmento</option>
-            </select>
-            <Button
-              size="sm"
-              disabled={!bulkSegment || bulkSegmentMutation.isPending}
-              onClick={applyBulkSegment}
-            >
-              {bulkSegmentMutation.isPending ? 'Aplicando…' : 'Aplicar'}
-            </Button>
+          <div className="flex items-center gap-3 ml-auto flex-wrap">
+            {/* Asignar etiqueta */}
+            {allTagEntities.length > 0 && (
+              <div className="flex items-center gap-2">
+                <Tag className="h-4 w-4 text-blue-600 shrink-0" />
+                <select
+                  value={bulkTagId}
+                  onChange={(e) => setBulkTagId(e.target.value)}
+                  className="rounded-lg border border-blue-300 bg-white px-3 py-1.5 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">Asignar etiqueta…</option>
+                  {allTagEntities.map((t) => (
+                    <option key={t.id} value={t.id}>{t.name}</option>
+                  ))}
+                </select>
+                <Button
+                  size="sm"
+                  disabled={!bulkTagId || bulkTagMutation.isPending}
+                  onClick={() => bulkTagMutation.mutate({ ids: Array.from(selectedIds), tagId: bulkTagId })}
+                >
+                  {bulkTagMutation.isPending ? 'Asignando…' : 'Asignar'}
+                </Button>
+              </div>
+            )}
+            {/* Separador */}
+            <div className="h-6 w-px bg-blue-200" />
+            {/* Asignar segmento */}
+            <div className="flex items-center gap-2">
+              <select
+                value={bulkSegment}
+                onChange={(e) => setBulkSegment(e.target.value)}
+                className="rounded-lg border border-blue-300 bg-white px-3 py-1.5 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">Asignar segmento…</option>
+                <option value="IM">IM — Importador (36% dto.)</option>
+                <option value="DS">DS — Distribuidor (26% dto.)</option>
+                <option value="CF">CF — Cliente Final (10% dto.)</option>
+                <option value="NINGUNA">Sin segmento</option>
+              </select>
+              <Button
+                size="sm"
+                disabled={!bulkSegment || bulkSegmentMutation.isPending}
+                onClick={applyBulkSegment}
+              >
+                {bulkSegmentMutation.isPending ? 'Aplicando…' : 'Aplicar'}
+              </Button>
+            </div>
             <button
               type="button"
               onClick={() => setSelectedIds(new Set())}
@@ -364,13 +410,20 @@ export default function Clients() {
                       </TableCell>
                       <TableCell>
                         <div className="flex flex-wrap gap-1">
-                          {(client.interestTags ?? []).slice(0, 3).map((t) => (
-                            <span key={t} className="text-xs bg-blue-50 text-blue-700 border border-blue-200 px-1.5 py-0.5 rounded-full font-medium">
-                              {t}
+                          {((client as any).tags ?? []).slice(0, 3).map((t: { id: string; name: string; color: string }) => (
+                            <span
+                              key={t.id}
+                              className="text-xs px-1.5 py-0.5 rounded-full font-medium border"
+                              style={{ backgroundColor: t.color + '20', color: t.color, borderColor: t.color + '40' }}
+                            >
+                              {t.name}
                             </span>
                           ))}
-                          {(client.interestTags ?? []).length > 3 && (
-                            <span className="text-xs text-gray-400">+{(client.interestTags ?? []).length - 3}</span>
+                          {((client as any).tags ?? []).length > 3 && (
+                            <span className="text-xs text-gray-400">+{((client as any).tags ?? []).length - 3}</span>
+                          )}
+                          {((client as any).tags ?? []).length === 0 && (
+                            <span className="text-gray-400 text-xs">—</span>
                           )}
                         </div>
                       </TableCell>

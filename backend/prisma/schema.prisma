@@ -86,10 +86,31 @@ model Client {
   tasks             Task[]
   campaignRecipients CampaignRecipient[]
   dripEnrollments   DripEnrollment[]
+  clientTags        ClientTag[]
 
   @@index([segment])
   @@index([lastOrderAt])
   @@index([optedOut])
+}
+
+// ── Tags ─────────────────────────────────────────────────────
+
+model Tag {
+  id          String      @id @default(cuid())
+  name        String      @unique
+  color       String      @default("#3B82F6")
+  description String?
+  createdAt   DateTime    @default(now())
+  clientTags  ClientTag[]
+}
+
+model ClientTag {
+  clientId String
+  tagId    String
+  client   Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  tag      Tag    @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([clientId, tagId])
 }
 
 enum ClientCategory {

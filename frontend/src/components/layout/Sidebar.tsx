@@ -24,6 +24,8 @@ import {
   CheckSquare,
   Receipt,
   MessageCircle,
+  Megaphone,
+  Tag,
 } from 'lucide-react'
 import { cn, getInitials } from '../../lib/utils'
 import { useAuthStore } from '../../store/auth'
@@ -162,6 +164,8 @@ const navGroups: NavGroup[] = [
       { to: '/cotizaciones', icon: <FileText className="h-5 w-5" />,       label: 'Cotizaciones',    roles: ['GERENTE', 'VENTAS'] },
       { to: '/pedidos',      icon: <Package className="h-5 w-5" />,        label: 'Pedidos',         roles: ['GERENTE', 'VENTAS', 'LOGISTICA', 'CONTADORA'] },
       { to: '/whatsapp',     icon: <MessageCircle className="h-5 w-5" />,  label: 'WhatsApp Assist', roles: ['GERENTE', 'VENTAS'] },
+      { to: '/campanas',     icon: <Megaphone className="h-5 w-5" />,       label: 'Campañas',        roles: ['GERENTE', 'VENTAS'] },
+      { to: '/etiquetas',    icon: <Tag className="h-5 w-5" />,            label: 'Etiquetas',       roles: ['GERENTE', 'VENTAS'] },
     ],
   },
   {
@@ -200,7 +204,7 @@ const roleLabels: Record<string, string> = {
   LOGISTICA: 'Logística',
 }
 
-export function Sidebar() {
+export function Sidebar({ hotLeadCount = 0 }: { hotLeadCount?: number }) {
   const { user, logout } = useAuthStore()
   const { sidebarCollapsed } = useUIStore()
   const navigate = useNavigate()
@@ -252,6 +256,14 @@ export function Sidebar() {
           )}
           {sidebarCollapsed && item.to === '/tareas' && pendingTasks && pendingTasks > 0 && (
             <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-red-500" />
+          )}
+          {!sidebarCollapsed && item.to === '/whatsapp' && hotLeadCount > 0 && (
+            <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 text-[10px] font-bold text-white animate-pulse">
+              {hotLeadCount > 9 ? '9+' : hotLeadCount}
+            </span>
+          )}
+          {sidebarCollapsed && item.to === '/whatsapp' && hotLeadCount > 0 && (
+            <span className="absolute top-1 right-1 w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse" />
           )}
         </>
       )}

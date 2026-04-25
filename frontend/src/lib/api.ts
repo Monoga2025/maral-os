@@ -112,6 +112,19 @@ export const clientsApi = {
     api.patch<{ updated: number }>('/clients/bulk-segment', { ids, segment }),
 }
 
+// Tags
+export const tagsApi = {
+  getAll: () => api.get<any[]>('/tags'),
+  create: (data: { name: string; color: string; description?: string }) =>
+    api.post('/tags', data),
+  update: (id: string, data: { name?: string; color?: string; description?: string }) =>
+    api.put(`/tags/${id}`, data),
+  delete: (id: string) => api.delete(`/tags/${id}`),
+  bulkAssign: (clientIds: string[], tagIds: string[], action: 'add' | 'remove' | 'replace' = 'add') =>
+    api.patch('/tags/bulk-assign', { clientIds, tagIds, action }),
+  getClients: (id: string) => api.get(`/tags/${id}/clients`),
+}
+
 // Products
 export const productsApi = {
   getAll: (params?: {

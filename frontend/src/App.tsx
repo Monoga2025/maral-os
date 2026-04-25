@@ -26,6 +26,13 @@ import Manual from './pages/Manual'
 import Tareas from './pages/Tareas'
 import Gastos from './pages/Gastos'
 import Whatsapp from './pages/Whatsapp'
+import Campaigns from './pages/Campaigns'
+import CampaignComposer from './components/campaigns/CampaignComposer'
+import CampaignLiveView from './components/campaigns/CampaignLiveView'
+import ImageLibrary from './pages/ImageLibrary'
+import CampaignLeads from './pages/CampaignLeads'
+import CampaignReports from './pages/CampaignReports'
+import Tags from './pages/Tags'
 import MobileDashboard from './pages/mobile/MobileDashboard'
 import MobileOrders from './pages/mobile/MobileOrders'
 import MobileClients from './pages/mobile/MobileClients'
@@ -83,6 +90,14 @@ export default function App() {
         <Route path="configuracion" element={<Settings />} />
         <Route path="manual" element={<Manual />} />
         <Route path="whatsapp" element={<Whatsapp />} />
+        <Route path="campanas" element={<Campaigns />} />
+        <Route path="campanas/nueva" element={<CampaignComposer />} />
+        <Route path="campanas/:id" element={<CampaignLiveView />} />
+        <Route path="campanas/:id/editar" element={<CampaignComposer />} />
+        <Route path="whatsapp/biblioteca" element={<ImageLibrary />} />
+        <Route path="whatsapp/leads" element={<CampaignLeads />} />
+        <Route path="reportes/campanas" element={<CampaignReports />} />
+        <Route path="etiquetas" element={<Tags />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
