@@ -24,6 +24,14 @@ import expenseRoutes from './routes/expenses';
 import aiRoutes from './routes/ai';
 import dianRoutes from './routes/dian';
 import whatsappRoutes from './routes/whatsapp';
+import campaignRoutes from './routes/campaigns';
+import imageGenRoutes from './routes/image-gen';
+import notificationRoutes from './routes/notifications';
+import { startSender } from './lib/campaign-sender';
+import { startDripWorker, seedDripSequences } from './lib/drip-scheduler';
+import { startBestTimeJob } from './lib/best-time';
+import { startPatternJob } from './lib/forbidden-patterns';
+import { startWeeklyReportJob } from './jobs/weekly-report';
 
 const app = express();
 const PORT = parseInt(process.env.PORT || '3001', 10);
@@ -93,6 +101,9 @@ app.use('/api/expenses', expenseRoutes);
 app.use('/api/ai', aiRoutes);
 app.use('/api/dian', dianRoutes);
 app.use('/api/whatsapp', whatsappRoutes);
+app.use('/api/campaigns', campaignRoutes);
+app.use('/api/image-gen', imageGenRoutes);
+app.use('/api/notifications', notificationRoutes);
 
 // ── Serve frontend in production ────────────────────────────
 if (process.env.NODE_ENV === 'production') {
@@ -121,6 +132,13 @@ app.use(
 );
 
 // ── Start server ────────────────────────────────────────────
+startSender();
+seedDripSequences().catch(console.error);
+startDripWorker();
+startBestTimeJob();
+startPatternJob();
+startWeeklyReportJob();
+
 app.listen(PORT, '0.0.0.0', () => {
   console.log('');
   console.log('  ╔═══════════════════════════════════════════╗');

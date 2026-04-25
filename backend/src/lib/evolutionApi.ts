@@ -32,6 +32,32 @@ function padNum(n: number, len = 4): string {
   return String(n).padStart(len, '0');
 }
 
+async function sendMedia(
+  phone: string,
+  type: 'IMAGE' | 'VIDEO' | 'AUDIO' | 'DOCUMENT',
+  mediaUrl: string,
+  caption?: string,
+  fileName?: string,
+): Promise<void> {
+  if (!BASE_URL || !API_KEY || !phone) return;
+  try {
+    const number = formatPhone(phone);
+    const mediatype = type.toLowerCase() as 'image' | 'video' | 'audio' | 'document';
+    const response = await fetch(`${BASE_URL}/message/sendMedia/${INSTANCE}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', apikey: API_KEY },
+      body: JSON.stringify({ number, mediatype, media: mediaUrl, caption, fileName }),
+    });
+    if (!response.ok) {
+      let body = '';
+      try { body = await response.text(); } catch { /* ignore */ }
+      console.warn(`[EvolutionAPI] sendMedia ${number} → ${response.status} | ${body.slice(0, 200)}`);
+    }
+  } catch (err) {
+    console.warn('[EvolutionAPI] Error sendMedia:', (err as Error).message);
+  }
+}
+
 async function sendTextMessage(phone: string, message: string): Promise<void> {
   if (!BASE_URL || !API_KEY || !phone) return;
   try {
@@ -180,6 +206,7 @@ function notifyOrderDispatched(
 
 export const evolutionApi = {
   sendTextMessage,
+  sendMedia,
   notifyNewTask,
   notifyOrderStatusChange,
   notifyProductionReady,
