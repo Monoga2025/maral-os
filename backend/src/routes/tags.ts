@@ -39,34 +39,6 @@ router.post('/', async (req: AuthRequest, res: Response) => {
   }
 })
 
-// PUT /api/tags/:id — editar etiqueta
-router.put('/:id', async (req: AuthRequest, res: Response) => {
-  try {
-    const data = tagSchema.partial().parse(req.body)
-    const tag = await prisma.tag.update({ where: { id: req.params.id }, data })
-    res.json(tag)
-  } catch (error) {
-    if (error instanceof z.ZodError) return res.status(400).json({ error: error.errors })
-    if ((error as { code?: string }).code === 'P2025')
-      return res.status(404).json({ error: 'Etiqueta no encontrada' })
-    if ((error as { code?: string }).code === 'P2002')
-      return res.status(409).json({ error: 'Ya existe una etiqueta con ese nombre' })
-    res.status(500).json({ error: 'Error al editar etiqueta' })
-  }
-})
-
-// DELETE /api/tags/:id — eliminar etiqueta (desasocia clientes por CASCADE)
-router.delete('/:id', async (req: AuthRequest, res: Response) => {
-  try {
-    await prisma.tag.delete({ where: { id: req.params.id } })
-    res.json({ ok: true })
-  } catch (error) {
-    if ((error as { code?: string }).code === 'P2025')
-      return res.status(404).json({ error: 'Etiqueta no encontrada' })
-    res.status(500).json({ error: 'Error al eliminar etiqueta' })
-  }
-})
-
 // PATCH /api/tags/bulk-assign — asignar etiquetas a múltiples clientes en lote
 router.patch('/bulk-assign', async (req: AuthRequest, res: Response) => {
   try {
@@ -93,6 +65,34 @@ router.patch('/bulk-assign', async (req: AuthRequest, res: Response) => {
   } catch (error) {
     if (error instanceof z.ZodError) return res.status(400).json({ error: error.errors })
     res.status(500).json({ error: 'Error al asignar etiquetas' })
+  }
+})
+
+// PUT /api/tags/:id — editar etiqueta
+router.put('/:id', async (req: AuthRequest, res: Response) => {
+  try {
+    const data = tagSchema.partial().parse(req.body)
+    const tag = await prisma.tag.update({ where: { id: req.params.id }, data })
+    res.json(tag)
+  } catch (error) {
+    if (error instanceof z.ZodError) return res.status(400).json({ error: error.errors })
+    if ((error as { code?: string }).code === 'P2025')
+      return res.status(404).json({ error: 'Etiqueta no encontrada' })
+    if ((error as { code?: string }).code === 'P2002')
+      return res.status(409).json({ error: 'Ya existe una etiqueta con ese nombre' })
+    res.status(500).json({ error: 'Error al editar etiqueta' })
+  }
+})
+
+// DELETE /api/tags/:id — eliminar etiqueta (desasocia clientes por CASCADE)
+router.delete('/:id', async (req: AuthRequest, res: Response) => {
+  try {
+    await prisma.tag.delete({ where: { id: req.params.id } })
+    res.json({ ok: true })
+  } catch (error) {
+    if ((error as { code?: string }).code === 'P2025')
+      return res.status(404).json({ error: 'Etiqueta no encontrada' })
+    res.status(500).json({ error: 'Error al eliminar etiqueta' })
   }
 })
 

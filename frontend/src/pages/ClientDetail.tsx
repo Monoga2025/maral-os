@@ -247,10 +247,10 @@ export default function ClientDetail() {
         <TabsList>
           <TabsTrigger value="resumen">Resumen</TabsTrigger>
           <TabsTrigger value="cotizaciones">
-            Cotizaciones ({quotations?.total ?? 0})
+            Cotizaciones ({quotations?.pagination?.total ?? 0})
           </TabsTrigger>
           <TabsTrigger value="pedidos">
-            Pedidos ({orders?.total ?? 0})
+            Pedidos ({orders?.pagination?.total ?? 0})
           </TabsTrigger>
           <TabsTrigger value="credito">Crédito</TabsTrigger>
           <TabsTrigger value="notas">Notas</TabsTrigger>

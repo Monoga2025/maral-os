@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams, useLocation } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
 import {
@@ -168,6 +168,7 @@ export default function QuotationForm() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const { id } = useParams<{ id: string }>()
+  const location = useLocation()
   const isEditMode = !!id
 
   const [step, setStep] = useState(1)
@@ -241,6 +242,22 @@ export default function QuotationForm() {
     setInitialized(true)
     setStep(2) // jump to products so the user can review immediately
   }, [existingQuotation, initialized, reset])
+
+  // ── Pre-select client from navigation state (e.g., from ClientDetail) ──
+  useEffect(() => {
+    const navClientId = (location.state as { clientId?: string } | null)?.clientId
+    if (!navClientId || isEditMode || initialized) return
+    clientsApi.getById(navClientId).then((r) => {
+      const client = r.data
+      setSelectedClient(client)
+      if (client.address) setValue('shippingAddress', client.address)
+      const disc = CATEGORY_DISCOUNTS[client.category]
+      if (disc) setSuggestedDiscount(disc.pct)
+      setInitialized(true)
+      setStep(2)
+    }).catch(() => {/* silently ignore — user can search manually */})
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.state])
 
   // ── Client search ─────────────────────────────────────────────
   const { data: clientResults } = useQuery({

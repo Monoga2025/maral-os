@@ -1,7 +1,7 @@
 import { Router, Response } from 'express';
 import { z } from 'zod';
 import prisma from '../lib/prisma';
-import { authenticate, AuthRequest } from '../middleware/auth';
+import { authenticate, requireRole, AuthRequest } from '../middleware/auth';
 
 const router = Router();
 router.use(authenticate);
@@ -156,7 +156,7 @@ router.get('/tags', async (_req: AuthRequest, res: Response) => {
 });
 
 // PATCH /api/clients/bulk-segment — asignar segmento a múltiples clientes en lote
-router.patch('/bulk-segment', async (req: AuthRequest, res: Response) => {
+router.patch('/bulk-segment', requireRole('GERENTE', 'VENTAS'), async (req: AuthRequest, res: Response) => {
   try {
     const { ids, segment } = z.object({
       ids: z.array(z.string()).min(1).max(500),

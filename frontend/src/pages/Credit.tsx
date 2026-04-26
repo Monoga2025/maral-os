@@ -20,6 +20,7 @@ const FACTORING_BADGE: Record<string, string> = {
 export default function Credit() {
   const qc = useQueryClient()
   const [payingId, setPayingId] = useState<string | null>(null)
+  const [payAmount, setPayAmount] = useState('')
 
   const { data: summaryData, isLoading: summaryLoading } = useQuery({
     queryKey: ['credit-summary'],
@@ -32,12 +33,13 @@ export default function Credit() {
   })
 
   const registerPayment = useMutation({
-    mutationFn: (id: string) => invoicesApi.registerPayment(id, 0),
+    mutationFn: ({ id, amount }: { id: string; amount: number }) => invoicesApi.registerPayment(id, amount),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['invoices'] })
       qc.invalidateQueries({ queryKey: ['credit-summary'] })
       toast.success('Pago registrado')
       setPayingId(null)
+      setPayAmount('')
     },
     onError: () => toast.error('Error al registrar pago'),
   })
@@ -220,9 +222,22 @@ export default function Credit() {
                     {inv.status !== 'PAGADA' && (
                       payingId === inv.id ? (
                         <div className="flex items-center gap-1">
-                          <button onClick={() => registerPayment.mutate(inv.id)}
-                            className="text-green-600 hover:text-green-800"><Check size={16} /></button>
-                          <button onClick={() => setPayingId(null)}
+                          <input
+                            type="number"
+                            min="0"
+                            step="1000"
+                            placeholder="Monto"
+                            value={payAmount}
+                            onChange={(e) => setPayAmount(e.target.value)}
+                            className="w-24 border border-gray-200 rounded px-1.5 py-0.5 text-xs focus:outline-none focus:border-blue-400"
+                            autoFocus
+                          />
+                          <button
+                            onClick={() => registerPayment.mutate({ id: inv.id, amount: parseFloat(payAmount) || 0 })}
+                            disabled={!payAmount || parseFloat(payAmount) <= 0}
+                            className="text-green-600 hover:text-green-800 disabled:opacity-40"
+                          ><Check size={16} /></button>
+                          <button onClick={() => { setPayingId(null); setPayAmount('') }}
                             className="text-gray-400 hover:text-gray-600"><X size={16} /></button>
                         </div>
                       ) : (

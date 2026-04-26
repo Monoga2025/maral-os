@@ -46,6 +46,7 @@ router.get('/', async (req: AuthRequest, res: Response) => {
               client: { select: { id: true, name: true } },
             },
           },
+          assignedUser: { select: { id: true, name: true } },
         },
       }),
       prisma.productionOrder.count({ where }),
@@ -222,6 +223,7 @@ router.patch('/:id/status', async (req: AuthRequest, res: Response) => {
       data: { status: status as never, updatedById: req.user!.userId },
       include: {
         product: { select: { id: true, reference: true, name: true } },
+        assignedUser: { select: { id: true, name: true } },
       },
     });
 
@@ -236,7 +238,11 @@ router.patch('/:id/status', async (req: AuthRequest, res: Response) => {
     });
 
     res.json(order);
-  } catch (error) {
+  } catch (error: unknown) {
+    if ((error as { code?: string }).code === 'P2025') {
+      res.status(404).json({ error: 'No encontrado' });
+      return;
+    }
     console.error('Update production status error:', error);
     res.status(500).json({ error: 'Error al actualizar estado' });
   }

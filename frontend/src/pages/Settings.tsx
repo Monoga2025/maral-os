@@ -1,133 +1,12 @@
 import { useState } from 'react'
 import { useAuthStore } from '../store/auth'
 import { getInitials } from '../lib/utils'
-import { Settings as SettingsIcon, User, Shield, RefreshCw, CheckCircle, AlertCircle, Clock, Users, Plus, Pencil, UserX, X, Eye, EyeOff } from 'lucide-react'
+import { Settings as SettingsIcon, User, Shield, CheckCircle, Users, Plus, Pencil, UserX, X, Eye, EyeOff } from 'lucide-react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import api, { usersApi } from '../lib/api'
+import { usersApi } from '../lib/api'
 import { toast } from 'sonner'
 import type { User as UserType } from '../types'
 
-// ── SyncStatus ────────────────────────────────────────────────────────────────
-
-interface SyncStatusData {
-  lastSync: string | null
-  status: 'never' | 'ok' | 'error' | 'running' | 'pending'
-  clientsSynced: number
-  productsSynced: number
-  message?: string
-}
-
-function SyncSection() {
-  const [requesting, setRequesting] = useState(false)
-  const [requestError, setRequestError] = useState<string | null>(null)
-  const queryClient = useQueryClient()
-
-  const { data, isLoading, isError } = useQuery<SyncStatusData>({
-    queryKey: ['sync-status'],
-    queryFn: () => api.get<SyncStatusData>('/sync/status').then((r) => r.data),
-    refetchInterval: (query) => {
-      const status = query.state.data?.status
-      return status === 'running' || status === 'pending' ? 3_000 : 15_000
-    },
-    retry: false,
-  })
-
-  const handleSync = async () => {
-    setRequesting(true)
-    setRequestError(null)
-    try {
-      await api.post('/sync/request')
-      queryClient.invalidateQueries({ queryKey: ['sync-status'] })
-    } catch (e: unknown) {
-      const err = e as { response?: { data?: { error?: string } } }
-      setRequestError(err?.response?.data?.error ?? 'No se pudo enviar la solicitud')
-    } finally {
-      setRequesting(false)
-    }
-  }
-
-  const formatDate = (iso: string | null) => {
-    if (!iso) return '—'
-    return new Date(iso).toLocaleString('es-CO', {
-      year: 'numeric', month: 'short', day: 'numeric',
-      hour: '2-digit', minute: '2-digit',
-    })
-  }
-
-  const isActive = data?.status === 'running' || data?.status === 'pending'
-  const canSync = !isActive && !requesting
-
-  return (
-    <div className="space-y-4">
-      <button
-        onClick={handleSync}
-        disabled={!canSync}
-        className={`w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-medium transition-colors ${
-          canSync ? 'bg-purple-600 text-white hover:bg-purple-700' : 'bg-gray-100 text-gray-400 cursor-not-allowed'
-        }`}
-      >
-        <RefreshCw className={`h-4 w-4 ${isActive ? 'animate-spin' : ''}`} />
-        {requesting ? 'Enviando...' : isActive ? data?.message ?? 'Sincronizando...' : 'Sincronizar con Merlin'}
-      </button>
-      {requestError && <p className="text-xs text-red-500 text-center">{requestError}</p>}
-      {isLoading ? (
-        <div className="flex items-center gap-2 text-sm text-gray-400">
-          <RefreshCw className="h-4 w-4 animate-spin" /> Consultando estado...
-        </div>
-      ) : isError || !data ? (
-        <div className="flex items-center gap-2 text-sm text-red-500">
-          <AlertCircle className="h-4 w-4" /> No se pudo obtener el estado
-        </div>
-      ) : (
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              {data.status === 'ok' && <CheckCircle className="h-4 w-4 text-green-500" />}
-              {data.status === 'error' && <AlertCircle className="h-4 w-4 text-red-500" />}
-              {data.status === 'never' && <Clock className="h-4 w-4 text-gray-400" />}
-              {(data.status === 'running' || data.status === 'pending') && <RefreshCw className="h-4 w-4 text-purple-500 animate-spin" />}
-              <span className="text-sm text-gray-600">
-                {data.status === 'never' && 'Nunca sincronizado'}
-                {data.status === 'ok' && 'Último sync exitoso'}
-                {data.status === 'error' && (data.message ?? 'Error en último sync')}
-                {data.status === 'pending' && 'Esperando al agente local...'}
-                {data.status === 'running' && 'Sincronizando...'}
-              </span>
-            </div>
-            {data.status !== 'never' && data.status !== 'pending' && data.status !== 'running' && (
-              <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                data.status === 'ok' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
-              }`}>
-                {data.status === 'ok' ? 'OK' : 'Error'}
-              </span>
-            )}
-          </div>
-          {data.status === 'ok' && (
-            <div className="grid grid-cols-3 gap-3">
-              <div className="rounded-lg bg-gray-50 p-3 text-center">
-                <p className="text-lg font-bold text-gray-900">{data.clientsSynced}</p>
-                <p className="text-xs text-gray-500">Clientes</p>
-              </div>
-              <div className="rounded-lg bg-gray-50 p-3 text-center">
-                <p className="text-lg font-bold text-gray-900">{data.productsSynced}</p>
-                <p className="text-xs text-gray-500">Productos</p>
-              </div>
-              <div className="rounded-lg bg-gray-50 p-3 text-center">
-                <p className="text-xs font-medium text-gray-900 leading-tight">{formatDate(data.lastSync)}</p>
-                <p className="text-xs text-gray-500">Fecha</p>
-              </div>
-            </div>
-          )}
-          {data.status === 'pending' && (
-            <p className="text-xs text-gray-400 bg-yellow-50 rounded-lg p-3">
-              El agente <span className="font-mono font-medium">sync_agent.py</span> debe estar corriendo en el computador de Merlin para procesar esta solicitud.
-            </p>
-          )}
-        </div>
-      )}
-    </div>
-  )
-}
 
 // ── User modal ────────────────────────────────────────────────────────────────
 
@@ -507,20 +386,6 @@ export default function Settings() {
             <span className="font-medium text-blue-600">$40.000.000 / mes</span>
           </div>
         </div>
-      </div>
-
-      {/* Merlin Sync */}
-      <div className="bg-white rounded-xl border border-gray-200 p-6">
-        <div className="flex items-center gap-3 mb-4">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-purple-100">
-            <RefreshCw className="h-5 w-5 text-purple-600" />
-          </div>
-          <div>
-            <h2 className="font-semibold text-gray-900">Sincronización con Merlin</h2>
-            <p className="text-sm text-gray-500">Importa clientes y productos desde el sistema contable</p>
-          </div>
-        </div>
-        <SyncSection />
       </div>
 
       <button

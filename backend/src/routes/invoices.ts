@@ -1,7 +1,7 @@
 import { Router, Response } from 'express';
 import { z } from 'zod';
 import prisma from '../lib/prisma';
-import { authenticate, AuthRequest } from '../middleware/auth';
+import { authenticate, requireRole, AuthRequest } from '../middleware/auth';
 
 const router = Router();
 router.use(authenticate);
@@ -166,7 +166,7 @@ router.get('/:id', async (req: AuthRequest, res: Response) => {
 });
 
 // POST /api/invoices
-router.post('/', async (req: AuthRequest, res: Response) => {
+router.post('/', requireRole('GERENTE', 'VENTAS'), async (req: AuthRequest, res: Response) => {
   try {
     const validation = invoiceSchema.safeParse(req.body);
     if (!validation.success) {

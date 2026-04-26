@@ -233,7 +233,7 @@ interface CreateForm {
 const DEFAULT_FORM: CreateForm = { title: '', description: '', priority: 'NORMAL', assignedToId: '', dueDate: '' }
 
 function CreateModal({
-  onClose, onSubmit, users, currentUser, isPending, initialPriority,
+  onClose, onSubmit, users, currentUser, isPending, initialPriority, initialAssignedToId,
 }: {
   onClose: () => void
   onSubmit: (data: CreateForm) => void
@@ -241,8 +241,9 @@ function CreateModal({
   currentUser: User
   isPending: boolean
   initialPriority?: TaskPriority
+  initialAssignedToId?: string
 }) {
-  const [form, setForm] = useState<CreateForm>({ ...DEFAULT_FORM, priority: initialPriority ?? 'NORMAL', dueDate: todayISO() })
+  const [form, setForm] = useState<CreateForm>({ ...DEFAULT_FORM, priority: initialPriority ?? 'NORMAL', dueDate: todayISO(), assignedToId: initialAssignedToId ?? '' })
   const [aiSuggestion, setAiSuggestion] = useState<{ priority: TaskPriority; dueDays: number } | null>(null)
   const [aiLoading, setAiLoading] = useState(false)
   const debounce = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -695,6 +696,7 @@ export default function Tareas() {
           currentUser={user as User}
           isPending={createMutation.isPending}
           initialPriority={modalPriority}
+          initialAssignedToId={resolvedUserId ?? user?.id}
         />
       )}
     </div>

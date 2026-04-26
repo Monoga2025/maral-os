@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useState, useEffect } from 'react'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { ArrowLeft, ArrowRight, AlertTriangle, Plus, Trash2, Check } from 'lucide-react'
 import { ordersApi, clientsApi, productsApi } from '../lib/api'
@@ -14,6 +14,7 @@ const CARRIERS = ['Servientrega', 'Interrapidísimo', 'TCC', 'Coordinadora', 'En
 
 export default function OrderForm() {
   const navigate = useNavigate()
+  const location = useLocation()
   const qc = useQueryClient()
 
   const [step, setStep] = useState(1)
@@ -32,6 +33,20 @@ export default function OrderForm() {
   const [type, setType] = useState<'PEDIDO' | 'GARANTIA' | 'MUESTRA'>('PEDIDO')
   const [notes, setNotes] = useState('')
   const [showAdvanced, setShowAdvanced] = useState(false)
+
+  useEffect(() => {
+    const navClientId = (location.state as { clientId?: string } | null)?.clientId
+    if (!navClientId) return
+    clientsApi.getById(navClientId).then((r) => {
+      const c = r.data
+      setSelectedClient(c)
+      setRecipientName(c.name)
+      setPhone(c.phone ?? '')
+      setAddress(c.address ?? '')
+      setCity(c.city ?? '')
+    }).catch(() => {/* silently ignore */})
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.state])
 
   const { data: clientsData } = useQuery({
     queryKey: ['clients-search', clientSearch],

@@ -2,6 +2,62 @@
 
 ## Correcciones aplicadas
 
+### 2026-04-26 — 12 bugs P1 (UI + BE + DA)
+
+**[UI-003] ClientDetail.tsx: counters Cotizaciones/Pedidos siempre 0**
+- Archivo: `frontend/src/pages/ClientDetail.tsx` (línea 250-253)
+- Cambio: `quotations?.total` → `quotations?.pagination?.total`; `orders?.total` → `orders?.pagination?.total`
+
+**[UI-004] Credit.tsx: pago registrado con $0 hardcodeado**
+- Archivo: `frontend/src/pages/Credit.tsx`
+- Cambio: agregado `payAmount` state; `mutationFn` acepta `{ id, amount }`; inline UI muestra input numérico con botón Confirmar deshabilitado si monto <= 0
+
+**[UI-001] QuotationForm.tsx: no leía clientId del navigation state**
+- Archivo: `frontend/src/pages/QuotationForm.tsx`
+- Cambio: importado `useLocation`; nuevo `useEffect([location.state])` que llama `clientsApi.getById`, setea cliente, shippingAddress, suggestedDiscount y avanza a step 2
+
+**[UI-002] OrderForm.tsx: no leía clientId del navigation state**
+- Archivo: `frontend/src/pages/OrderForm.tsx`
+- Cambio: importado `useLocation` y `useEffect`; nuevo `useEffect([location.state])` que carga cliente y pre-llena recipientName, phone, address, city
+
+**[BE-021] tags.ts: /bulk-assign inaccesible (capturado como /:id)**
+- Archivo: `backend/src/routes/tags.ts`
+- Cambio: bloque `PATCH /bulk-assign` movido antes de `PUT /:id`; bloque duplicado al final eliminado
+
+**[BE-033] clients.ts: PATCH /bulk-segment sin autorización de rol**
+- Archivo: `backend/src/routes/clients.ts`
+- Cambio: importado `requireRole`; `requireRole('GERENTE', 'VENTAS')` agregado al handler
+
+**[BE-034] invoices.ts: POST / sin autorización de rol**
+- Archivo: `backend/src/routes/invoices.ts`
+- Cambio: importado `requireRole`; `requireRole('GERENTE', 'VENTAS')` agregado al POST /
+
+**[DA-005] orders.ts: guideNumber no persistía en PATCH /:id/status**
+- Archivo: `backend/src/routes/orders.ts` (PATCH /:id/status)
+- Cambio: `...(guideNumber !== undefined ? { guideNumber } : {})` agregado al `data` del update
+
+**[DA-003] production.ts: assignedUser no incluido en GET lista y PATCH status**
+- Archivo: `backend/src/routes/production.ts`
+- Cambio: `assignedUser: { select: { id: true, name: true } }` agregado al include de `findMany` y del `update` en PATCH /:id/status
+
+**[DA-004] orders.ts: PUT /:id retornaba pedido sin relaciones**
+- Archivo: `backend/src/routes/orders.ts` (PUT /:id)
+- Cambio: `include: { client, items: { include: { product } } }` agregado al `prisma.order.update`
+
+**[BE-022] orders.ts: PATCH /:id/status retornaba 500 en vez de 404**
+- Archivo: `backend/src/routes/orders.ts` (catch del PATCH /:id/status)
+- Cambio: `catch` tipado como `unknown`; guarda P2025 → 404
+
+**[BE-029] production.ts: PATCH /:id/status retornaba 500 en vez de 404**
+- Archivo: `backend/src/routes/production.ts` (catch del PATCH /:id/status)
+- Cambio: mismo patrón P2025 → 404
+
+**[BE-027] products.ts: low-stock incluía productos con minStock=0**
+- Archivo: `backend/src/routes/products.ts` (GET /low-stock)
+- Cambio: `AND "minStock" > 0` agregado a la cláusula WHERE del query raw
+
+
+
 ### 2026-04-25 — PDF cotizaciones: layout y variables de entorno
 
 **[TASK-013] PDF tabla: altura dinámica + clip descripción**

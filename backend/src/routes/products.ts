@@ -91,7 +91,7 @@ router.get('/low-stock', async (req: AuthRequest, res: Response) => {
     >`
       SELECT id, reference, name, stock, "minStock", category, unit
       FROM "Product"
-      WHERE active = true AND stock <= "minStock"
+      WHERE active = true AND "minStock" > 0 AND stock <= "minStock"
       ORDER BY (stock / NULLIF("minStock", 0)) ASC
     `;
 

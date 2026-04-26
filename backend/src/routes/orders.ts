@@ -302,6 +302,10 @@ router.put('/:id', async (req: AuthRequest, res: Response) => {
         ...rest,
         dispatchDate: dispatchDate ? new Date(dispatchDate) : undefined,
       },
+      include: {
+        client: { select: { id: true, name: true } },
+        items: { include: { product: { select: { id: true, reference: true, name: true } } } },
+      },
     });
 
     await prisma.activityLog.create({
@@ -333,7 +337,11 @@ router.patch('/:id/status', async (req: AuthRequest, res: Response) => {
 
     const order = await prisma.order.update({
       where: { id: req.params.id },
-      data: { status: status as never, updatedById: req.user!.userId },
+      data: {
+        status: status as never,
+        updatedById: req.user!.userId,
+        ...(guideNumber !== undefined ? { guideNumber } : {}),
+      },
     });
 
     await prisma.activityLog.create({
@@ -402,7 +410,11 @@ router.patch('/:id/status', async (req: AuthRequest, res: Response) => {
     }
 
     res.json(order);
-  } catch (error) {
+  } catch (error: unknown) {
+    if ((error as { code?: string }).code === 'P2025') {
+      res.status(404).json({ error: 'No encontrado' });
+      return;
+    }
     console.error('Update order status error:', error);
     res.status(500).json({ error: 'Error al actualizar estado' });
   }
