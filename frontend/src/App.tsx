@@ -28,6 +28,7 @@ import Gastos from './pages/Gastos'
 import Whatsapp from './pages/Whatsapp'
 import Campaigns from './pages/Campaigns'
 import CampaignComposer from './components/campaigns/CampaignComposer'
+import CampaignWizard from './pages/CampaignWizard'
 import CampaignLiveView from './components/campaigns/CampaignLiveView'
 import ImageLibrary from './pages/ImageLibrary'
 import CampaignLeads from './pages/CampaignLeads'
@@ -91,7 +92,7 @@ export default function App() {
         <Route path="manual" element={<Manual />} />
         <Route path="whatsapp" element={<Whatsapp />} />
         <Route path="campanas" element={<Campaigns />} />
-        <Route path="campanas/nueva" element={<CampaignComposer />} />
+        <Route path="campanas/nueva" element={<CampaignWizard />} />
         <Route path="campanas/:id" element={<CampaignLiveView />} />
         <Route path="campanas/:id/editar" element={<CampaignComposer />} />
         <Route path="whatsapp/biblioteca" element={<ImageLibrary />} />

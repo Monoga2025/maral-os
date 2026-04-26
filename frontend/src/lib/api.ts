@@ -125,6 +125,16 @@ export const tagsApi = {
   getClients: (id: string) => api.get(`/tags/${id}/clients`),
 }
 
+// Categories
+export const categoriesApi = {
+  getAll: () => api.get<any[]>('/categories'),
+  create: (data: { code: string; name: string; color?: string; description?: string; sortOrder?: number }) =>
+    api.post('/categories', data),
+  update: (id: string, data: { code?: string; name?: string; color?: string; description?: string; sortOrder?: number }) =>
+    api.put(`/categories/${id}`, data),
+  delete: (id: string) => api.delete(`/categories/${id}`),
+}
+
 // Segments
 export const segmentsApi = {
   getAll: () => api.get<any[]>('/segments'),
@@ -465,6 +475,14 @@ export const campaignsApi = {
       technicalSpecs: string[]
       suggestedCampaignAngle: string
     }>('/campaigns/analyze-photo', { imageUrl }),
+
+  uploadImage: (file: File) => {
+    const form = new FormData()
+    form.append('file', file)
+    return api.post<{ url: string; name: string; size: number }>('/campaigns/upload-image', form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
+  },
 }
 
 // WhatsApp Assist

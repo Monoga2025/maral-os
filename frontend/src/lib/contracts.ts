@@ -138,7 +138,7 @@ export interface CreateClientRequest {
   whatsapp?: string
   city?: string
   address?: string
-  category: 'FUNDADOR_HISTORICO' | 'FUNDADOR_MARAL' | 'ALIADO' | 'PROSPECTO' | 'IMPORTADOR' | 'DISTRIBUIDOR' | 'CLIENTE_FINAL'
+  category: string
   creditLimit?: number
   paymentDays?: number
   notes?: string

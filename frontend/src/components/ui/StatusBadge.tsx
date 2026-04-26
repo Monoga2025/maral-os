@@ -45,10 +45,7 @@ const orderStatusMap: Record<
   CANCELADO: { label: 'Cancelado', variant: 'red' },
 }
 
-const clientCategoryMap: Record<
-  ClientCategory,
-  { label: string; variant: BadgeVariant }
-> = {
+const clientCategoryMap: Record<string, { label: string; variant: BadgeVariant }> = {
   FUNDADOR_HISTORICO: { label: 'Fundador Histórico', variant: 'red' },
   FUNDADOR_MARAL: { label: 'Fundador Maral', variant: 'blue' },
   ALIADO: { label: 'Aliado', variant: 'green' },

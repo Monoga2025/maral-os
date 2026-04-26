@@ -56,7 +56,7 @@ model Client {
   whatsapp        String?
   email           String?
   address         String?
-  category        ClientCategory   @default(PROSPECTO)
+  category        String           @default("PROSPECTO")
   howFound        String?
   allowWhiteLabel Boolean          @default(false)
   creditLimit     Float            @default(0)
@@ -113,14 +113,17 @@ model ClientTag {
   @@id([clientId, tagId])
 }
 
-enum ClientCategory {
-  FUNDADOR_HISTORICO
-  FUNDADOR_MARAL
-  ALIADO
-  PROSPECTO
-  IMPORTADOR
-  DISTRIBUIDOR
-  CLIENTE_FINAL
+// ── Category model (managed via /api/categories) ──────────────
+
+model Category {
+  id          String   @id @default(cuid())
+  code        String   @unique
+  name        String
+  color       String   @default("#64748B")
+  description String?
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }
 
 enum FactoringStatus {

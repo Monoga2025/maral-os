@@ -1,5 +1,8 @@
 import { Router, Response } from 'express'
 import { z } from 'zod'
+import path from 'path'
+import fs from 'fs'
+import multer from 'multer'
 import prisma from '../lib/prisma'
 import { authenticate, requireRole, AuthRequest } from '../middleware/auth'
 import { resolveAudience } from '../lib/audience-query'
@@ -9,6 +12,33 @@ import { scoreAudience } from '../lib/purchase-predictor'
 
 const router = Router()
 router.use(authenticate)
+
+// ── Image upload ────────────────────────────────────────────────
+
+const CAMPAIGN_UPLOAD_DIR = path.join(process.env.UPLOAD_DIR || './uploads', 'campaigns')
+if (!fs.existsSync(CAMPAIGN_UPLOAD_DIR)) fs.mkdirSync(CAMPAIGN_UPLOAD_DIR, { recursive: true })
+
+const campaignImageUpload = multer({
+  storage: multer.diskStorage({
+    destination: (_req, _file, cb) => cb(null, CAMPAIGN_UPLOAD_DIR),
+    filename: (_req, file, cb) => {
+      const ext = path.extname(file.originalname).toLowerCase()
+      cb(null, `${Date.now()}-${Math.random().toString(36).slice(2)}${ext}`)
+    },
+  }),
+  limits: { fileSize: 20 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    if (file.mimetype.startsWith('image/') || file.mimetype.startsWith('video/')) cb(null, true)
+    else cb(new Error('Solo imágenes y videos'))
+  },
+})
+
+// POST /api/campaigns/upload-image
+router.post('/upload-image', requireRole('GERENTE', 'VENTAS'), campaignImageUpload.single('file'), (req: AuthRequest, res: Response) => {
+  if (!req.file) { res.status(400).json({ error: 'No se recibió archivo' }); return }
+  const url = `/uploads/campaigns/${req.file.filename}`
+  res.json({ url, name: req.file.originalname, size: req.file.size })
+})
 
 // ── Schemas ────────────────────────────────────────────────────
 

@@ -16,7 +16,7 @@ const clientSchema = z.object({
   whatsapp: z.string().optional(),
   email: z.string().email().optional().or(z.literal('')),
   address: z.string().optional(),
-  category: z.enum(['FUNDADOR_HISTORICO', 'FUNDADOR_MARAL', 'ALIADO', 'PROSPECTO', 'IMPORTADOR', 'DISTRIBUIDOR', 'CLIENTE_FINAL']).optional(),
+  category: z.string().optional(),
   howFound: z.string().optional(),
   allowWhiteLabel: z.boolean().optional(),
   creditLimit: z.number().min(0).optional(),

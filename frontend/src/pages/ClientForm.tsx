@@ -22,7 +22,7 @@ const schema = z.object({
   whatsapp: z.string().optional(),
   city: z.string().optional(),
   address: z.string().optional(),
-  category: z.enum(['FUNDADOR_HISTORICO', 'FUNDADOR_MARAL', 'ALIADO', 'PROSPECTO', 'IMPORTADOR', 'DISTRIBUIDOR', 'CLIENTE_FINAL']),
+  category: z.string().min(1),
   creditLimit: z.coerce.number().min(0),
   paymentDays: z.coerce.number().min(0),
   factoringStatus: z.enum(['APROBADO', 'EN_ESTUDIO', 'RECHAZADO', 'NO_APLICA']),

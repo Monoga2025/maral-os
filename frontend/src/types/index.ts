@@ -4,14 +4,7 @@ export type TaskPriority = 'URGENTE' | 'NORMAL' | 'DESPUES'
 export type TaskStatus = 'PENDIENTE' | 'EN_PROGRESO' | 'COMPLETADA' | 'CANCELADA'
 export type ExpenseType = 'CAJA_MENOR' | 'TARJETA'
 
-export type ClientCategory =
-  | 'FUNDADOR_HISTORICO'
-  | 'FUNDADOR_MARAL'
-  | 'ALIADO'
-  | 'PROSPECTO'
-  | 'IMPORTADOR'
-  | 'DISTRIBUIDOR'
-  | 'CLIENTE_FINAL'
+export type ClientCategory = string
 
 export type FactoringStatus = 'APROBADO' | 'EN_ESTUDIO' | 'RECHAZADO' | 'NO_APLICA'
 
