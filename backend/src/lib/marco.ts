@@ -4,6 +4,9 @@
  * templates ganadores, voice & tone, psicología de decisión.
  */
 
+import fs from 'fs'
+import path from 'path'
+
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY
 const MODEL = 'google/gemini-2.5-flash'
 const OR_BASE = 'https://openrouter.ai/api/v1/chat/completions'
@@ -221,6 +224,21 @@ export interface MarcoRequest {
   vendorName?: 'John' | 'Lady'
 }
 
+// ── Helpers ────────────────────────────────────────────────────
+
+// Convierte una URL de imagen a base64 data URL si es localhost
+async function resolveImageUrl(url: string): Promise<string> {
+  if (!url.startsWith('http://localhost') && !url.startsWith('https://localhost')) {
+    return url
+  }
+  const urlPath = new URL(url).pathname // /uploads/campaigns/filename.jpg
+  const filePath = path.join(process.cwd(), urlPath)
+  const buffer = fs.readFileSync(filePath)
+  const ext = path.extname(filePath).slice(1).toLowerCase()
+  const mime = ext === 'png' ? 'image/png' : ext === 'gif' ? 'image/gif' : ext === 'webp' ? 'image/webp' : 'image/jpeg'
+  return `data:${mime};base64,${buffer.toString('base64')}`
+}
+
 // ── Llamada a la IA ────────────────────────────────────────────
 
 async function callOpenRouter(messages: { role: string; content: unknown }[]): Promise<string> {
@@ -303,11 +321,15 @@ INSTRUCCIONES:
 6. Copy en español colombiano natural, voz de maestro de oficio
 7. Responde SOLO con JSON válido, sin markdown`
 
-  // Build messages — include photos if provided
-  const userContent: unknown = req.productPhotoUrls?.length
+  // Build messages — include photos if provided (convert localhost URLs to base64)
+  const resolvedUrls = req.productPhotoUrls?.length
+    ? await Promise.all(req.productPhotoUrls.map(resolveImageUrl))
+    : undefined
+
+  const userContent: unknown = resolvedUrls?.length
     ? [
         { type: 'text', text: userPrompt },
-        ...req.productPhotoUrls.map((url) => ({
+        ...resolvedUrls.map((url) => ({
           type: 'image_url',
           image_url: { url },
         })),
@@ -332,6 +354,8 @@ export async function analyzeProductPhoto(imageUrl: string): Promise<{
   suggestedCampaignAngle: string
 }> {
   if (!OPENROUTER_API_KEY) throw new Error('OPENROUTER_API_KEY no configurada')
+
+  const resolvedUrl = await resolveImageUrl(imageUrl)
 
   const raw = await callOpenRouter([
     {
@@ -361,7 +385,7 @@ Responde en JSON:
   "suggestedCampaignAngle": "..."
 }`,
         },
-        { type: 'image_url', image_url: { url: imageUrl } },
+        { type: 'image_url', image_url: { url: resolvedUrl } },
       ],
     },
   ])
