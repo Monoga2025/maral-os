@@ -2,7 +2,7 @@ import fs from 'fs';
 import path from 'path';
 
 const OR_BASE = 'https://openrouter.ai/api/v1/chat/completions';
-const IMAGE_MODEL = 'google/gemini-2.5-flash-preview-05-20';
+const IMAGE_MODEL = 'google/gemini-2.5-flash';
 
 const BRAND_RULES = `
 REGLAS DE MARCA MARAL (obligatorias):

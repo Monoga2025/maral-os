@@ -5,7 +5,7 @@
  */
 
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY
-const MODEL = 'google/gemini-2.5-flash-preview-05-20'
+const MODEL = 'google/gemini-2.5-flash'
 const OR_BASE = 'https://openrouter.ai/api/v1/chat/completions'
 
 // ── System prompt con toda la doctrina embebida ────────────────
