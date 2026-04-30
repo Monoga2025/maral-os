@@ -426,12 +426,12 @@ function SendBar({ chat, onSent }: { chat: WaChat; onSent: () => void }) {
   }
 
   return (
-    <div className="flex items-end gap-2 px-3 py-2.5 bg-[#f0f2f5] border-t border-gray-200">
+    <div className="flex items-end gap-2 px-3 py-2.5 bg-[#0d1b2a]/90 backdrop-blur-sm border-t border-white/10">
       <input ref={fileInputRef} type="file" className="hidden" accept="image/*,image/webp,video/*,application/pdf,.doc,.docx,.xls,.xlsx" onChange={handleFile} />
-      <button onClick={() => fileInputRef.current?.click()} className="h-9 w-9 shrink-0 flex items-center justify-center rounded-full text-gray-500 hover:bg-gray-200 transition-colors" title="Adjuntar archivo">
+      <button onClick={() => fileInputRef.current?.click()} className="h-9 w-9 shrink-0 flex items-center justify-center rounded-full text-white/50 hover:bg-white/10 transition-colors" title="Adjuntar archivo">
         <Paperclip className="h-5 w-5" />
       </button>
-      <div className="flex-1 bg-white rounded-2xl border border-gray-200 flex items-end px-3 py-2 focus-within:border-gray-300">
+      <div className="flex-1 bg-white/10 rounded-2xl border border-white/15 flex items-end px-3 py-2 focus-within:border-white/30 focus-within:bg-white/15 transition-colors">
         <textarea
           ref={textareaRef}
           value={text}
@@ -439,7 +439,7 @@ function SendBar({ chat, onSent }: { chat: WaChat; onSent: () => void }) {
           onKeyDown={handleKey}
           placeholder="Escribe un mensaje..."
           rows={1}
-          className="flex-1 resize-none bg-transparent text-sm text-gray-800 placeholder-gray-400 focus:outline-none max-h-[120px]"
+          className="flex-1 resize-none bg-transparent text-sm text-white placeholder-white/40 focus:outline-none max-h-[120px]"
         />
       </div>
       {text.trim() ? (
@@ -1078,46 +1078,58 @@ function ChatView({ chat, token }: { chat: WaChat; token: string }) {
     <div className="flex h-full">
       {/* Chat area */}
       <div
-        className="flex flex-col flex-1 min-w-0 bg-[#efeae2]"
-        style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23d9d0c7' fill-opacity='0.3'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")` }}
+        className="flex flex-col flex-1 min-w-0"
+        style={{
+          background: 'linear-gradient(160deg, #1a2a3a 0%, #0f1e2e 40%, #0d1b2a 100%)',
+          backgroundImage: `linear-gradient(160deg, #1a2a3a 0%, #0f1e2e 40%, #0d1b2a 100%), url("data:image/svg+xml,%3Csvg width='80' height='80' viewBox='0 0 80 80' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Ccircle fill='%2300a884' fill-opacity='0.04' cx='40' cy='40' r='30'/%3E%3Ccircle fill='%2300a884' fill-opacity='0.03' cx='0' cy='0' r='20'/%3E%3Ccircle fill='%2300a884' fill-opacity='0.03' cx='80' cy='80' r='20'/%3E%3C/g%3E%3C/svg%3E")`,
+        }}
       >
         {/* Header */}
-        <div className="flex items-center gap-3 px-4 py-2.5 bg-[#f0f2f5] border-b border-gray-200 shrink-0">
+        <div className="flex items-center gap-3 px-4 py-2.5 bg-[#0d1b2a]/90 backdrop-blur-sm border-b border-white/10 shrink-0">
           <Avatar chat={chat} />
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold text-gray-900 truncate">{formatChatName(chat)}</p>
-            <p className="text-xs text-gray-500 truncate">{chat.type === 'grupo' ? 'Grupo' : `+${chat.number}`}</p>
+            {/* Prefer MARAL client name over WhatsApp pushName */}
+            <p className="text-sm font-semibold text-white truncate">
+              {chat.clientName && chat.clientName !== chat.name ? chat.clientName : formatChatName(chat)}
+            </p>
+            <p className="text-[11px] text-white/50 truncate">
+              {chat.clientName && chat.clientName !== chat.name
+                ? `WhatsApp: ${chat.name} · +${chat.number}`
+                : chat.type === 'grupo' ? 'Grupo' : `+${chat.number}`}
+            </p>
           </div>
           <button
             onClick={() => setShowRightPanel(v => !v)}
             title={showRightPanel ? 'Cerrar panel' : 'Abrir panel'}
-            className={cn('rounded-full p-2 transition-colors', showRightPanel ? 'bg-[#00a884] text-white' : 'text-[#54656f] hover:bg-gray-200')}
+            className={cn('rounded-full p-2 transition-colors', showRightPanel ? 'bg-[#00a884] text-white' : 'text-white/60 hover:bg-white/10')}
           >
             {showRightPanel ? <ChevronRight className="h-5 w-5" /> : <ChevronLeft className="h-5 w-5" />}
           </button>
         </div>
 
         {/* Messages */}
-        <div className="flex-1 overflow-y-auto px-4 py-4 space-y-1.5">
-          {isLoading && (
-            <div className="flex justify-center py-8"><RefreshCw className="h-5 w-5 animate-spin text-gray-400" /></div>
-          )}
-          {messages.map(msg => (
-            <MessageBubble key={msg.id} msg={msg} token={token} />
-          ))}
-          {/* Ghost suggestion inline */}
-          {activeSuggestion && overrideSuggestion === null && (
-            <GhostSuggestion
-              text={activeSuggestion}
-              isSending={sendDirectMutation.isPending}
-              isRegenerating={manualLoading}
-              onSend={(t) => sendDirectMutation.mutate(t)}
-              onEdit={handleEditSuggestion}
-              onRegenerate={requestSuggestion}
-              onDismiss={handleDismissSuggestion}
-            />
-          )}
-          <div ref={messagesEndRef} />
+        <div className="flex-1 overflow-y-auto">
+          <div className="flex flex-col justify-end min-h-full px-4 py-4 space-y-1.5">
+            {isLoading && (
+              <div className="flex justify-center py-8"><RefreshCw className="h-5 w-5 animate-spin text-gray-300" /></div>
+            )}
+            {messages.map(msg => (
+              <MessageBubble key={msg.id} msg={msg} token={token} />
+            ))}
+            {/* Ghost suggestion inline */}
+            {activeSuggestion && overrideSuggestion === null && (
+              <GhostSuggestion
+                text={activeSuggestion}
+                isSending={sendDirectMutation.isPending}
+                isRegenerating={manualLoading}
+                onSend={(t) => sendDirectMutation.mutate(t)}
+                onEdit={handleEditSuggestion}
+                onRegenerate={requestSuggestion}
+                onDismiss={handleDismissSuggestion}
+              />
+            )}
+            <div ref={messagesEndRef} />
+          </div>
         </div>
 
         {/* Quick ask Lady */}
