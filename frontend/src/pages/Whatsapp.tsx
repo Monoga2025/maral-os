@@ -11,7 +11,7 @@ import {
   ChevronRight, ChevronLeft, FileSpreadsheet, Tag,
   AlertCircle, CheckCircle, Info, BarChart2, Image,
   Clock, TrendingUp, Phone, Mail, MapPin, ExternalLink,
-  AlertTriangle,
+  AlertTriangle, Building2,
 } from 'lucide-react'
 import { cn } from '../lib/utils'
 import { toast } from 'sonner'
@@ -1176,13 +1176,34 @@ function ChatItem({ chat, selected, onClick }: { chat: WaChat; selected: boolean
         <div className="flex items-center justify-between gap-1 mb-0.5">
           <div className="min-w-0">
             <span className="text-sm font-medium text-[#111b21] truncate block">{formatChatName(chat)}</span>
-            {chat.type !== 'grupo' && chat.name && chat.name !== chat.number && (
-              <span className="text-[11px] text-[#667781] block leading-none -mt-0.5">+{chat.number}</span>
+            {chat.clientName && chat.clientName !== chat.name && (
+              <span className="flex items-center gap-0.5 text-[10px] text-blue-600 leading-none -mt-0.5 truncate">
+                <Building2 className="h-2.5 w-2.5 shrink-0" />{chat.clientName}
+              </span>
             )}
           </div>
           <span className={cn('text-[11px] shrink-0', chat.unanswered ? 'text-[#25d366] font-semibold' : 'text-[#667781]')}>
             {formatTime(chat.lastTimestamp)}
           </span>
+        </div>
+        <div className="flex items-center gap-1.5 flex-wrap mb-0.5">
+          {chat.temperature === 'HOT' && (
+            <span className="text-[10px] font-bold text-red-500">🔥 HOT</span>
+          )}
+          {chat.temperature === 'WARM' && (
+            <span className="text-[10px] font-bold text-amber-500">🌡 WARM</span>
+          )}
+          {chat.clientCategory && (
+            <span className={cn(
+              'text-[9px] font-bold px-1.5 py-0.5 rounded-full',
+              chat.clientCategory === 'IM' ? 'bg-purple-100 text-purple-700' :
+              chat.clientCategory === 'DS' ? 'bg-blue-100 text-blue-700' :
+              'bg-gray-100 text-gray-600',
+            )}>
+              {chat.clientCategory}
+            </span>
+          )}
+          <span className="text-[10px] text-[#667781]">+{chat.number}</span>
         </div>
         <p className={cn('text-[13px] truncate', chat.unanswered ? 'text-[#111b21] font-medium' : 'text-[#667781]')}>
           {chat.lastMessage || '—'}
@@ -1281,7 +1302,7 @@ function SettingsPanel({ onClose }: { onClose: () => void }) {
 
 // ─── Main page ────────────────────────────────────────────────
 
-type ChatFilter = 'todos' | 'sinleer' | 'grupos'
+type ChatFilter = 'todos' | 'sinleer' | 'hot' | 'grupos'
 
 export default function Whatsapp() {
   const [selectedChat, setSelectedChat] = useState<WaChat | null>(null)
@@ -1306,6 +1327,7 @@ export default function Whatsapp() {
     // filter by tab
     if (filter === 'grupos' && c.type !== 'grupo') return false
     if (filter === 'sinleer' && (!c.unread || c.unread === 0)) return false
+    if (filter === 'hot' && c.temperature !== 'HOT') return false
     if (filter === 'todos' && c.type === 'grupo') return false
     // search
     if (search) {
@@ -1372,11 +1394,28 @@ export default function Whatsapp() {
           </div>
         </div>
 
+        {/* Stats bar */}
+        <div className="grid grid-cols-3 divide-x divide-gray-100 border-b border-gray-200 bg-white shrink-0">
+          <div className="px-3 py-2 text-center">
+            <p className="text-base font-bold text-[#111b21]">{allChats.length}</p>
+            <p className="text-[9px] text-gray-400 uppercase tracking-wide">Total</p>
+          </div>
+          <div className="px-3 py-2 text-center">
+            <p className="text-base font-bold text-amber-500">{allChats.filter(c => c.unanswered).length}</p>
+            <p className="text-[9px] text-gray-400 uppercase tracking-wide">Sin resp.</p>
+          </div>
+          <div className="px-3 py-2 text-center">
+            <p className="text-base font-bold text-red-500">{allChats.filter(c => c.temperature === 'HOT').length}</p>
+            <p className="text-[9px] text-gray-400 uppercase tracking-wide">Hot</p>
+          </div>
+        </div>
+
         {/* Filter tabs */}
         <div className="flex border-b border-gray-100 bg-white shrink-0">
           {([
             ['todos', 'Chats', totalUnread],
             ['sinleer', 'Sin leer', allChats.filter(c => c.type !== 'grupo' && c.unread > 0).length],
+            ['hot', '🔥 Hot', allChats.filter(c => c.temperature === 'HOT').length],
             ['grupos', 'Grupos', gruposUnread],
           ] as [ChatFilter, string, number][]).map(([f, label, count]) => (
             <button

@@ -663,19 +663,58 @@ router.get('/chats', async (_req: AuthRequest, res: Response) => {
 
   const configured = !!(EVOL_BASE && EVOL_KEY) || !!(process.env.WHATSAPP_EXPORT_PATH);
 
+  // Batch-lookup de clientes por número de WhatsApp
+  const contactNumbers = chats.filter(c => c.type === 'contacto').map(c => c.number);
+
+  const clients = contactNumbers.length > 0 ? await prisma.client.findMany({
+    where: { active: true, whatsapp: { not: null } },
+    select: { id: true, name: true, category: true, whatsapp: true },
+  }) : [];
+
+  function matchClient(chatNumber: string, clientList: typeof clients) {
+    return clientList.find(cl => {
+      const wa = cl.whatsapp?.replace(/\D/g, '') ?? '';
+      const num = chatNumber.replace(/\D/g, '');
+      return wa === num || wa.endsWith(num) || num.endsWith(wa);
+    });
+  }
+
+  const matchedClientIds = chats
+    .map(c => matchClient(c.number, clients)?.id)
+    .filter((id): id is string => !!id);
+
+  const temperatures = matchedClientIds.length > 0 ? await prisma.campaignRecipient.findMany({
+    where: {
+      clientId: { in: matchedClientIds },
+      status: { in: ['SENT', 'DELIVERED', 'READ', 'REPLIED'] },
+    },
+    select: { clientId: true, temperature: true, createdAt: true },
+    orderBy: { createdAt: 'desc' },
+    distinct: ['clientId'],
+  }) : [];
+
+  const tempMap = new Map(temperatures.map(t => [t.clientId, t.temperature]));
+
   res.json({
-    data: chats.map(c => ({
-      id: c.id,
-      jid: c.jid,
-      number: c.number,
-      name: c.pushName ?? c.number,
-      type: c.type,
-      unread: c.unread,
-      lastMessage: c.lastText ?? '',
-      lastTimestamp: c.lastAt?.toISOString() ?? new Date(0).toISOString(),
-      fromMeLast: false,
-      unanswered: c.unread > 0,
-    })),
+    data: chats.map(c => {
+      const cl = matchClient(c.number, clients);
+      return {
+        id: c.id,
+        jid: c.jid,
+        number: c.number,
+        name: c.pushName ?? c.number,
+        type: c.type,
+        unread: c.unread,
+        lastMessage: c.lastText ?? '',
+        lastTimestamp: c.lastAt?.toISOString() ?? new Date(0).toISOString(),
+        fromMeLast: false,
+        unanswered: c.unread > 0,
+        clientId: cl?.id,
+        clientName: cl?.name,
+        clientCategory: cl?.category ?? undefined,
+        temperature: cl ? (tempMap.get(cl.id) ?? undefined) : undefined,
+      };
+    }),
     total: chats.length,
     configured,
   });

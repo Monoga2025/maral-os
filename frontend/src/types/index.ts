@@ -419,6 +419,10 @@ export interface WaChat {
   fromMeLast: boolean
   unanswered: boolean
   profilePic?: string
+  clientId?: string
+  clientName?: string
+  clientCategory?: string
+  temperature?: string
 }
 
 export interface WaMessage {
