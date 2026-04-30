@@ -512,6 +512,27 @@ export const whatsappApi = {
   configureWebhook: (webhookUrl: string) =>
     api.post('/whatsapp/configure-webhook', { webhookUrl }),
   getMediaUrl: (messageId: string) => `/api/whatsapp/media/${messageId}`,
+  profilePicUrl: (number: string) => {
+    const token = localStorage.getItem('token')
+    return `/api/whatsapp/profile-pic/${encodeURIComponent(number)}?token=${encodeURIComponent(token ?? '')}`
+  },
+  preQuote: (jid: string) =>
+    api.post<{
+      quotationId: string | null
+      quotationNumber?: number
+      clientFound: boolean
+      clientId?: string
+      clientName?: string
+      matchedItems: { productId: string; qty: number; unitPrice: number; description: string }[]
+      unmatchedItems: { description: string; qty: number; unitPrice: number | null }[]
+      parsed: {
+        items: { description: string; qty: number; unitPrice: number | null }[]
+        shippingAddress: string | null
+        notes: string | null
+        clientPhone: string | null
+      }
+      message?: string
+    }>('/whatsapp/pre-quote', { jid }),
 }
 
 // Sprint 3: Image Generation (Nano Banana)

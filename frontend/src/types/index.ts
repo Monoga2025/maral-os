@@ -418,6 +418,7 @@ export interface WaChat {
   lastTimestamp: string
   fromMeLast: boolean
   unanswered: boolean
+  profilePic?: string
 }
 
 export interface WaMessage {

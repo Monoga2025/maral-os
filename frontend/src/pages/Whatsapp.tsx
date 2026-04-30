@@ -1,5 +1,5 @@
-import { useState, useRef, useEffect, useCallback } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useState, useRef, useEffect } from 'react'
+import { useSearchParams, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { whatsappApi } from '../lib/api'
 import { useAuthStore } from '../store/auth'
@@ -8,6 +8,8 @@ import {
   MessageCircle, Send, Search, Users, RefreshCw,
   Paperclip, Mic, FileText, X, Check,
   CheckCheck, Sparkles, Settings, Download, Zap,
+  ChevronRight, ChevronLeft, FileSpreadsheet, Tag,
+  AlertCircle, CheckCircle, Info,
 } from 'lucide-react'
 import { cn } from '../lib/utils'
 import { toast } from 'sonner'
@@ -47,6 +49,43 @@ function fileToBase64(file: File): Promise<string> {
     reader.onerror = reject
     reader.readAsDataURL(file)
   })
+}
+
+// ─── Avatar (with profile pic fallback) ──────────────────────
+
+function Avatar({
+  chat,
+  size = 'md',
+}: {
+  chat: WaChat
+  size?: 'sm' | 'md' | 'lg'
+}) {
+  const [picFailed, setPicFailed] = useState(false)
+  const isGroup = chat.type === 'grupo'
+  const name = formatChatName(chat)
+  const sizeClass = size === 'sm' ? 'h-8 w-8 text-xs' : size === 'lg' ? 'h-12 w-12 text-base' : 'h-10 w-10 text-sm'
+  const picUrl = !isGroup && !picFailed ? whatsappApi.profilePicUrl(chat.number) : null
+
+  if (picUrl) {
+    return (
+      <img
+        src={picUrl}
+        alt={name}
+        className={cn('rounded-full object-cover shrink-0', sizeClass)}
+        onError={() => setPicFailed(true)}
+      />
+    )
+  }
+
+  return (
+    <div className={cn(
+      'flex shrink-0 items-center justify-center rounded-full text-white font-bold',
+      sizeClass,
+      isGroup ? 'bg-emerald-500' : 'bg-[#dfe5e7] text-[#54656f]',
+    )}>
+      {isGroup ? <Users className="h-4 w-4" /> : <span>{getInitials(name)}</span>}
+    </div>
+  )
 }
 
 // ─── Media bubble content ─────────────────────────────────────
@@ -519,10 +558,14 @@ function ChatView({
 }) {
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const qc = useQueryClient()
+  const navigate = useNavigate()
   const [dismissedSuggestions, setDismissedSuggestions] = useState<Set<string>>(new Set())
   const [overrideSuggestion, setOverrideSuggestion] = useState<string | null>(null)
   const [manualSuggestion, setManualSuggestion] = useState<string | null>(null)
   const [manualLoading, setManualLoading] = useState(false)
+  const [showRightPanel, setShowRightPanel] = useState(false)
+  const [preQuoting, setPreQuoting] = useState(false)
+  const [preQuoteResult, setPreQuoteResult] = useState<Awaited<ReturnType<typeof whatsappApi.preQuote>>['data'] | null>(null)
 
   const { data, isLoading } = useQuery({
     queryKey: ['wa-chat', chat.jid],
@@ -649,78 +692,238 @@ function ChatView({
     setManualSuggestion(null)
   }
 
+  const handlePreQuote = async () => {
+    setPreQuoting(true)
+    setPreQuoteResult(null)
+    try {
+      const res = await whatsappApi.preQuote(chat.jid)
+      setPreQuoteResult(res.data)
+      if (res.data.quotationId) {
+        toast.success(`Cotización #${res.data.quotationNumber} creada para ${res.data.clientName}`)
+      } else {
+        toast.info(res.data.message ?? 'Revisa los detalles en el panel')
+      }
+    } catch (err) {
+      const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error
+      toast.error(msg ?? 'Error al pre-cotizar')
+    } finally {
+      setPreQuoting(false)
+    }
+  }
+
   return (
-    <div className="flex flex-col h-full bg-[#efeae2]"
-      style={{
-        backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23d9d0c7' fill-opacity='0.3'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
-      }}
-    >
-      {/* Header */}
-      <div className="flex items-center gap-3 px-4 py-2.5 bg-[#f0f2f5] border-b border-gray-200 shrink-0">
-        <div className={cn(
-          'flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-white text-sm font-bold',
-          chat.type === 'grupo' ? 'bg-emerald-500' : 'bg-[#00a884]',
-        )}>
-          {chat.type === 'grupo' ? <Users className="h-5 w-5" /> : getInitials(formatChatName(chat))}
-        </div>
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-semibold text-gray-900 truncate">{formatChatName(chat)}</p>
-          <p className="text-xs text-gray-500 truncate">
-            {chat.type === 'grupo' ? 'Grupo' : `+${chat.number}`}
-          </p>
-        </div>
-      </div>
-
-      {/* Messages */}
-      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-1.5">
-        {isLoading && (
-          <div className="flex justify-center py-8">
-            <RefreshCw className="h-5 w-5 animate-spin text-gray-400" />
+    <div className="flex h-full">
+      {/* Chat area */}
+      <div className="flex flex-col flex-1 min-w-0 bg-[#efeae2]"
+        style={{
+          backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23d9d0c7' fill-opacity='0.3'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
+        }}
+      >
+        {/* Header */}
+        <div className="flex items-center gap-3 px-4 py-2.5 bg-[#f0f2f5] border-b border-gray-200 shrink-0">
+          <Avatar chat={chat} />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-gray-900 truncate">{formatChatName(chat)}</p>
+            <p className="text-xs text-gray-500 truncate">
+              {chat.type === 'grupo' ? 'Grupo' : `+${chat.number}`}
+            </p>
           </div>
+          <button
+            onClick={() => setShowRightPanel(v => !v)}
+            title="Herramientas"
+            className={cn(
+              'rounded-full p-2 transition-colors',
+              showRightPanel ? 'bg-[#00a884] text-white' : 'text-[#54656f] hover:bg-gray-200',
+            )}
+          >
+            {showRightPanel ? <ChevronRight className="h-5 w-5" /> : <ChevronLeft className="h-5 w-5" />}
+          </button>
+        </div>
+
+        {/* Messages */}
+        <div className="flex-1 overflow-y-auto px-4 py-4 space-y-1.5">
+          {isLoading && (
+            <div className="flex justify-center py-8">
+              <RefreshCw className="h-5 w-5 animate-spin text-gray-400" />
+            </div>
+          )}
+          {messages.map(msg => (
+            <MessageBubble key={msg.id} msg={msg} token={token} />
+          ))}
+          <div ref={messagesEndRef} />
+        </div>
+
+        {/* AI suggestion bar (active suggestion) */}
+        {activeSuggestion && (
+          <AISuggestionBar
+            suggestion={activeSuggestion}
+            isRegenerating={manualLoading}
+            isSending={sendDirectMutation.isPending}
+            onSendDirect={(text) => sendDirectMutation.mutate(text)}
+            onEdit={handleEditSuggestion}
+            onRegenerate={requestSuggestion}
+            onDismiss={handleDismissSuggestion}
+          />
         )}
-        {messages.map(msg => (
-          <MessageBubble key={msg.id} msg={msg} token={token} />
-        ))}
-        <div ref={messagesEndRef} />
+
+        {/* Quick ask Lady bar */}
+        {showQuickAsk && (
+          <QuickAskLadyBar
+            isLoading={manualLoading}
+            onRequest={requestSuggestion}
+          />
+        )}
+
+        {/* Send bar */}
+        {overrideSuggestion !== null ? (
+          <SuggestionConfirmBar
+            suggestion={overrideSuggestion}
+            chat={chat}
+            onSent={() => {
+              setOverrideSuggestion(null)
+              qc.invalidateQueries({ queryKey: ['wa-chat', chat.jid] })
+            }}
+            onCancel={() => setOverrideSuggestion(null)}
+          />
+        ) : (
+          <SendBar
+            chat={chat}
+            onSent={() => qc.invalidateQueries({ queryKey: ['wa-chat', chat.jid] })}
+          />
+        )}
       </div>
 
-      {/* AI suggestion bar (active suggestion) */}
-      {activeSuggestion && (
-        <AISuggestionBar
-          suggestion={activeSuggestion}
-          isRegenerating={manualLoading}
-          isSending={sendDirectMutation.isPending}
-          onSendDirect={(text) => sendDirectMutation.mutate(text)}
-          onEdit={handleEditSuggestion}
-          onRegenerate={requestSuggestion}
-          onDismiss={handleDismissSuggestion}
-        />
-      )}
+      {/* Right panel */}
+      {showRightPanel && (
+        <div className="w-72 shrink-0 border-l border-gray-200 bg-white flex flex-col overflow-y-auto">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 bg-[#f0f2f5]">
+            <span className="text-sm font-semibold text-[#111b21]">Herramientas</span>
+            <button onClick={() => setShowRightPanel(false)} className="text-[#54656f] hover:text-[#111b21]">
+              <X className="h-4 w-4" />
+            </button>
+          </div>
 
-      {/* Quick ask Lady bar */}
-      {showQuickAsk && (
-        <QuickAskLadyBar
-          isLoading={manualLoading}
-          onRequest={requestSuggestion}
-        />
-      )}
+          <div className="p-4 space-y-4">
+            {/* Pre-cotizar */}
+            <div className="space-y-2">
+              <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Cotización</p>
+              <button
+                onClick={handlePreQuote}
+                disabled={preQuoting}
+                className="w-full flex items-center gap-3 rounded-xl border border-[#00a884]/30 bg-emerald-50 px-4 py-3 text-left hover:bg-emerald-100 disabled:opacity-60 transition-colors"
+              >
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#00a884] text-white">
+                  {preQuoting
+                    ? <RefreshCw className="h-4 w-4 animate-spin" />
+                    : <FileSpreadsheet className="h-4 w-4" />
+                  }
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-[#111b21]">
+                    {preQuoting ? 'Analizando chat…' : 'Pre-cotizar'}
+                  </p>
+                  <p className="text-[11px] text-gray-500">
+                    Extrae el pedido del chat y crea cotización
+                  </p>
+                </div>
+              </button>
 
-      {/* Send bar */}
-      {overrideSuggestion !== null ? (
-        <SuggestionConfirmBar
-          suggestion={overrideSuggestion}
-          chat={chat}
-          onSent={() => {
-            setOverrideSuggestion(null)
-            qc.invalidateQueries({ queryKey: ['wa-chat', chat.jid] })
-          }}
-          onCancel={() => setOverrideSuggestion(null)}
-        />
-      ) : (
-        <SendBar
-          chat={chat}
-          onSent={() => qc.invalidateQueries({ queryKey: ['wa-chat', chat.jid] })}
-        />
+              {/* Pre-quote result */}
+              {preQuoteResult && (
+                <div className={cn(
+                  'rounded-xl border p-3 space-y-2 text-xs',
+                  preQuoteResult.quotationId
+                    ? 'border-emerald-200 bg-emerald-50'
+                    : 'border-amber-200 bg-amber-50',
+                )}>
+                  {preQuoteResult.quotationId ? (
+                    <>
+                      <div className="flex items-center gap-1.5 text-emerald-700 font-semibold">
+                        <CheckCircle className="h-3.5 w-3.5" />
+                        Cotización #{preQuoteResult.quotationNumber} creada
+                      </div>
+                      <p className="text-emerald-600">Cliente: {preQuoteResult.clientName}</p>
+                      <div className="space-y-1">
+                        {preQuoteResult.matchedItems.map((it, i) => (
+                          <p key={i} className="text-gray-600">• {it.qty}x {it.description}</p>
+                        ))}
+                      </div>
+                      {preQuoteResult.unmatchedItems.length > 0 && (
+                        <div className="border-t border-emerald-200 pt-2 space-y-1">
+                          <p className="flex items-center gap-1 text-amber-600 font-medium">
+                            <AlertCircle className="h-3 w-3" />
+                            Agregar manualmente:
+                          </p>
+                          {preQuoteResult.unmatchedItems.map((it, i) => (
+                            <p key={i} className="text-gray-500">• {it.qty}x {it.description}</p>
+                          ))}
+                        </div>
+                      )}
+                      <button
+                        onClick={() => navigate(`/cotizaciones/${preQuoteResult.quotationId}/editar`)}
+                        className="w-full mt-1 rounded-lg bg-[#00a884] py-1.5 text-white font-medium hover:bg-[#009c7a] transition-colors"
+                      >
+                        Abrir cotización →
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <div className="flex items-center gap-1.5 text-amber-700 font-semibold">
+                        <Info className="h-3.5 w-3.5" />
+                        {preQuoteResult.clientFound ? 'Productos no encontrados' : 'Cliente no encontrado'}
+                      </div>
+                      <p className="text-gray-600">{preQuoteResult.message}</p>
+                      {preQuoteResult.parsed?.items?.length > 0 && (
+                        <div className="space-y-1">
+                          <p className="font-medium text-gray-500">Detectado en chat:</p>
+                          {preQuoteResult.parsed.items.map((it, i) => (
+                            <p key={i} className="text-gray-500">• {it.qty}x {it.description}</p>
+                          ))}
+                        </div>
+                      )}
+                      <button
+                        onClick={() => navigate('/cotizaciones/nueva')}
+                        className="w-full mt-1 rounded-lg bg-amber-500 py-1.5 text-white font-medium hover:bg-amber-600 transition-colors"
+                      >
+                        Crear manualmente →
+                      </button>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Lista de precios */}
+            <div className="space-y-2">
+              <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Lista de precios</p>
+              <button
+                onClick={() => {
+                  const text = `📋 *Lista de precios MARAL — Distribuidor*\n\n*Antenas handy/portátil:*\n501/502 Motorola-ICOM VHF: $14.765 IVA inc\n503 Kenwood VHF: $18.331\n503-H/504 Hytera-Yaesu VHF: $21.791\n505 Mototrbo VHF: $32.758\n\n*Antenas móvil VHF:*\n101 1/4 onda: $27.818\n103 Maxrad 5/8 3dB: $58.667\n103-R Maxrad resorte: $89.161\n\n*Antenas móvil UHF:*\n105 Maxrad 7/8 5dB: $65.028\n105-R Maxrad resorte: $94.867\n\n*Bases:*\n201 Perforar: $17.534 | 301 Uña cromada: $34.981\n307 Magnética: $48.503 | 307-R Magnética reforzada: $59.441\n\n*Kits antena+base:*\nK-23 5/8 VHF + Uña: $91.886\nK 103-M Maxrad VHF + Magnética: $147.060\nK 105-M Maxrad UHF + Magnética: $138.254\n\n_Precios más IVA. Descuento 26% distribuidor ya aplicado._\n_Sujeto a cambios sin previo aviso._`
+                  navigator.clipboard.writeText(text).then(() => toast.success('Lista copiada al portapapeles'))
+                }}
+                className="w-full flex items-center gap-3 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-left hover:bg-gray-100 transition-colors"
+              >
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-blue-500 text-white">
+                  <Tag className="h-4 w-4" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-[#111b21]">Copiar lista de precios</p>
+                  <p className="text-[11px] text-gray-500">Resumen para enviar al cliente</p>
+                </div>
+              </button>
+            </div>
+
+            {/* Info del cliente */}
+            <div className="space-y-2">
+              <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Contacto</p>
+              <div className="rounded-xl border border-gray-200 bg-gray-50 p-3 space-y-1">
+                <p className="text-sm font-medium text-[#111b21]">{formatChatName(chat)}</p>
+                <p className="text-xs text-gray-500">+{chat.number}</p>
+                <p className="text-xs text-gray-400 capitalize">{chat.type}</p>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )
@@ -801,8 +1004,6 @@ function ChatItem({
   onClick: () => void
 }) {
   const name = formatChatName(chat)
-  const isGroup = chat.type === 'grupo'
-  const initials = getInitials(name)
 
   return (
     <button
@@ -812,12 +1013,7 @@ function ChatItem({
         selected ? 'bg-[#f0f2f5]' : 'hover:bg-[#f5f6f6]',
       )}
     >
-      <div className={cn(
-        'flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-white text-sm font-bold',
-        isGroup ? 'bg-emerald-500' : 'bg-[#dfe5e7] text-[#54656f]',
-      )}>
-        {isGroup ? <Users className="h-5 w-5" /> : <span className="text-sm font-semibold">{initials}</span>}
-      </div>
+      <Avatar chat={chat} />
       <div className="flex-1 min-w-0">
         <div className="flex items-center justify-between gap-1 mb-0.5">
           <span className="text-sm font-medium text-[#111b21] truncate">{name}</span>
