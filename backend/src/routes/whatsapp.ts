@@ -74,6 +74,112 @@ Cuando la respuesta tiene 2 momentos distintos (saludo + acción, confirmación 
 
 ---
 
+## Lista de precios distribuidor — marzo 2026 (precios SIN IVA / CON IVA incluido)
+
+### Antenas handy / portátil
+501/502 Motorola-ICOM VHF: $12.408 / $14.765  |  531/532 Motorola-ICOM UHF: $12.408 / $14.765
+503 Kenwood VHF: $15.405 / $18.331  |  533 Kenwood UHF: $15.405 / $18.331
+503-H/504/504-H Hytera-Yaesu VHF: $18.312 / $21.791  |  533-H/534/534-H Hytera-Yaesu UHF: $18.312 / $21.791
+505/509-V Mototrbo-Motorola XTS VHF: $27.528 / $32.758  |  535/539-U Mototrbo-XTS UHF: $27.528 / $32.758
+Stubby Motorola-ICOM VHF (501-ST/502-ST): $12.408 / $14.765
+Stubby Kenwood VHF (503-ST): $15.405 / $18.331
+Stubby Hytera-Yaesu-Mototrbo VHF (503-H-ST/504-ST/505-ST): $16.314 / $19.413
+Antena telescópica 5 elem (506): $47.448 / $56.463  |  Antena calibrable VHF Motorola (515-M): $14.685 / $17.476
+Antena calibrable VHF Kenwood (515-K): $17.882 / $21.280  |  Hytera (515-H): $20.779 / $24.727
+
+### Antenas móvil VHF
+101 1/4 onda VHF: $23.377 / $27.818  |  102-2 1/4 onda gold: $36.763 / $43.748
+102-2R 1/4 onda resorte lujo: $58.342 / $69.427  |  102-6FV látigo inox VHF: $84.715 / $100.811
+103 Tipo Maxrad VHF 5/8 3dB: $49.300 / $58.667  |  103-R Maxrad resorte VHF: $74.925 / $89.161
+106 Tipo Tram VHF 5/8 3dB: $49.300 / $58.667  |  106-R Tram resorte VHF: $74.925 / $89.161
+104/104-1/104-2 Maxrad VHF caña L/M/C: $128.671 / $153.119  |  106C-L/M/C Tram VHF caña: $128.671 / $153.119
+
+### Antenas móvil UHF
+105 Maxrad UHF 7/8 5dB: $54.645 / $65.028  |  102-U Eco UHF gold: $51.848 / $61.699
+105-R Maxrad resorte UHF: $79.720 / $94.867  |  108 Tram UHF 7/8: $54.645 / $65.028
+108-R Tram resorte UHF: $79.720 / $94.867  |  111 Maxrad UHF 5/8 3dB: $44.955 / $53.496
+102-2FU látigo inox UHF: $50.764 / $60.409
+
+### Bases para antenas móviles
+201 Base perforar 3/8: $14.734 / $17.534  |  205 Base perforar pin largo: $18.496 / $22.011
+301 Base uña cromada: $29.396 / $34.981  |  301-3 Base pestaña cromada Atos: $32.602 / $38.797
+302 Base uña plástica: $29.396 / $34.981  |  305 Base en L bus: $29.396 / $34.981
+307 Base magnética estándar: $40.759 / $48.503  |  307-R Base magnética reforzada: $49.950 / $59.441
+307-X Base magnética fuerza extrema: $88.911 / $105.804
+315-1D Base con radiales VHF/UHF (cable directo): $77.123 / $91.776
+315-1PL Base con radiales VHF/UHF (PL259): $88.611 / $105.447
+309 Base pestaña giratoria 360°: $50.435 / $60.017  |  314-I Base agarre robusto: $75.724 / $90.112
+
+### Accesorios
+601 Látigo americano inox VHF: $21.713 / $25.839  |  602 Látigo UHF inox: $39.760 / $47.315
+634 Resorte de lujo bobina 5/8: $25.874 / $30.790  |  620/621 OVNI (seguro robo): $22.747 / $27.069
+603 Conector PL259 macho con reductor: $8.341 / $9.925  |  604 Mini UHF macho RG58: $4.710 / $5.605
+606 PL259 ponchar RG58: $5.974 / $7.109  |  607 BNC macho RG58: $6.204 / $7.383
+
+### Cables coaxiales
+622-1 / 627-1 / 628-1 Cable RG-58 x 1mt: $4.958 / $5.900
+RG8-V / RG213-V Cable RG8/RG213 x 1mt (multifilar): $13.986 / $16.643
+LMAR400 Cable LMR400 x 1mt (unifilar): $13.172 / $15.675
+HEL-HAN 1/2 Heliax Hansen 1/2 superflexible x 1mt: $19.277 / $22.940
+622-152 Carreta RG-58 x 152mt: $710.400 / $845.376  |  627-305 Carreta RG-58 Welspec x 305mt: $1.420.800 / $1.690.752
+
+### Kits antena + base
+K-23/K-24 Antena 5/8 VHF + Uña cromada: $77.215 / $91.886
+K-23B/K-24B Antena 5/8 VHF + Base perforar: $62.554 / $74.439
+K-25 Antena 1/4 onda VHF + Uña cromada: $51.662 / $61.478
+K-25B Antena 1/4 VHF + Base perforar: $37.371 / $44.471
+K-28 Maxrad UHF + Uña cromada: $82.561 / $98.248
+K 103-M Maxrad VHF + Base magnética 2en1: $123.580 / $147.060
+K 105-M Maxrad UHF + Base magnética 2en1: $116.180 / $138.254
+K-R7 Kit VHF 5/8 + radiales + 7mt RG-58 + PL259: $159.766 / $190.122
+
+### Antenas estación base Estándar (garantía 2 años)
+MR-805 Vela G-3 VHF (137-174MHz) 3dB: $140.822 / $167.578
+MR-801-B/A Vela G-6 VHF 6dB: $218.670 / $260.217
+MR-136/144/150 Vela G-7 Hustler VHF 7dB: $539.608 / $642.134
+MR-810 Vehicular VHF con radiales: $126.392 / $150.406
+MR-416-3 Yagi 3 elem fijos VHF 7.1dB: $218.300 / $259.777
+MR-416-5 Yagi 5 elem VHF 9.2dB: $311.540 / $370.733
+MR-416-7 Yagi 7 elem VHF 11dB: $410.700 / $488.733
+MR-416T3 Yagi 3 elem tele VHF Maxrad: $347.726 / $413.794
+MR-224 4 Dipolos VHF 6-9dB en línea: $1.443.000 / $1.717.170
+MR-802 Vela G-7 UHF 6dB: $218.670 / $260.217
+MR-430-3 Yagi 3 elem UHF 7.1dB: $254.930 / $303.367
+MR-430-7 Yagi 7 elem UHF 11dB: $262.700 / $312.613
+MR470-4 4 Dipolos UHF 9dB: $1.529.580 / $1.820.200
+MR-800-6 Yagi 6 elem 806-896MHz: $165.760 / $197.254
+MR-800-12 Yagi 12 elem 806-896MHz: $210.160 / $250.090
+MR900-O Vela omni 900-1900MHz: $399.600 / $475.524
+
+### Antenas estación base Premium (garantía 5 años)
+P-805 Vela G-3 VHF: $172.568 / $205.356
+P-801 Vela G-6 VHF: $250.342 / $297.907
+P-136/144/150 Vela G-7 Hustler VHF: $580.900 / $691.271
+P-416-3 Yagi 3 elem fijos VHF: $247.900 / $295.001
+P-416-5 Yagi 5 elem VHF: $341.140 / $405.957
+P-224 4 Dipolos VHF premium: $2.401.300 / $2.857.547
+P-802 Vela G-7 UHF: $250.342 / $297.907
+P-430-3 Yagi 3 elem UHF: $284.308 / $338.327
+P470-4 4 Dipolos UHF premium: $1.898.840 / $2.259.620
+P-800-6 Yagi 6 elem 800MHz: $184.260 / $219.269
+P-900-O Vela omni 900MHz: $399.600 / $475.524
+
+### Recubrimientos para antenas handy
+561-563 VHF (Motorola/ICOM/Kenwood): $7.927 / $9.433
+565-567 UHF (Motorola/ICOM/Kenwood): $7.927 / $9.433
+571 DTR-620: $8.921 / $10.616
+581 Servicio mantenimiento antena: $13.327 / $15.859
+
+---
+
+## Cómo usas los precios
+- Si el cliente pregunta por un producto específico, busca en la lista y responde con precio DIST (sin IVA) y precio con IVA
+- Ejemplo: "Don William esa antena Maxrad VHF 5/8 está en $49.300 sin IVA ($58.667 con IVA) 😊"
+- Si necesitas confirmar precio o no está en la lista: "Ese valor lo verifico y te confirmo en un momentico 👌🏼"
+- Para kits: menciona que incluye antena + base
+
+---
+
 ## Ejemplos reales
 
 ### Pedido nuevo
@@ -859,6 +965,247 @@ router.post('/import-history', async (_req: AuthRequest, res: Response) => {
     }
 
     res.json({ imported: count });
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+// ─── GET /api/whatsapp/profile-pic/:number ───────────────────
+
+router.get('/profile-pic/:number', async (req: AuthRequest, res: Response) => {
+  const { number } = req.params;
+  if (!EVOL_BASE || !EVOL_KEY) { res.status(503).json({ error: 'Evolution no configurado' }); return; }
+  try {
+    const result = await fetch(
+      `${EVOL_BASE}/chat/fetchProfilePictureUrl/${EVOL_INST}?number=${encodeURIComponent(number)}`,
+      { headers: evolHeaders() },
+    );
+    if (!result.ok) { res.status(404).json({ error: 'No encontrado' }); return; }
+    const data = await result.json() as { profilePictureUrl?: string };
+    const picUrl = data.profilePictureUrl;
+    if (!picUrl) { res.status(404).json({ error: 'Sin foto' }); return; }
+
+    // Proxy the image so the frontend doesn't need to expose the Evolution API key
+    const imgRes = await fetch(picUrl);
+    if (!imgRes.ok) { res.status(404).json({ error: 'No se pudo obtener imagen' }); return; }
+    const buf = Buffer.from(await imgRes.arrayBuffer());
+    res.setHeader('Content-Type', imgRes.headers.get('content-type') ?? 'image/jpeg');
+    res.setHeader('Cache-Control', 'private, max-age=86400');
+    res.send(buf);
+  } catch {
+    res.status(404).end();
+  }
+});
+
+// ─── POST /api/whatsapp/pre-quote ────────────────────────────
+
+const PRE_QUOTE_PROMPT = `Eres un asistente de ventas de MARAL TECNOLOGÍA Y COMUNICACIONES. Analiza el historial de una conversación de WhatsApp y extrae la información de cotización.
+
+Devuelve ÚNICAMENTE un JSON válido con esta estructura:
+{
+  "items": [
+    { "description": "nombre del producto tal como lo pide el cliente", "qty": número, "unitPrice": número_o_null }
+  ],
+  "shippingAddress": "dirección de envío si la mencionaron, o null",
+  "notes": "observaciones relevantes del pedido, o null",
+  "clientPhone": "número telefónico del cliente sin prefijo país si se menciona, o null"
+}
+
+Reglas:
+- Extrae SOLO los productos que el cliente pide comprar, no los que ya tienen o mencionan como referencia
+- Si el cliente pide múltiples unidades, usa qty correctamente
+- unitPrice: usa el precio si se menciona en el chat, de lo contrario null
+- Incluye dirección de envío si la mencionan (Interrapidísimo, transportadora, ciudad destino, destinatario)
+- Devuelve JSON puro sin markdown, sin explicaciones`;
+
+router.post('/pre-quote', async (req: AuthRequest, res: Response) => {
+  const { jid } = req.body as { jid: string };
+  if (!jid?.trim()) { res.status(400).json({ error: 'jid requerido' }); return; }
+
+  try {
+    const chat = await prisma.whatsAppChat.findFirst({
+      where: { OR: [{ jid }, { number: jid }] },
+    });
+    if (!chat) { res.status(404).json({ error: 'Chat no encontrado' }); return; }
+
+    const messages = await prisma.whatsAppMessage.findMany({
+      where: { chatId: chat.id, type: { in: ['text', 'other'] }, NOT: { text: null } },
+      orderBy: { timestamp: 'desc' },
+      take: 30,
+    });
+    messages.reverse();
+
+    const history = messages
+      .filter(m => m.text?.trim())
+      .map(m => `${m.fromMe ? 'Lady' : 'Cliente'}: ${m.text}`)
+      .join('\n');
+
+    if (!history) {
+      res.status(400).json({ error: 'No hay mensajes de texto en el chat' });
+      return;
+    }
+
+    const rawJson = await callOpenRouter(
+      PRE_QUOTE_PROMPT,
+      `Cliente: ${chat.pushName ?? chat.number}\n\nConversación:\n${history}`,
+    );
+
+    let parsed: {
+      items: { description: string; qty: number; unitPrice: number | null }[];
+      shippingAddress: string | null;
+      notes: string | null;
+      clientPhone: string | null;
+    };
+
+    try {
+      const clean = rawJson.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+      parsed = JSON.parse(clean);
+    } catch {
+      res.status(422).json({ error: 'No se pudo extraer información del chat', raw: rawJson });
+      return;
+    }
+
+    if (!parsed.items?.length) {
+      res.status(422).json({ error: 'No se detectaron productos en la conversación' });
+      return;
+    }
+
+    // Look up client by phone number
+    const phoneClean = chat.number.replace(/^57/, '').replace(/\D/g, '');
+    const client = await prisma.client.findFirst({
+      where: {
+        OR: [
+          { whatsapp: { contains: phoneClean } },
+          { phone: { contains: phoneClean } },
+        ],
+      },
+    });
+
+    // Try to match products from DB
+    const matchedItems: { productId: string; qty: number; unitPrice: number; description: string }[] = [];
+    const unmatchedItems: { description: string; qty: number; unitPrice: number | null }[] = [];
+
+    for (const item of parsed.items) {
+      const keywords = item.description
+        .split(/\s+/)
+        .filter(w => w.length > 3)
+        .slice(0, 4);
+
+      let product = null;
+      for (const kw of keywords) {
+        product = await prisma.product.findFirst({
+          where: {
+            OR: [
+              { name: { contains: kw, mode: 'insensitive' } },
+              { reference: { contains: kw, mode: 'insensitive' } },
+            ],
+            active: true,
+          },
+        });
+        if (product) break;
+      }
+
+      if (product) {
+        matchedItems.push({
+          productId: product.id,
+          qty: item.qty ?? 1,
+          unitPrice: item.unitPrice ?? product.priceList ?? 0,
+          description: item.description,
+        });
+      } else {
+        unmatchedItems.push(item);
+      }
+    }
+
+    // Only create quotation if we have at least one matched item OR client exists with items
+    if (!matchedItems.length && !client) {
+      res.json({
+        quotationId: null,
+        parsed,
+        clientFound: false,
+        matchedItems,
+        unmatchedItems,
+        message: 'No se encontraron productos ni cliente en el sistema. Revisa manualmente.',
+      });
+      return;
+    }
+
+    if (!matchedItems.length) {
+      res.json({
+        quotationId: null,
+        parsed,
+        clientFound: !!client,
+        clientId: client?.id,
+        clientName: client?.name,
+        matchedItems,
+        unmatchedItems,
+        message: 'Productos no encontrados en el catálogo. Crea la cotización manualmente.',
+      });
+      return;
+    }
+
+    if (!client) {
+      res.json({
+        quotationId: null,
+        parsed,
+        clientFound: false,
+        matchedItems,
+        unmatchedItems,
+        message: 'Cliente no encontrado en el sistema. Asígnalo manualmente al crear la cotización.',
+      });
+      return;
+    }
+
+    // Resolve seller — use authenticated user or fall back to first GERENTE
+    let sellerId = req.user?.userId ?? '';
+    if (!sellerId) {
+      const gerente = await prisma.user.findFirst({ where: { role: 'GERENTE' }, select: { id: true } });
+      sellerId = gerente?.id ?? '';
+    }
+    if (!sellerId) { res.status(500).json({ error: 'No se encontró vendedor para asignar' }); return; }
+
+    // Create the quotation
+    const subtotal = matchedItems.reduce((s, i) => s + i.qty * i.unitPrice, 0);
+    const quotation = await prisma.quotation.create({
+      data: {
+        clientId: client.id,
+        sellerId,
+        status: 'BORRADOR',
+        validityDays: 15,
+        paymentTerms: 'Contado',
+        notes: [
+          parsed.notes,
+          unmatchedItems.length
+            ? `Productos pendientes de agregar: ${unmatchedItems.map(i => `${i.qty}x ${i.description}`).join(', ')}`
+            : null,
+          `Generada desde WhatsApp — ${chat.pushName ?? chat.number}`,
+        ].filter(Boolean).join('\n'),
+        shippingAddress: parsed.shippingAddress ?? undefined,
+        subtotal,
+        tax: 0,
+        total: subtotal,
+        items: {
+          create: matchedItems.map(i => ({
+            productId: i.productId,
+            qty: i.qty,
+            unitPrice: i.unitPrice,
+            discount: 0,
+            subtotal: i.qty * i.unitPrice,
+          })),
+        },
+      },
+      select: { id: true, number: true },
+    });
+
+    res.json({
+      quotationId: quotation.id,
+      quotationNumber: quotation.number,
+      clientFound: true,
+      clientName: client.name,
+      matchedItems,
+      unmatchedItems,
+      parsed,
+    });
   } catch (err) {
     res.status(500).json({ error: (err as Error).message });
   }
