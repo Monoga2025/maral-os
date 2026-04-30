@@ -148,6 +148,17 @@ function MediaContent({ msg, token }: { msg: WaMessage; token: string }) {
       </a>
     )
   }
+  if (msg.type === 'sticker') {
+    return (
+      <img
+        src={src}
+        alt="sticker"
+        className="max-w-[160px] max-h-[160px] object-contain cursor-pointer"
+        onClick={() => window.open(src, '_blank')}
+        onError={(e) => { (e.target as HTMLImageElement).alt = '[sticker]' }}
+      />
+    )
+  }
   return <span className="italic text-xs opacity-60">[{msg.type}]</span>
 }
 
@@ -156,8 +167,22 @@ function MediaContent({ msg, token }: { msg: WaMessage; token: string }) {
 function MessageBubble({ msg, token }: { msg: WaMessage; token: string }) {
   const isMe = msg.fromMe
   const isText = msg.type === 'text' || msg.type === 'other'
-  // Skip empty text bubbles (stickers, reactions, deleted messages with no body)
+  const isSticker = msg.type === 'sticker'
+  // Skip empty text bubbles (reactions, deleted messages with no body)
   if (isText && !msg.text?.trim()) return null
+  // Stickers: transparent bubble, no bg
+  if (isSticker) {
+    return (
+      <div className={cn('flex items-end gap-1.5', isMe ? 'justify-end' : 'justify-start')}>
+        <div className="relative">
+          <MediaContent msg={msg} token={token} />
+          <span className={cn('absolute bottom-0 right-1 text-[10px]', isMe ? 'text-gray-500' : 'text-gray-400')}>
+            {formatTime(msg.timestamp)}
+          </span>
+        </div>
+      </div>
+    )
+  }
   return (
     <div className={cn('flex items-end gap-1.5', isMe ? 'justify-end' : 'justify-start')}>
       <div className={cn(
@@ -335,9 +360,11 @@ function SendBar({ chat, onSent }: { chat: WaChat; onSent: () => void }) {
     e.target.value = ''
     try {
       const base64 = await fileToBase64(file)
-      const isImage = file.type.startsWith('image/')
+      const isSticker = file.type === 'image/webp'
+      const isImage = !isSticker && file.type.startsWith('image/')
       const isVideo = file.type.startsWith('video/')
-      sendMutation.mutate({ jid: chat.jid, type: isImage ? 'image' : isVideo ? 'video' : 'document', mediaBase64: base64, mimeType: file.type, fileName: file.name })
+      const type = isSticker ? 'sticker' : isImage ? 'image' : isVideo ? 'video' : 'document'
+      sendMutation.mutate({ jid: chat.jid, type, mediaBase64: base64, mimeType: file.type, fileName: file.name })
     } catch { toast.error('Error procesando archivo') }
   }
 
@@ -400,7 +427,7 @@ function SendBar({ chat, onSent }: { chat: WaChat; onSent: () => void }) {
 
   return (
     <div className="flex items-end gap-2 px-3 py-2.5 bg-[#f0f2f5] border-t border-gray-200">
-      <input ref={fileInputRef} type="file" className="hidden" accept="image/*,video/*,application/pdf,.doc,.docx,.xls,.xlsx" onChange={handleFile} />
+      <input ref={fileInputRef} type="file" className="hidden" accept="image/*,image/webp,video/*,application/pdf,.doc,.docx,.xls,.xlsx" onChange={handleFile} />
       <button onClick={() => fileInputRef.current?.click()} className="h-9 w-9 shrink-0 flex items-center justify-center rounded-full text-gray-500 hover:bg-gray-200 transition-colors" title="Adjuntar archivo">
         <Paperclip className="h-5 w-5" />
       </button>

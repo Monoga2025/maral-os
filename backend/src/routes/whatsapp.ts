@@ -803,6 +803,23 @@ router.post('/send', async (req: AuthRequest, res: Response) => {
           data: { lastText: '[audio]', lastAt: new Date(), unread: 0 },
         });
       }
+    } else if (type === 'sticker') {
+      if (!mediaBase64) { res.status(400).json({ error: 'mediaBase64 requerido' }); return; }
+      await fetch(`${EVOL_BASE}/message/sendSticker/${EVOL_INST}`, {
+        method: 'POST',
+        headers: evolHeaders(),
+        body: JSON.stringify({ number, sticker: mediaBase64 }),
+      });
+      const chat = await prisma.whatsAppChat.findFirst({ where: { OR: [{ jid }, { number }] } });
+      if (chat) {
+        await prisma.whatsAppMessage.create({
+          data: { chatId: chat.id, fromMe: true, type: 'sticker', mimeType: 'image/webp', timestamp: new Date() },
+        });
+        await prisma.whatsAppChat.update({
+          where: { id: chat.id },
+          data: { lastText: '[sticker]', lastAt: new Date(), unread: 0 },
+        });
+      }
     } else {
       // image / video / document
       if (!mediaBase64) { res.status(400).json({ error: 'mediaBase64 requerido' }); return; }
