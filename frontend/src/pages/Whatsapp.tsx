@@ -156,6 +156,8 @@ function MediaContent({ msg, token }: { msg: WaMessage; token: string }) {
 function MessageBubble({ msg, token }: { msg: WaMessage; token: string }) {
   const isMe = msg.fromMe
   const isText = msg.type === 'text' || msg.type === 'other'
+  // Skip empty text bubbles (stickers, reactions, deleted messages with no body)
+  if (isText && !msg.text?.trim()) return null
   return (
     <div className={cn('flex items-end gap-1.5', isMe ? 'justify-end' : 'justify-start')}>
       <div className={cn(
@@ -1145,7 +1147,12 @@ function ChatItem({ chat, selected, onClick }: { chat: WaChat; selected: boolean
       </div>
       <div className="flex-1 min-w-0">
         <div className="flex items-center justify-between gap-1 mb-0.5">
-          <span className="text-sm font-medium text-[#111b21] truncate">{formatChatName(chat)}</span>
+          <div className="min-w-0">
+            <span className="text-sm font-medium text-[#111b21] truncate block">{formatChatName(chat)}</span>
+            {chat.type !== 'grupo' && chat.name && chat.name !== chat.number && (
+              <span className="text-[11px] text-[#667781] block leading-none -mt-0.5">+{chat.number}</span>
+            )}
+          </div>
           <span className={cn('text-[11px] shrink-0', chat.unanswered ? 'text-[#25d366] font-semibold' : 'text-[#667781]')}>
             {formatTime(chat.lastTimestamp)}
           </span>
