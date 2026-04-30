@@ -505,6 +505,7 @@ function RightPanel({
   onPreQuote,
   preQuoting,
   preQuoteResult,
+  initialClient = null,
 }: {
   chat: WaChat
   messages: WaMessage[]
@@ -512,10 +513,12 @@ function RightPanel({
   onPreQuote: () => void
   preQuoting: boolean
   preQuoteResult: Awaited<ReturnType<typeof whatsappApi.preQuote>>['data'] | null
+  initialClient?: Awaited<ReturnType<typeof whatsappApi.linkedClient>>['data']['client'] | null
 }) {
   const [tab, setTab] = useState<RightTab>('perfil')
   const navigate = useNavigate()
 
+  // Reuse the query already kicked off by ChatView (same key → cache hit, no extra request)
   const { data: clientData } = useQuery({
     queryKey: ['wa-linked-client', chat.jid],
     queryFn: () => whatsappApi.linkedClient(chat.jid),
@@ -531,7 +534,7 @@ function RightPanel({
     retry: 1,
   })
 
-  const client = clientData?.data?.client ?? null
+  const client = clientData?.data?.client ?? initialClient
   const mediaItems = mediaData?.data?.media ?? []
 
   // Analytics
@@ -943,6 +946,15 @@ function ChatView({ chat, token }: { chat: WaChat; token: string }) {
     staleTime: 1000,
   })
 
+  // Authoritative client lookup — used for header name and passed to RightPanel
+  const { data: linkedClientData } = useQuery({
+    queryKey: ['wa-linked-client', chat.jid],
+    queryFn: () => whatsappApi.linkedClient(chat.jid),
+    staleTime: 60_000,
+    retry: 1,
+  })
+  const linkedClient = linkedClientData?.data?.client ?? null
+
   useEffect(() => {
     if (error) setIsError(true)
     else setIsError(false)
@@ -1088,12 +1100,12 @@ function ChatView({ chat, token }: { chat: WaChat; token: string }) {
         <div className="flex items-center gap-3 px-4 py-2.5 bg-[#0d1b2a]/90 backdrop-blur-sm border-b border-white/10 shrink-0">
           <Avatar chat={chat} />
           <div className="flex-1 min-w-0">
-            {/* Prefer MARAL client name over WhatsApp pushName */}
+            {/* Prefer MARAL client name (from authoritative linked-client query) */}
             <p className="text-sm font-semibold text-white truncate">
-              {chat.clientName && chat.clientName !== chat.name ? chat.clientName : formatChatName(chat)}
+              {linkedClient?.name ?? formatChatName(chat)}
             </p>
             <p className="text-[11px] text-white/50 truncate">
-              {chat.clientName && chat.clientName !== chat.name
+              {linkedClient && linkedClient.name !== chat.name
                 ? `WhatsApp: ${chat.name} · +${chat.number}`
                 : chat.type === 'grupo' ? 'Grupo' : `+${chat.number}`}
             </p>
@@ -1162,6 +1174,7 @@ function ChatView({ chat, token }: { chat: WaChat; token: string }) {
           onPreQuote={handlePreQuote}
           preQuoting={preQuoting}
           preQuoteResult={preQuoteResult}
+          initialClient={linkedClient}
         />
       )}
     </div>
