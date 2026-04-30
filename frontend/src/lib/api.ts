@@ -533,6 +533,19 @@ export const whatsappApi = {
       }
       message?: string
     }>('/whatsapp/pre-quote', { jid }),
+  linkedClient: (jid: string) =>
+    api.get<{
+      client: {
+        id: string; name: string; company: string | null; city: string | null
+        category: string; email: string | null; phone: string | null; whatsapp: string | null
+        tags: string[]; lifetimeValue: string | null; lastOrderAt: string | null
+        orderCount: number; quotationCount: number
+      } | null
+    }>(`/whatsapp/chats/${encodeURIComponent(jid)}/linked-client`),
+  chatMedia: (jid: string) =>
+    api.get<{
+      media: { id: string; type: string; mimeType: string | null; fileName: string | null; timestamp: string; fromMe: boolean }[]
+    }>(`/whatsapp/chats/${encodeURIComponent(jid)}/media`),
 }
 
 // Sprint 3: Image Generation (Nano Banana)

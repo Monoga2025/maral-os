@@ -1234,4 +1234,83 @@ router.post('/configure-webhook', async (req: AuthRequest, res: Response) => {
   res.json(data);
 });
 
+// ─── GET /api/whatsapp/chats/:jid/linked-client ───────────────
+
+router.get('/chats/:jid/linked-client', async (req: AuthRequest, res: Response) => {
+  const jid = decodeURIComponent(req.params.jid);
+  try {
+    const chat = await prisma.whatsAppChat.findFirst({
+      where: { OR: [{ jid }, { number: jid }] },
+    });
+    if (!chat) { res.status(404).json({ client: null }); return; }
+
+    const phoneClean = chat.number.replace(/^57/, '').replace(/\D/g, '');
+    const phoneFull  = '57' + phoneClean;
+
+    // 1) Match by phone/whatsapp field
+    let client = await prisma.client.findFirst({
+      where: {
+        active: true,
+        OR: [
+          { whatsapp: { contains: phoneClean } },
+          { whatsapp: { contains: phoneFull } },
+          { phone:    { contains: phoneClean } },
+        ],
+      },
+      select: { id: true, name: true, company: true, city: true, category: true, email: true, phone: true, whatsapp: true, tags: true, lifetimeValue: true, lastOrderAt: true },
+    });
+
+    // 2) Fallback: name similarity (split pushName into tokens)
+    if (!client && chat.pushName) {
+      const tokens = chat.pushName
+        .split(/\s+/)
+        .filter(t => t.length >= 3)
+        .slice(0, 3);
+      for (const token of tokens) {
+        client = await prisma.client.findFirst({
+          where: { active: true, name: { contains: token, mode: 'insensitive' } },
+          select: { id: true, name: true, company: true, city: true, category: true, email: true, phone: true, whatsapp: true, tags: true, lifetimeValue: true, lastOrderAt: true },
+        });
+        if (client) break;
+      }
+    }
+
+    if (!client) { res.json({ client: null }); return; }
+
+    // Attach stats
+    const orderCount = await prisma.order.count({ where: { clientId: client.id } });
+    const quotationCount = await prisma.quotation.count({ where: { clientId: client.id } });
+
+    res.json({ client: { ...client, orderCount, quotationCount } });
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+// ─── GET /api/whatsapp/chats/:jid/media ──────────────────────
+
+router.get('/chats/:jid/media', async (req: AuthRequest, res: Response) => {
+  const jid = decodeURIComponent(req.params.jid);
+  try {
+    const chat = await prisma.whatsAppChat.findFirst({
+      where: { OR: [{ jid }, { number: jid }] },
+    });
+    if (!chat) { res.status(404).json({ media: [] }); return; }
+
+    const media = await prisma.whatsAppMessage.findMany({
+      where: {
+        chatId: chat.id,
+        type: { in: ['image', 'document', 'video'] },
+      },
+      orderBy: { timestamp: 'desc' },
+      take: 50,
+      select: { id: true, type: true, mimeType: true, fileName: true, timestamp: true, fromMe: true },
+    });
+
+    res.json({ media });
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
 export default router;
