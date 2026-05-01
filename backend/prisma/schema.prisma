@@ -618,6 +618,7 @@ model WhatsAppChat {
   jid       String            @unique
   number    String
   pushName  String?
+  savedName String?
   type      String            @default("contacto")
   unread    Int               @default(0)
   lastText  String?

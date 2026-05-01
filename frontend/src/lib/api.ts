@@ -546,6 +546,8 @@ export const whatsappApi = {
     api.get<{
       media: { id: string; type: string; mimeType: string | null; fileName: string | null; timestamp: string; fromMe: boolean }[]
     }>(`/whatsapp/chats/${encodeURIComponent(jid)}/media`),
+  importContacts: (vcf: string) =>
+    api.post<{ updated: number; parsed: number }>('/whatsapp/import-contacts', { vcf }),
 }
 
 // Sprint 3: Image Generation (Nano Banana)

@@ -1276,6 +1276,8 @@ function SettingsPanel({ onClose }: { onClose: () => void }) {
   const [webhookUrl, setWebhookUrl] = useState('')
   const [importing, setImporting] = useState(false)
   const [configuring, setConfiguring] = useState(false)
+  const [importingContacts, setImportingContacts] = useState(false)
+  const vcfInputRef = useRef<HTMLInputElement>(null)
 
   return (
     <div className="flex flex-col h-full bg-white">
@@ -1299,6 +1301,40 @@ function SettingsPanel({ onClose }: { onClose: () => void }) {
           >
             {importing ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
             {importing ? 'Importando...' : 'Importar desde export'}
+          </button>
+        </section>
+
+        <section className="space-y-3">
+          <h3 className="text-sm font-semibold text-gray-700">Importar contactos del celular</h3>
+          <p className="text-xs text-gray-500">Sube el archivo <strong>.vcf</strong> exportado de Google Contactos. Los nombres que tienes guardados reemplazarán los nombres de WhatsApp en la lista.</p>
+          <input
+            ref={vcfInputRef}
+            type="file"
+            accept=".vcf,text/vcard"
+            className="hidden"
+            onChange={async (e) => {
+              const file = e.target.files?.[0]
+              if (!file) return
+              e.target.value = ''
+              setImportingContacts(true)
+              try {
+                const text = await file.text()
+                const res = await whatsappApi.importContacts(text)
+                toast.success(`${res.data.updated} contactos actualizados de ${res.data.parsed} en el archivo`)
+              } catch {
+                toast.error('Error importando contactos')
+              } finally {
+                setImportingContacts(false)
+              }
+            }}
+          />
+          <button
+            onClick={() => vcfInputRef.current?.click()}
+            disabled={importingContacts}
+            className="flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
+          >
+            {importingContacts ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Users className="h-4 w-4" />}
+            {importingContacts ? 'Importando...' : 'Subir contacts.vcf'}
           </button>
         </section>
 

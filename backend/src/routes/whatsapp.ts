@@ -702,7 +702,7 @@ router.get('/chats', async (_req: AuthRequest, res: Response) => {
         id: c.id,
         jid: c.jid,
         number: c.number,
-        name: c.pushName ?? c.number,
+        name: c.savedName ?? c.pushName ?? c.number,
         type: c.type,
         unread: c.unread,
         lastMessage: c.lastText ?? '',
@@ -1364,6 +1364,91 @@ router.get('/chats/:jid/media', async (req: AuthRequest, res: Response) => {
     });
 
     res.json({ media });
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+// ─── POST /api/whatsapp/import-contacts (VCF) ────────────────
+
+router.post('/import-contacts', async (req: AuthRequest, res: Response) => {
+  try {
+    const { vcf } = req.body as { vcf: string };
+    if (!vcf || typeof vcf !== 'string') {
+      res.status(400).json({ error: 'Se requiere el contenido VCF en body.vcf' });
+      return;
+    }
+
+    // Parse VCF — decode QUOTED-PRINTABLE + extract FN and TEL
+    function decodeQP(str: string, charset = 'utf-8'): string {
+      void charset;
+      return str.replace(/=([0-9A-Fa-f]{2})/g, (_, hex) =>
+        String.fromCharCode(parseInt(hex, 16))
+      );
+    }
+
+    function extractFN(block: string): string {
+      // FN with optional encoding
+      const m = block.match(/^FN(?:;[^:]*)?:(.*)/m);
+      if (!m) return '';
+      const line = m[1].trim();
+      if (/ENCODING=QUOTED-PRINTABLE/i.test(block)) return decodeQP(line);
+      return line;
+    }
+
+    function extractTels(block: string): string[] {
+      const tels: string[] = [];
+      for (const m of block.matchAll(/^TEL[^:]*:(.*)/gm)) {
+        const raw = m[1].replace(/[\s\-().]/g, '');
+        if (raw.length >= 7) tels.push(raw);
+      }
+      return tels;
+    }
+
+    function normalize(num: string): string {
+      const digits = num.replace(/\D/g, '');
+      // Strip leading 57 country code → last 10 digits
+      if (digits.length > 10 && digits.startsWith('57')) return digits.slice(2);
+      if (digits.length > 10 && digits.startsWith('057')) return digits.slice(3);
+      return digits;
+    }
+
+    // Build map: local10digits → name
+    const contactMap = new Map<string, string>();
+    const blocks = vcf.split(/(?:^|\n)BEGIN:VCARD/i).filter(Boolean);
+    for (const block of blocks) {
+      const name = extractFN(block);
+      if (!name) continue;
+      for (const tel of extractTels(block)) {
+        const key = normalize(tel);
+        if (key.length >= 7) contactMap.set(key, name);
+      }
+    }
+
+    if (contactMap.size === 0) {
+      res.json({ updated: 0, parsed: 0 });
+      return;
+    }
+
+    // Load all chats and match
+    const chats = await prisma.whatsAppChat.findMany({
+      select: { id: true, number: true },
+    });
+
+    let updated = 0;
+    for (const chat of chats) {
+      const key = normalize(chat.number);
+      const name = contactMap.get(key);
+      if (name) {
+        await prisma.whatsAppChat.update({
+          where: { id: chat.id },
+          data: { savedName: name },
+        });
+        updated++;
+      }
+    }
+
+    res.json({ updated, parsed: contactMap.size });
   } catch (err) {
     res.status(500).json({ error: (err as Error).message });
   }
