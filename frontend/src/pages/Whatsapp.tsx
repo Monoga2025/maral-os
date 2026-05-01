@@ -52,9 +52,14 @@ function formatTime(ts: string) {
 
 function formatChatName(chat: WaChat) {
   const name = chat.name ?? ''
-  if (name && name !== chat.number) return name
-  const num = chat.number.replace(/^57/, '')
-  return `+57 ${num}`
+  const numDigits = chat.number.replace(/\D/g, '')
+  const nameDigits = name.replace(/\D/g, '')
+  // If name is just the number (with or without spaces/formatting), show as +57 XXXX
+  if (!name || nameDigits === numDigits) {
+    const local = numDigits.replace(/^57/, '')
+    return `+57 ${local}`
+  }
+  return name
 }
 
 function getInitials(name: string) {
@@ -1200,10 +1205,12 @@ function ChatItem({ chat, selected, onClick }: { chat: WaChat; selected: boolean
       <div className="flex-1 min-w-0">
         <div className="flex items-center justify-between gap-1 mb-0.5">
           <div className="min-w-0">
-            <span className="text-sm font-medium text-[#111b21] truncate block">{formatChatName(chat)}</span>
-            {chat.clientName && chat.clientName !== chat.name && (
-              <span className="flex items-center gap-0.5 text-[10px] text-blue-600 leading-none -mt-0.5 truncate">
-                <Building2 className="h-2.5 w-2.5 shrink-0" />{chat.clientName}
+            <span className="text-sm font-medium text-[#111b21] truncate block">
+              {chat.clientName ?? formatChatName(chat)}
+            </span>
+            {chat.clientName && formatChatName(chat) !== chat.clientName && (
+              <span className="flex items-center gap-0.5 text-[10px] text-[#667781] leading-none -mt-0.5 truncate">
+                <Building2 className="h-2.5 w-2.5 shrink-0" />{formatChatName(chat)}
               </span>
             )}
           </div>
