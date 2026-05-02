@@ -75,6 +75,18 @@ export interface User {
   updatedAt: string
 }
 
+export type FriendlinessLevel = 'poco' | 'intermedio' | 'mucho' | 'muchísimo'
+
+export interface ProductLines {
+  predefined?: {
+    estacion_base?: boolean
+    movil?: boolean
+    handy?: boolean
+    telemetria?: boolean
+  }
+  custom?: string[]
+}
+
 export interface Client {
   id: string
   name: string
@@ -105,6 +117,18 @@ export interface Client {
   ordersCount?: number
   /** @deprecated alias for active */
   isActive?: boolean
+  // Contactos adicionales
+  ownerName?: string
+  purchaseContactName?: string
+  secretaryName?: string
+  otherContactName?: string
+  // Perfil comercial
+  purchaseVolumeScore?: number | null
+  companySizeScore?: number | null
+  friendlinessLevel?: FriendlinessLevel | null
+  competitors?: string
+  callNotes?: string
+  productLines?: ProductLines | null
 }
 
 export interface ProductComponent {

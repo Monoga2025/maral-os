@@ -28,6 +28,42 @@
 
 ---
 
+## 2026-05-01 — Claude Code — Módulo Clientes v2: perfil comercial completo
+
+### Qué se hizo
+Expansión completa del módulo de clientes con datos de ventas cualitativos y perfil comercial profundo, solicitados por John para mejorar la gestión comercial.
+
+### Cambios realizados
+- `backend/prisma/schema.prisma`: 10 campos nuevos en modelo `Client`:
+  - Contactos: `ownerName`, `purchaseContactName`, `secretaryName`, `otherContactName`
+  - Perfil comercial: `purchaseVolumeScore` (Int, calculado), `companySizeScore` (Int, manual 1-10), `friendlinessLevel` (String), `competitors` (Text), `callNotes` (Text), `productLines` (Json)
+- `backend/src/routes/clients.ts`:
+  - Schema Zod extendido con todos los campos nuevos
+  - `GET /:id`: calcula `purchaseVolumeScore` automáticamente (proporcional al máximo spend del universo de clientes, escala 1-10)
+  - `GET /:id/orders`: nuevo endpoint — historial completo de pedidos paginado
+- `frontend/src/types/index.ts`: tipos `FriendlinessLevel`, `ProductLines`, campos nuevos en interfaz `Client`
+- `frontend/src/lib/contracts.ts`: `CreateClientRequest` / `UpdateClientRequest` extendidos
+- `frontend/src/pages/ClientForm.tsx`: reescrito con secciones:
+  - Información básica (empresa + nombre principal)
+  - Contactos adicionales (dueño, contacto compras, secretaria, otro)
+  - Condiciones comerciales (sin cambio funcional)
+  - Perfil de ventas: tamaño manual 1-10, amigabilidad, competidores, checkboxes líneas de producto + líneas custom, notas de llamadas
+- `frontend/src/pages/ClientDetail.tsx`: tab nuevo "Perfil Comercial" con:
+  - Score volumen (IA, puntos visuales), score tamaño (manual), badge amigabilidad
+  - Sección líneas de producto (predefinidas + custom)
+  - Sección dónde compra / competidores
+  - Sección notas de llamadas
+  - Tab Pedidos ahora muestra historial completo (antes solo 5 últimos)
+
+### Decisiones técnicas
+- `purchaseVolumeScore` se calcula en tiempo real en el GET /:id usando `groupBy` sobre toda la tabla de pedidos — sin almacenar en DB para que siempre refleje el estado actual. Si la empresa crece se puede migrar a job nocturno.
+- `productLines` se almacena como Json `{predefined: {estacion_base, movil, handy, telemetria}, custom: []}` para ser extensible sin migrations.
+- `callNotes` es texto libre (textarea) — el usuario antepone la fecha manualmente, como acordado.
+
+### Próximos pasos
+- Deploy EasyPanel: `prisma migrate deploy` con los nuevos campos
+- Poblar datos de clientes existentes (companySizeScore, callNotes) en sesión de trabajo con John
+
 ## 2026-04-20 — Claude Code — Módulo cotizaciones: HTML render, firma, guía de envío, numeración
 
 ### Qué se hizo

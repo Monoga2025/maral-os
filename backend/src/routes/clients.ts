@@ -29,6 +29,17 @@ const clientSchema = z.object({
   interestTags: z.array(z.string().min(1).max(30)).optional(),
   optedOut: z.boolean().optional(),
   segment: z.string().min(1).max(10).optional().nullable(),
+  // Contactos adicionales
+  ownerName: z.string().optional(),
+  purchaseContactName: z.string().optional(),
+  secretaryName: z.string().optional(),
+  otherContactName: z.string().optional(),
+  // Perfil comercial
+  companySizeScore: z.number().int().min(1).max(10).optional().nullable(),
+  friendlinessLevel: z.enum(['poco', 'intermedio', 'mucho', 'muchísimo']).optional().nullable(),
+  competitors: z.string().optional(),
+  callNotes: z.string().optional(),
+  productLines: z.any().optional(),
 });
 
 // GET /api/clients
@@ -205,7 +216,7 @@ router.get('/:id', async (req: AuthRequest, res: Response) => {
     }
 
     // Calculate stats (parallel queries)
-    const [totalOrders, totalSpentAgg, creditUsedAgg] = await Promise.all([
+    const [totalOrders, totalSpentAgg, creditUsedAgg, maxSpentAgg] = await Promise.all([
       prisma.order.count({ where: { clientId: req.params.id } }),
       prisma.order.aggregate({
         where: { clientId: req.params.id, status: { not: 'CANCELADO' } },
@@ -215,10 +226,22 @@ router.get('/:id', async (req: AuthRequest, res: Response) => {
         where: { clientId: req.params.id, status: { in: ['VIGENTE', 'VENCIDA'] } },
         _sum: { amount: true },
       }),
+      // Max total spend across all clients for relative scoring
+      prisma.order.groupBy({
+        by: ['clientId'],
+        where: { status: { not: 'CANCELADO' } },
+        _sum: { total: true },
+        orderBy: { _sum: { total: 'desc' } },
+        take: 1,
+      }),
     ]);
     const totalSpent = totalSpentAgg._sum.total || 0;
     const lastOrder = client.orders[0] ?? null;
     const creditUsed = Number(creditUsedAgg._sum.amount ?? 0);
+    const maxSpent = Number(maxSpentAgg[0]?._sum?.total ?? totalSpent ?? 1);
+    const purchaseVolumeScore = maxSpent > 0
+      ? Math.max(1, Math.min(10, Math.round((totalSpent / maxSpent) * 10)))
+      : null;
 
     res.json({
       ...client,
@@ -226,6 +249,7 @@ router.get('/:id', async (req: AuthRequest, res: Response) => {
       totalPurchases: totalSpent,
       ordersCount: totalOrders,
       lastOrderAt: lastOrder?.createdAt || null,
+      purchaseVolumeScore,
       stats: {
         totalOrders,
         totalSpent,
@@ -348,6 +372,48 @@ router.delete('/:id', async (req: AuthRequest, res: Response) => {
   } catch (error) {
     console.error('Delete client error:', error);
     res.status(500).json({ error: 'Error al eliminar cliente' });
+  }
+});
+
+// GET /api/clients/:id/orders — historial completo de pedidos del cliente
+router.get('/:id/orders', async (req: AuthRequest, res: Response) => {
+  try {
+    const clientId = req.params.id;
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 50;
+
+    const client = await prisma.client.findUnique({ where: { id: clientId }, select: { id: true } });
+    if (!client) {
+      res.status(404).json({ error: 'Cliente no encontrado' });
+      return;
+    }
+
+    const [orders, total] = await Promise.all([
+      prisma.order.findMany({
+        where: { clientId },
+        orderBy: { createdAt: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit,
+        select: {
+          id: true,
+          number: true,
+          status: true,
+          type: true,
+          total: true,
+          city: true,
+          carrier: true,
+          dispatchDate: true,
+          createdAt: true,
+          _count: { select: { items: true } },
+        },
+      }),
+      prisma.order.count({ where: { clientId } }),
+    ]);
+
+    res.json({ data: orders, pagination: { page, limit, total, pages: Math.ceil(total / limit) } });
+  } catch (error) {
+    console.error('Client orders error:', error);
+    res.status(500).json({ error: 'Error al obtener pedidos del cliente' });
   }
 });
 

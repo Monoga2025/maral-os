@@ -15,6 +15,12 @@ import {
   Tag,
   X,
   BellOff,
+  Users,
+  TrendingUp,
+  ShoppingBag,
+  Smile,
+  PhoneCall,
+  Layers,
 } from 'lucide-react'
 import { clientsApi, quotationsApi, ordersApi } from '../lib/api'
 import { formatCOP, formatDate } from '../lib/utils'
@@ -31,9 +37,52 @@ import {
   TableCell,
 } from '../components/ui/Table'
 import { PageSkeleton } from '../components/ui/LoadingSkeleton'
-import type { QuotationStatus, OrderStatus } from '../types'
+import type { QuotationStatus, OrderStatus, FriendlinessLevel, ProductLines } from '../types'
 
 const PRESET_TAGS = ['DIPOLOS', 'VHF', 'ANTENAS', 'UHF', 'REPETIDORES', 'ACCESORIOS']
+
+const PRODUCT_LINES_PREDEFINED = [
+  { key: 'estacion_base', label: 'Línea Estación Base' },
+  { key: 'movil', label: 'Línea Móvil' },
+  { key: 'handy', label: 'Línea Handy' },
+  { key: 'telemetria', label: 'Línea Telemetría' },
+]
+
+const FRIENDLINESS_LABELS: Record<FriendlinessLevel, string> = {
+  poco: 'Poco amigable',
+  intermedio: 'Intermedio',
+  mucho: 'Mucho',
+  'muchísimo': 'Muchísimo',
+}
+
+const FRIENDLINESS_COLORS: Record<FriendlinessLevel, string> = {
+  poco: 'bg-red-100 text-red-700',
+  intermedio: 'bg-yellow-100 text-yellow-700',
+  mucho: 'bg-green-100 text-green-700',
+  'muchísimo': 'bg-emerald-100 text-emerald-700',
+}
+
+const SCORE_COLORS: Record<string, string> = {
+  blue: 'bg-blue-500',
+  purple: 'bg-purple-500',
+  green: 'bg-green-500',
+}
+
+function ScoreDots({ value, max = 10, color = 'blue' }: { value: number | null | undefined; max?: number; color?: string }) {
+  if (!value) return <span className="text-gray-400 text-xs">—</span>
+  const activeClass = SCORE_COLORS[color] ?? 'bg-blue-500'
+  return (
+    <div className="flex items-center gap-1">
+      {Array.from({ length: max }).map((_, i) => (
+        <div
+          key={i}
+          className={`h-2.5 w-2.5 rounded-full ${i < value ? activeClass : 'bg-gray-200'}`}
+        />
+      ))}
+      <span className="ml-1 text-sm font-bold text-gray-800">{value}/10</span>
+    </div>
+  )
+}
 
 export default function ClientDetail() {
   const { id } = useParams<{ id: string }>()
@@ -51,15 +100,13 @@ export default function ClientDetail() {
 
   const { data: quotations } = useQuery({
     queryKey: ['quotations', { clientId: id }],
-    queryFn: () =>
-      quotationsApi.getAll({ clientId: id!, pageSize: 50 }).then((r) => r.data),
+    queryFn: () => quotationsApi.getAll({ clientId: id!, pageSize: 50 }).then((r) => r.data),
     enabled: !!id,
   })
 
   const { data: orders } = useQuery({
     queryKey: ['orders', { clientId: id }],
-    queryFn: () =>
-      ordersApi.getAll({ clientId: id!, pageSize: 50 }).then((r) => r.data),
+    queryFn: () => ordersApi.getAll({ clientId: id!, pageSize: 100 }).then((r) => r.data),
     enabled: !!id,
   })
 
@@ -99,6 +146,8 @@ export default function ClientDetail() {
     ? (client.creditUsed / client.creditLimit) * 100
     : 0
 
+  const productLines = client.productLines as ProductLines | null | undefined
+
   return (
     <div className="space-y-5">
       {/* Header */}
@@ -131,8 +180,8 @@ export default function ClientDetail() {
               {client.company && (
                 <div className="flex items-center gap-1.5 text-gray-600 mb-1">
                   <Building2 className="h-4 w-4 text-gray-400" />
-                  <span className="text-sm">{client.company}</span>
-                  {client.rut && <span className="text-xs text-gray-400">· RUT: {client.rut}</span>}
+                  <span className="text-sm font-medium">{client.company}</span>
+                  {client.rut && <span className="text-xs text-gray-400">· NIT: {client.rut}</span>}
                 </div>
               )}
               <div className="flex flex-wrap gap-4 mt-2">
@@ -182,20 +231,14 @@ export default function ClientDetail() {
                 variant="outline"
                 size="sm"
                 leftIcon={<FileText className="h-4 w-4" />}
-                onClick={() =>
-                  navigate('/cotizaciones/nueva', {
-                    state: { clientId: client.id },
-                  })
-                }
+                onClick={() => navigate('/cotizaciones/nueva', { state: { clientId: client.id } })}
               >
                 Nueva Cotización
               </Button>
               <Button
                 size="sm"
                 leftIcon={<Plus className="h-4 w-4" />}
-                onClick={() =>
-                  navigate('/pedidos/nuevo', { state: { clientId: client.id } })
-                }
+                onClick={() => navigate('/pedidos/nuevo', { state: { clientId: client.id } })}
               >
                 Nuevo Pedido
               </Button>
@@ -246,6 +289,7 @@ export default function ClientDetail() {
       <Tabs defaultValue="resumen">
         <TabsList>
           <TabsTrigger value="resumen">Resumen</TabsTrigger>
+          <TabsTrigger value="perfil">Perfil Comercial</TabsTrigger>
           <TabsTrigger value="cotizaciones">
             Cotizaciones ({quotations?.pagination?.total ?? 0})
           </TabsTrigger>
@@ -256,10 +300,11 @@ export default function ClientDetail() {
           <TabsTrigger value="notas">Notas</TabsTrigger>
         </TabsList>
 
+        {/* ── Resumen ──────────────────────────────────────────── */}
         <TabsContent value="resumen">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-            {/* Campaign tags card */}
-            <Card className="md:col-span-2">
+          <div className="space-y-4">
+            {/* Campaign tags */}
+            <Card>
               <CardHeader>
                 <CardTitle className="flex items-center justify-between gap-2">
                   <span className="flex items-center gap-2">
@@ -298,26 +343,18 @@ export default function ClientDetail() {
                       </button>
                     </span>
                   ))}
-
-                  {/* Add tag input */}
                   <div className="relative">
                     <div className="flex items-center gap-1 border border-dashed border-gray-300 rounded-full px-2.5 py-1 hover:border-blue-400 transition-colors">
                       <Plus className="h-3 w-3 text-gray-400" />
                       <input
                         ref={tagInputRef}
                         value={tagInput}
-                        onChange={(e) => {
-                          setTagInput(e.target.value.toUpperCase())
-                          setShowSuggestions(true)
-                        }}
+                        onChange={(e) => { setTagInput(e.target.value.toUpperCase()); setShowSuggestions(true) }}
                         onFocus={() => setShowSuggestions(true)}
                         onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
                         onKeyDown={(e) => {
                           if (e.key === 'Enter') addTag(tagInput)
-                          if (e.key === 'Escape') {
-                            setTagInput('')
-                            setShowSuggestions(false)
-                          }
+                          if (e.key === 'Escape') { setTagInput(''); setShowSuggestions(false) }
                         }}
                         placeholder="Agregar etiqueta"
                         className="text-xs w-28 bg-transparent outline-none placeholder-gray-400 text-gray-700"
@@ -326,9 +363,7 @@ export default function ClientDetail() {
                     {showSuggestions && (
                       <div className="absolute top-full left-0 mt-1 z-10 bg-white border border-gray-200 rounded-lg shadow-lg py-1 min-w-[140px]">
                         {PRESET_TAGS.filter(
-                          (t) =>
-                            (!tagInput || t.includes(tagInput)) &&
-                            !(client.interestTags ?? []).includes(t)
+                          (t) => (!tagInput || t.includes(tagInput)) && !(client.interestTags ?? []).includes(t)
                         ).map((t) => (
                           <button
                             key={t}
@@ -350,101 +385,237 @@ export default function ClientDetail() {
                     )}
                   </div>
                 </div>
-                {(client.interestTags ?? []).length === 0 && (
-                  <p className="text-xs text-gray-400 mt-2">
-                    Sin etiquetas. Agrega "DIPOLOS" para incluir en la campaña VHF.
-                  </p>
-                )}
               </CardContent>
             </Card>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Información de contacto */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Users className="h-4 w-4 text-gray-500" />
+                    Contactos
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <dl className="space-y-2.5">
+                    {[
+                      { label: 'Empresa', value: client.company },
+                      { label: 'Nombre principal', value: client.name },
+                      { label: 'Dueño', value: client.ownerName },
+                      { label: 'Contacto compras', value: client.purchaseContactName },
+                      { label: 'Secretaria / recepción', value: client.secretaryName },
+                      { label: 'Otro contacto', value: client.otherContactName },
+                      { label: 'RUT / NIT', value: client.rut },
+                      { label: 'Email', value: client.email },
+                      { label: 'Teléfono', value: client.phone },
+                      { label: 'WhatsApp', value: client.whatsapp },
+                      { label: 'Ciudad', value: client.city },
+                      { label: 'Dirección', value: client.address },
+                    ].map(
+                      (item) =>
+                        item.value && (
+                          <div key={item.label} className="flex justify-between text-sm">
+                            <dt className="text-gray-500 shrink-0">{item.label}</dt>
+                            <dd className="font-medium text-gray-900 text-right ml-4">{item.value}</dd>
+                          </div>
+                        )
+                    )}
+                  </dl>
+                </CardContent>
+              </Card>
+
+              {/* Condiciones comerciales */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <CreditCard className="h-4 w-4 text-gray-500" />
+                    Condiciones comerciales
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <dl className="space-y-2.5">
+                    <div className="flex justify-between text-sm">
+                      <dt className="text-gray-500">Categoría</dt>
+                      <dd><ClientCategoryBadge category={client.category} /></dd>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <dt className="text-gray-500">Cupo de crédito</dt>
+                      <dd className="font-semibold text-gray-900">{formatCOP(client.creditLimit)}</dd>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <dt className="text-gray-500">Crédito usado</dt>
+                      <dd className="font-semibold text-red-600">{formatCOP(client.creditUsed)}</dd>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <dt className="text-gray-500">Disponible</dt>
+                      <dd className="font-semibold text-green-600">
+                        {formatCOP(Math.max(0, client.creditLimit - client.creditUsed))}
+                      </dd>
+                    </div>
+                    <div className="h-2 rounded-full bg-gray-100">
+                      <div
+                        className={`h-full rounded-full transition-all ${creditPct > 90 ? 'bg-red-500' : creditPct > 70 ? 'bg-orange-500' : 'bg-blue-500'}`}
+                        style={{ width: `${Math.min(creditPct, 100)}%` }}
+                      />
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <dt className="text-gray-500">Días de pago</dt>
+                      <dd className="font-semibold text-gray-900">{client.paymentDays} días</dd>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <dt className="text-gray-500">Factoring</dt>
+                      <dd><FactoringStatusBadge status={client.factoringStatus} /></dd>
+                    </div>
+                  </dl>
+                </CardContent>
+              </Card>
+            </div>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Información de contacto</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <dl className="space-y-2.5">
-                  {[
-                    { label: 'Nombre', value: client.name },
-                    { label: 'Empresa', value: client.company },
-                    { label: 'RUT', value: client.rut },
-                    { label: 'Email', value: client.email },
-                    { label: 'Teléfono', value: client.phone },
-                    { label: 'WhatsApp', value: client.whatsapp },
-                    { label: 'Ciudad', value: client.city },
-                    { label: 'Dirección', value: client.address },
-                  ].map(
-                    (item) =>
-                      item.value && (
-                        <div key={item.label} className="flex justify-between text-sm">
-                          <dt className="text-gray-500">{item.label}</dt>
-                          <dd className="font-medium text-gray-900 text-right">
-                            {item.value}
-                          </dd>
-                        </div>
-                      )
+        </TabsContent>
+
+        {/* ── Perfil Comercial ─────────────────────────────────── */}
+        <TabsContent value="perfil">
+          <div className="space-y-4">
+            {/* Scores */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <Card>
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <TrendingUp className="h-4 w-4 text-blue-500" />
+                    <p className="text-xs font-medium text-gray-500">Score volumen de compra</p>
+                  </div>
+                  <ScoreDots value={client.purchaseVolumeScore} color="blue" />
+                  <p className="text-xs text-gray-400 mt-1">Calculado automáticamente</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Building2 className="h-4 w-4 text-purple-500" />
+                    <p className="text-xs font-medium text-gray-500">Tamaño del cliente</p>
+                  </div>
+                  <ScoreDots value={client.companySizeScore} color="purple" />
+                  <p className="text-xs text-gray-400 mt-1">Asignado manualmente</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Smile className="h-4 w-4 text-green-500" />
+                    <p className="text-xs font-medium text-gray-500">Amigabilidad</p>
+                  </div>
+                  {client.friendlinessLevel ? (
+                    <span className={`inline-block text-sm font-semibold px-2.5 py-0.5 rounded-full ${FRIENDLINESS_COLORS[client.friendlinessLevel as FriendlinessLevel]}`}>
+                      {FRIENDLINESS_LABELS[client.friendlinessLevel as FriendlinessLevel]}
+                    </span>
+                  ) : (
+                    <span className="text-gray-400 text-sm">Sin definir</span>
                   )}
-                </dl>
-              </CardContent>
-            </Card>
+                </CardContent>
+              </Card>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Líneas de producto */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Layers className="h-4 w-4 text-gray-500" />
+                    Líneas de producto
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {(!productLines || (!Object.values(productLines.predefined ?? {}).some(Boolean) && !productLines.custom?.length)) ? (
+                    <p className="text-sm text-gray-400">Sin líneas registradas. Edita el cliente para agregar.</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {PRODUCT_LINES_PREDEFINED.map(({ key, label }) =>
+                        productLines?.predefined?.[key as keyof typeof productLines.predefined] ? (
+                          <div key={key} className="flex items-center gap-2">
+                            <div className="h-2 w-2 rounded-full bg-blue-500" />
+                            <span className="text-sm text-gray-800">{label}</span>
+                          </div>
+                        ) : null
+                      )}
+                      {(productLines?.custom ?? []).map((line) => (
+                        <div key={line} className="flex items-center gap-2">
+                          <div className="h-2 w-2 rounded-full bg-gray-400" />
+                          <span className="text-sm text-gray-800">{line}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="mt-3"
+                    leftIcon={<Pencil className="h-3.5 w-3.5" />}
+                    onClick={() => navigate(`/clientes/${client.id}/editar`)}
+                  >
+                    Editar líneas
+                  </Button>
+                </CardContent>
+              </Card>
+
+              {/* Dónde compra / Competidores */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <ShoppingBag className="h-4 w-4 text-gray-500" />
+                    ¿Dónde compra? (competidores)
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {client.competitors ? (
+                    <p className="text-sm text-gray-700 whitespace-pre-wrap">{client.competitors}</p>
+                  ) : (
+                    <p className="text-sm text-gray-400">Sin información. Edita el cliente para agregar.</p>
+                  )}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="mt-3"
+                    leftIcon={<Pencil className="h-3.5 w-3.5" />}
+                    onClick={() => navigate(`/clientes/${client.id}/editar`)}
+                  >
+                    Editar
+                  </Button>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Notas de llamadas */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <CreditCard className="h-4 w-4 text-gray-500" />
-                  Condiciones comerciales
+                  <PhoneCall className="h-4 w-4 text-gray-500" />
+                  Notas de llamadas
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <dl className="space-y-2.5">
-                  <div className="flex justify-between text-sm">
-                    <dt className="text-gray-500">Categoría</dt>
-                    <dd>
-                      <ClientCategoryBadge category={client.category} />
-                    </dd>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <dt className="text-gray-500">Cupo de crédito</dt>
-                    <dd className="font-semibold text-gray-900">
-                      {formatCOP(client.creditLimit)}
-                    </dd>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <dt className="text-gray-500">Crédito usado</dt>
-                    <dd className="font-semibold text-red-600">
-                      {formatCOP(client.creditUsed)}
-                    </dd>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <dt className="text-gray-500">Disponible</dt>
-                    <dd className="font-semibold text-green-600">
-                      {formatCOP(Math.max(0, client.creditLimit - client.creditUsed))}
-                    </dd>
-                  </div>
-                  <div className="h-2 rounded-full bg-gray-100">
-                    <div
-                      className={`h-full rounded-full transition-all ${creditPct > 90 ? 'bg-red-500' : creditPct > 70 ? 'bg-orange-500' : 'bg-blue-500'}`}
-                      style={{ width: `${Math.min(creditPct, 100)}%` }}
-                    />
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <dt className="text-gray-500">Días de pago</dt>
-                    <dd className="font-semibold text-gray-900">
-                      {client.paymentDays} días
-                    </dd>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <dt className="text-gray-500">Factoring</dt>
-                    <dd>
-                      <FactoringStatusBadge status={client.factoringStatus} />
-                    </dd>
-                  </div>
-                </dl>
+                {client.callNotes ? (
+                  <pre className="text-sm text-gray-700 whitespace-pre-wrap font-sans leading-relaxed">
+                    {client.callNotes}
+                  </pre>
+                ) : (
+                  <p className="text-sm text-gray-400">Sin notas de llamadas. Edita el cliente para agregar.</p>
+                )}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="mt-3"
+                  leftIcon={<Pencil className="h-3.5 w-3.5" />}
+                  onClick={() => navigate(`/clientes/${client.id}/editar`)}
+                >
+                  Agregar notas
+                </Button>
               </CardContent>
             </Card>
           </div>
         </TabsContent>
 
+        {/* ── Cotizaciones ─────────────────────────────────────── */}
         <TabsContent value="cotizaciones">
           <Card className="overflow-hidden">
             <Table>
@@ -478,6 +649,7 @@ export default function ClientDetail() {
           </Card>
         </TabsContent>
 
+        {/* ── Pedidos (historial completo) ─────────────────────── */}
         <TabsContent value="pedidos">
           <Card className="overflow-hidden">
             <Table>
@@ -485,6 +657,7 @@ export default function ClientDetail() {
                 <TableRow>
                   <TableHead>Número</TableHead>
                   <TableHead>Fecha</TableHead>
+                  <TableHead>Ciudad</TableHead>
                   <TableHead>Total</TableHead>
                   <TableHead>Estado</TableHead>
                 </TableRow>
@@ -496,34 +669,39 @@ export default function ClientDetail() {
                     className="cursor-pointer"
                     onClick={() => navigate(`/pedidos/${o.id}`)}
                   >
-                    <TableCell className="font-medium">{o.number}</TableCell>
+                    <TableCell className="font-medium">#{o.number}</TableCell>
                     <TableCell>{formatDate(o.createdAt)}</TableCell>
+                    <TableCell className="text-gray-600">{o.city ?? '—'}</TableCell>
                     <TableCell className="font-semibold">{formatCOP(o.total)}</TableCell>
                     <TableCell>
                       <OrderStatusBadge status={o.status as OrderStatus} />
                     </TableCell>
                   </TableRow>
                 ))}
+                {!orders?.data?.length && (
+                  <TableRow>
+                    <TableCell colSpan={5} className="text-center text-gray-400 py-8">
+                      Sin pedidos registrados
+                    </TableCell>
+                  </TableRow>
+                )}
               </TableBody>
             </Table>
           </Card>
         </TabsContent>
 
+        {/* ── Crédito ──────────────────────────────────────────── */}
         <TabsContent value="credito">
           <Card>
             <CardContent className="p-6">
               <div className="grid grid-cols-3 gap-4 mb-6">
                 <div className="rounded-xl bg-blue-50 p-4">
                   <p className="text-xs font-medium text-blue-600">Cupo total</p>
-                  <p className="mt-1 text-xl font-bold text-blue-700">
-                    {formatCOP(client.creditLimit)}
-                  </p>
+                  <p className="mt-1 text-xl font-bold text-blue-700">{formatCOP(client.creditLimit)}</p>
                 </div>
                 <div className="rounded-xl bg-red-50 p-4">
                   <p className="text-xs font-medium text-red-600">Usado</p>
-                  <p className="mt-1 text-xl font-bold text-red-700">
-                    {formatCOP(client.creditUsed)}
-                  </p>
+                  <p className="mt-1 text-xl font-bold text-red-700">{formatCOP(client.creditUsed)}</p>
                 </div>
                 <div className="rounded-xl bg-green-50 p-4">
                   <p className="text-xs font-medium text-green-600">Disponible</p>
@@ -546,17 +724,14 @@ export default function ClientDetail() {
           </Card>
         </TabsContent>
 
+        {/* ── Notas ────────────────────────────────────────────── */}
         <TabsContent value="notas">
           <Card>
             <CardContent className="p-6">
               {client.notes ? (
-                <p className="text-sm text-gray-700 whitespace-pre-wrap">
-                  {client.notes}
-                </p>
+                <p className="text-sm text-gray-700 whitespace-pre-wrap">{client.notes}</p>
               ) : (
-                <p className="text-sm text-gray-400 text-center py-8">
-                  Sin notas para este cliente
-                </p>
+                <p className="text-sm text-gray-400 text-center py-8">Sin notas para este cliente</p>
               )}
             </CardContent>
           </Card>

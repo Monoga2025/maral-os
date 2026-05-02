@@ -1,10 +1,10 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { useForm } from 'react-hook-form'
+import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft, Save } from 'lucide-react'
+import { ArrowLeft, Save, Plus, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { clientsApi } from '../lib/api'
 import { Button } from '../components/ui/Button'
@@ -29,15 +29,37 @@ const schema = z.object({
   purchaseFrequency: z.enum(['FRECUENTE', 'INTERMITENTE', 'ESPORADICA', 'NINGUNA']),
   isProvider: z.boolean().optional(),
   notes: z.string().optional(),
+  // Contactos adicionales
+  ownerName: z.string().optional(),
+  purchaseContactName: z.string().optional(),
+  secretaryName: z.string().optional(),
+  otherContactName: z.string().optional(),
+  // Perfil comercial
+  companySizeScore: z.coerce.number().int().min(1).max(10).optional().nullable(),
+  friendlinessLevel: z.enum(['poco', 'intermedio', 'mucho', 'muchísimo']).optional().nullable(),
+  competitors: z.string().optional(),
+  callNotes: z.string().optional(),
 })
 
 type FormData = z.infer<typeof schema>
+
+const PRODUCT_LINES_PREDEFINED = [
+  { key: 'estacion_base', label: 'Línea Estación Base' },
+  { key: 'movil', label: 'Línea Móvil' },
+  { key: 'handy', label: 'Línea Handy' },
+  { key: 'telemetria', label: 'Línea Telemetría' },
+]
 
 export default function ClientForm() {
   const { id } = useParams<{ id: string }>()
   const isEditing = !!id
   const navigate = useNavigate()
   const queryClient = useQueryClient()
+
+  // productLines managed separately (not in react-hook-form due to complex structure)
+  const [predefinedLines, setPredefinedLines] = useState<Record<string, boolean>>({})
+  const [customLines, setCustomLines] = useState<string[]>([])
+  const [newCustomLine, setNewCustomLine] = useState('')
 
   const { data: client } = useQuery({
     queryKey: ['client', id],
@@ -48,6 +70,7 @@ export default function ClientForm() {
   const {
     register,
     handleSubmit,
+    control,
     reset,
     formState: { errors },
   } = useForm<FormData>({
@@ -80,26 +103,54 @@ export default function ClientForm() {
         purchaseFrequency: (client.purchaseFrequency as any) ?? 'NINGUNA',
         isProvider: client.isProvider ?? false,
         notes: client.notes ?? '',
+        ownerName: client.ownerName ?? '',
+        purchaseContactName: client.purchaseContactName ?? '',
+        secretaryName: client.secretaryName ?? '',
+        otherContactName: client.otherContactName ?? '',
+        companySizeScore: client.companySizeScore ?? undefined,
+        friendlinessLevel: (client.friendlinessLevel as any) ?? undefined,
+        competitors: client.competitors ?? '',
+        callNotes: client.callNotes ?? '',
       })
+      const pl = client.productLines as any
+      if (pl) {
+        setPredefinedLines(pl.predefined ?? {})
+        setCustomLines(pl.custom ?? [])
+      }
     }
   }, [client, reset])
 
   const mutation = useMutation({
-    mutationFn: (data: FormData) =>
-      isEditing
-        ? clientsApi.update(id!, data)
-        : clientsApi.create(data),
+    mutationFn: (data: FormData) => {
+      const payload = {
+        ...data,
+        productLines: {
+          predefined: predefinedLines,
+          custom: customLines,
+        },
+      }
+      return isEditing ? clientsApi.update(id!, payload) : clientsApi.create(payload)
+    },
     onSuccess: (res) => {
       queryClient.invalidateQueries({ queryKey: ['clients'] })
-      toast.success(
-        isEditing ? 'Cliente actualizado' : 'Cliente creado exitosamente'
-      )
+      toast.success(isEditing ? 'Cliente actualizado' : 'Cliente creado exitosamente')
       navigate(`/clientes/${res.data.id}`)
     },
     onError: () => {
       toast.error('Error al guardar el cliente')
     },
   })
+
+  const addCustomLine = () => {
+    const trimmed = newCustomLine.trim()
+    if (!trimmed || customLines.includes(trimmed)) return
+    setCustomLines((prev) => [...prev, trimmed])
+    setNewCustomLine('')
+  }
+
+  const removeCustomLine = (line: string) => {
+    setCustomLines((prev) => prev.filter((l) => l !== line))
+  }
 
   return (
     <div className="space-y-5 max-w-3xl">
@@ -120,57 +171,38 @@ export default function ClientForm() {
       </div>
 
       <form onSubmit={handleSubmit((d) => mutation.mutate(d))} className="space-y-5">
-        {/* Basic info */}
+        {/* Información básica */}
         <Card>
           <CardHeader>
             <CardTitle>Información básica</CardTitle>
           </CardHeader>
           <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Input
-              label="Nombre completo *"
-              {...register('name')}
-              error={errors.name?.message}
-            />
-            <Input
-              label="Empresa"
-              {...register('company')}
-              error={errors.company?.message}
-            />
-            <Input
-              label="RUT / NIT"
-              {...register('rut')}
-              placeholder="900.123.456-7"
-            />
-            <Input
-              label="Email"
-              type="email"
-              {...register('email')}
-              error={errors.email?.message}
-            />
-            <Input
-              label="Teléfono"
-              {...register('phone')}
-              placeholder="3001234567"
-            />
-            <Input
-              label="WhatsApp"
-              {...register('whatsapp')}
-              placeholder="3001234567"
-            />
-            <Input
-              label="Ciudad"
-              placeholder="Ej: Bogotá"
-              {...register('city')}
-            />
-            <Input
-              label="Dirección"
-              placeholder="Ej: Calle 45 # 23-12"
-              {...register('address')}
-            />
+            <Input label="Nombre empresa *" {...register('company')} placeholder="Ej: Meltec S.A.S." />
+            <Input label="Nombre principal / Dueño *" {...register('name')} error={errors.name?.message} />
+            <Input label="RUT / NIT" {...register('rut')} placeholder="900.123.456-7" />
+            <Input label="Email" type="email" {...register('email')} error={errors.email?.message} />
+            <Input label="Teléfono" {...register('phone')} placeholder="3001234567" />
+            <Input label="WhatsApp" {...register('whatsapp')} placeholder="3001234567" />
+            <Input label="Ciudad" placeholder="Ej: Bogotá" {...register('city')} />
+            <Input label="Dirección" placeholder="Ej: Calle 45 # 23-12" {...register('address')} />
           </CardContent>
         </Card>
 
-        {/* Commercial conditions */}
+        {/* Contactos adicionales */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Contactos adicionales</CardTitle>
+            <p className="text-sm text-gray-500 mt-1">Personas clave dentro de la empresa cliente.</p>
+          </CardHeader>
+          <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Input label="Nombre dueño" {...register('ownerName')} placeholder="Ej: Carlos Pérez" />
+            <Input label="Nombre contacto de compras" {...register('purchaseContactName')} placeholder="Ej: María García" />
+            <Input label="Nombre secretaria / recepción" {...register('secretaryName')} placeholder="Ej: Lucía Ramírez" />
+            <Input label="Otro contacto" {...register('otherContactName')} placeholder="Ej: Gerente técnico" />
+          </CardContent>
+        </Card>
+
+        {/* Condiciones comerciales */}
         <Card>
           <CardHeader>
             <CardTitle>Condiciones comerciales</CardTitle>
@@ -211,7 +243,7 @@ export default function ClientForm() {
             <div>
               <div className="flex items-center gap-1 mb-1">
                 <span className="text-sm font-medium text-gray-700">Estado Factoring</span>
-                <Hint text="El factoring es cuando una entidad financiera le paga a Maral por adelantado las facturas del cliente. Clientes aprobados: Meltec, ISEC, Eleinco. Si no aplica, dejar en 'Sin Factoring'." side="top" />
+                <Hint text="El factoring es cuando una entidad financiera le paga a Maral por adelantado las facturas del cliente." side="top" />
               </div>
               <select
                 className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 h-9"
@@ -226,7 +258,7 @@ export default function ClientForm() {
             <div>
               <div className="flex items-center gap-1 mb-1">
                 <span className="text-sm font-medium text-gray-700">Cupo de crédito (COP) *</span>
-                <Hint text="Monto máximo en pesos que este cliente puede comprar a crédito. Ej: $5.000.000 para clientes nuevos, $20.000.000 para fundadores." side="top" />
+                <Hint text="Monto máximo en pesos que este cliente puede comprar a crédito." side="top" />
               </div>
               <input
                 type="number"
@@ -241,7 +273,7 @@ export default function ClientForm() {
             <div>
               <div className="flex items-center gap-1 mb-1">
                 <span className="text-sm font-medium text-gray-700">Días de pago</span>
-                <Hint text="Cuántos días calendario tiene el cliente para pagar después de recibir la factura. Valores comunes: 30, 45, 60 o 90 días." side="top" />
+                <Hint text="Cuántos días calendario tiene el cliente para pagar después de recibir la factura." side="top" />
               </div>
               <input
                 type="number"
@@ -256,10 +288,132 @@ export default function ClientForm() {
           </CardContent>
         </Card>
 
-        {/* Notes */}
+        {/* Perfil de ventas */}
         <Card>
           <CardHeader>
-            <CardTitle>Notas internas</CardTitle>
+            <CardTitle>Perfil de ventas</CardTitle>
+            <p className="text-sm text-gray-500 mt-1">Información cualitativa para priorizar y personalizar el acercamiento comercial.</p>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <div className="flex items-center gap-1 mb-1">
+                  <span className="text-sm font-medium text-gray-700">Tamaño del cliente (1-10)</span>
+                  <Hint text="Asigna un número según qué tan grande consideras que es este cliente como empresa, independiente de lo que nos compre. Ej: Meltec = 9, una tienda pequeña = 2." side="top" />
+                </div>
+                <input
+                  type="number"
+                  min="1"
+                  max="10"
+                  placeholder="1 = pequeño · 10 = gigante"
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 h-9"
+                  {...register('companySizeScore')}
+                />
+                {errors.companySizeScore && <p className="text-xs text-red-500 mt-1">{errors.companySizeScore.message}</p>}
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-700 block mb-1">Amigabilidad del cliente</label>
+                <Controller
+                  name="friendlinessLevel"
+                  control={control}
+                  render={({ field }) => (
+                    <select
+                      {...field}
+                      value={field.value ?? ''}
+                      onChange={(e) => field.onChange(e.target.value || null)}
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 h-9"
+                    >
+                      <option value="">Sin definir</option>
+                      <option value="poco">Poco amigable</option>
+                      <option value="intermedio">Intermedio</option>
+                      <option value="mucho">Mucho</option>
+                      <option value="muchísimo">Muchísimo</option>
+                    </select>
+                  )}
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="text-sm font-medium text-gray-700 block mb-1">
+                ¿Dónde normalmente compra? (competidores)
+              </label>
+              <Textarea
+                placeholder="Ej: Le compra antenas a don Carlos, cable a Colombiatex, repetidoras a Meltec..."
+                rows={3}
+                {...register('competitors')}
+              />
+            </div>
+
+            {/* Líneas de producto */}
+            <div>
+              <p className="text-sm font-medium text-gray-700 mb-2">Líneas de producto que maneja</p>
+              <div className="space-y-2">
+                {PRODUCT_LINES_PREDEFINED.map(({ key, label }) => (
+                  <label key={key} className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={!!predefinedLines[key]}
+                      onChange={(e) =>
+                        setPredefinedLines((prev) => ({ ...prev, [key]: e.target.checked }))
+                      }
+                      className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    />
+                    <span className="text-sm text-gray-700">{label}</span>
+                  </label>
+                ))}
+                {/* Custom lines */}
+                {customLines.map((line) => (
+                  <div key={line} className="flex items-center gap-2">
+                    <input type="checkbox" checked readOnly className="rounded border-gray-300 text-blue-600" />
+                    <span className="text-sm text-gray-700 flex-1">{line}</span>
+                    <button
+                      type="button"
+                      onClick={() => removeCustomLine(line)}
+                      className="text-gray-400 hover:text-red-500 transition-colors"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                ))}
+                {/* Add custom line */}
+                <div className="flex items-center gap-2 mt-1">
+                  <input
+                    type="text"
+                    value={newCustomLine}
+                    onChange={(e) => setNewCustomLine(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addCustomLine() } }}
+                    placeholder="Otra línea (ej: CCTV, Internet Rural...)"
+                    className="flex-1 border border-dashed border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent"
+                  />
+                  <Button type="button" size="sm" variant="outline" leftIcon={<Plus className="h-3.5 w-3.5" />} onClick={addCustomLine}>
+                    Agregar
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Notas de llamadas */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Notas de llamadas</CardTitle>
+            <p className="text-sm text-gray-500 mt-1">Registra temas importantes de cada llamada anteponiendo la fecha. Ej: "15 feb - solo trabajan con Motorola"</p>
+          </CardHeader>
+          <CardContent>
+            <Textarea
+              placeholder={"15 feb - nuestros ingresos vienen del alquiler de repetidoras\n03 mar - solo trabajan con productos Motorola\n20 mar - le compran antenas a don Carlos por el crédito"}
+              rows={6}
+              {...register('callNotes')}
+            />
+          </CardContent>
+        </Card>
+
+        {/* Notas internas */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Notas internas generales</CardTitle>
           </CardHeader>
           <CardContent>
             <Textarea
@@ -272,18 +426,10 @@ export default function ClientForm() {
 
         {/* Footer */}
         <div className="flex items-center justify-end gap-3">
-          <Button
-            variant="outline"
-            type="button"
-            onClick={() => navigate('/clientes')}
-          >
+          <Button variant="outline" type="button" onClick={() => navigate('/clientes')}>
             Cancelar
           </Button>
-          <Button
-            type="submit"
-            loading={mutation.isPending}
-            leftIcon={<Save className="h-4 w-4" />}
-          >
+          <Button type="submit" loading={mutation.isPending} leftIcon={<Save className="h-4 w-4" />}>
             {isEditing ? 'Guardar cambios' : 'Crear cliente'}
           </Button>
         </div>

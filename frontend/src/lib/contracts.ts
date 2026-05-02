@@ -141,7 +141,20 @@ export interface CreateClientRequest {
   category: string
   creditLimit?: number
   paymentDays?: number
+  factoringStatus?: 'APROBADO' | 'EN_ESTUDIO' | 'RECHAZADO' | 'NO_APLICA'
+  purchaseFrequency?: 'FRECUENTE' | 'INTERMITENTE' | 'ESPORADICA' | 'NINGUNA'
   notes?: string
+  // Contactos adicionales
+  ownerName?: string
+  purchaseContactName?: string
+  secretaryName?: string
+  otherContactName?: string
+  // Perfil comercial
+  companySizeScore?: number | null
+  friendlinessLevel?: 'poco' | 'intermedio' | 'mucho' | 'muchísimo' | null
+  competitors?: string
+  callNotes?: string
+  productLines?: Record<string, unknown> | null
 }
 
 export type UpdateClientRequest = Partial<CreateClientRequest>

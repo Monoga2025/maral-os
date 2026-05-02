@@ -68,6 +68,24 @@ model Client {
   purchaseFrequency PurchaseFrequency  @default(NINGUNA)
   /// Código interno de Merlin (campo Tercero en VENMovimientos). Lo asigna sync_maral.py.
   merlinCode        String?
+  // ── Contactos adicionales ────────────────────────────────────
+  ownerName             String?
+  purchaseContactName   String?
+  secretaryName         String?
+  otherContactName      String?
+  // ── Perfil comercial ─────────────────────────────────────────
+  /// Score 1-10 calculado automáticamente por volumen de compra histórico
+  purchaseVolumeScore   Int?
+  /// Score 1-10 asignado manualmente según tamaño percibido del cliente
+  companySizeScore      Int?
+  /// Nivel de amigabilidad: poco / intermedio / mucho / muchísimo
+  friendlinessLevel     String?
+  /// Empresas donde el cliente normalmente compra (texto libre)
+  competitors           String?
+  /// Notas cronológicas de llamadas (cada entrada antepone fecha)
+  callNotes             String?
+  /// Líneas de producto del cliente {predefined:{estacion_base,movil,handy,telemetria}, custom:[]}
+  productLines          Json?
   // ── Campaign segmentation fields (Sprint 0) ──────────────────
   tags              String[]           @default([])
   segment           String?
