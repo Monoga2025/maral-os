@@ -37,6 +37,7 @@ import type { ConvertToOrderRequest } from '../lib/contracts'
 import { TourButton } from '../components/tour/TourButton'
 
 const STATUS_TABS: { value: string; label: string }[] = [
+  { value: 'all', label: 'Todas' },
   { value: 'active', label: 'Activas' },
   { value: 'BORRADOR', label: 'Borrador' },
   { value: 'ENVIADA', label: 'Enviada' },
@@ -54,7 +55,7 @@ function getDateAgeClass(createdAt: string, status: string): string {
   return 'text-red-500 font-semibold'
 }
 
-const CARRIERS = ['Servientrega', 'Interrapidísimo', 'Coordinadora', 'TCC', 'Envia', 'Otro']
+const CARRIERS = ['Cualquiera', 'Servientrega', 'Interrapidísimo', 'Coordinadora', 'TCC', 'Envia', 'Otro']
 
 interface ConvertModalProps {
   quotationId: string
@@ -73,7 +74,7 @@ function ConvertModal({ quotationId: _id, clientName, clientPhone, clientAddress
     address: clientAddress ?? '',
     city: clientCity ?? '',
     phone: clientPhone ?? '',
-    carrier: '',
+    carrier: 'Cualquiera',
     freightPayer: 'DESTINATARIO',
     freightPayment: 'CONTADO',
     type: 'PEDIDO',
@@ -85,7 +86,6 @@ function ConvertModal({ quotationId: _id, clientName, clientPhone, clientAddress
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    if (!form.carrier) { toast.error('Selecciona una transportadora'); return }
     onConfirm(form)
   }
 
@@ -240,6 +240,11 @@ export default function Quotations() {
   const { data, isLoading } = useQuery({
     queryKey: ['quotations', { search, status: statusTab, page }],
     queryFn: async () => {
+      if (statusTab === 'all') {
+        return quotationsApi
+          .getAll({ search: search || undefined, page, pageSize: 20 })
+          .then((r) => r.data)
+      }
       if (statusTab === 'active') {
         // Fetch BORRADOR + ENVIADA merged (two calls, combined client-side)
         const [borradores, enviadas] = await Promise.all([
@@ -561,7 +566,7 @@ export default function Quotations() {
                               e.stopPropagation()
                               setDownloadingId(q.id)
                               try {
-                                await quotationsApi.downloadPDF(q.id, q.number)
+                                await quotationsApi.downloadPDF(q.id, q.number, q.client?.name ?? q.client?.company)
                               } catch {
                                 toast.error('Error al generar PDF')
                               } finally {

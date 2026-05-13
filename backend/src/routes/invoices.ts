@@ -102,6 +102,11 @@ router.get('/', async (req: AuthRequest, res: Response) => {
     if (status) where.status = status;
     if (clientId) where.clientId = clientId;
 
+    await prisma.invoice.updateMany({
+      where: { status: 'VIGENTE', dueDate: { lt: now } },
+      data: { status: 'VENCIDA' },
+    });
+
     const [invoices, total] = await Promise.all([
       prisma.invoice.findMany({
         where,

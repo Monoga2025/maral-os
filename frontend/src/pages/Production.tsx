@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Factory, Plus, X } from 'lucide-react'
-import { productionApi, productsApi } from '../lib/api'
+import { productionApi, productsApi, usersApi } from '../lib/api'
 import { formatDate, getStatusColor } from '../lib/utils'
 import type { ProductionOrder } from '../types'
 import { toast } from 'sonner'
@@ -14,8 +14,6 @@ const PHASES = [
   { key: 'ENSAMBLE_FINAL', label: 'Ensamble Final', desc: 'Ensamble completo, revisión, empaque' },
 ]
 
-const ASSIGNEES = ['Angelo', 'Iván', 'Sin asignar']
-
 export default function Production() {
   const qc = useQueryClient()
   const [phaseFilter, setPhaseFilter] = useState('')
@@ -24,7 +22,7 @@ export default function Production() {
   const [newProductId, setNewProductId] = useState('')
   const [newQty, setNewQty] = useState(1)
   const [newPhase, setNewPhase] = useState('BASICO')
-  const [newAssignee, setNewAssignee] = useState('Angelo')
+  const [newAssignee, setNewAssignee] = useState('')
   const [newRequired, setNewRequired] = useState('')
 
   const { data, isLoading } = useQuery({
@@ -39,6 +37,11 @@ export default function Production() {
   const { data: productsData } = useQuery({
     queryKey: ['products-all'],
     queryFn: () => productsApi.getAll({ pageSize: 200 }),
+  })
+
+  const { data: usersData } = useQuery({
+    queryKey: ['assignable-users'],
+    queryFn: () => usersApi.assignable().then((r) => r.data),
   })
 
   const updateStatus = useMutation({
@@ -66,6 +69,7 @@ export default function Production() {
 
   const orders: ProductionOrder[] = data?.data.data ?? []
   const products = productsData?.data.data ?? []
+  const assignees = (usersData ?? []).filter((u) => u.role === 'LOGISTICA' || u.role === 'GERENTE')
 
   const STATUS_FLOW: Record<string, string> = {
     PENDIENTE: 'EN_PROCESO',
@@ -201,7 +205,7 @@ export default function Production() {
                     {PHASES.find((p) => p.key === order.phase)?.label ?? order.phase}
                   </span>
                 </td>
-                <td className="px-4 py-3 text-gray-600">{ASSIGNEES.includes(order.assignedTo ?? '') ? order.assignedTo : '—'}</td>
+                <td className="px-4 py-3 text-gray-600">{order.assignedUser?.name ?? '—'}</td>
                 <td className="px-4 py-3 text-gray-500 text-xs">
                   {order.requiredDate ? formatDate(order.requiredDate) : '—'}
                 </td>
@@ -273,7 +277,8 @@ export default function Production() {
                   </div>
                   <select value={newAssignee} onChange={(e) => setNewAssignee(e.target.value)}
                     className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    {ASSIGNEES.map((a) => <option key={a}>{a}</option>)}
+                    <option value="">Sin asignar</option>
+                    {assignees.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
                   </select>
                 </div>
                 <div>

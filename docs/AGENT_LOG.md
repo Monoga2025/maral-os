@@ -28,6 +28,54 @@
 
 ---
 
+## 2026-05-13 — OpenCode — Variables compartidas entre módulos core
+
+### Qué se hizo
+- Se corrigieron cortes de datos entre Clientes, Cotizaciones, Pedidos, Producción, Crédito, Inventario, Campañas y Tareas.
+- Se usaron subagentes de exploración para auditar flujo core, segmentación/categorías/etiquetas y contratos frontend/backend.
+
+### Hallazgos importantes
+- `GET /api/quotations` no devolvía dirección/teléfono del cliente, por eso la conversión a pedido abría datos vacíos.
+- Clientes filtraba etiquetas con `interestTags`, mientras campañas y asignación masiva usan `Tag` + `ClientTag`.
+- Segmentos y categorías tenían CRUD dinámico, pero Clientes seguía con listas hardcodeadas.
+- Descuento de cotización se perdía al convertir a pedido porque se copiaba `unitPrice` bruto.
+- Producción recibía nombres (`Angelo`, `Iván`) en un campo que Prisma relaciona contra `User.id`.
+- Cartera no se alimentaba automáticamente desde pedidos a crédito despachados.
+
+### Cambios realizados
+- `backend/src/routes/clients.ts`: filtros `segment`/`tagId`, select completo de cliente, `previousNames`, validación de segmentos.
+- `backend/src/routes/quotations.ts`: filtro `clientId`, select de cliente completo, conversión con fallback de dirección/teléfono, `sourceCampaignId`, `confirmed`, precio final con descuento.
+- `backend/src/routes/orders.ts`: `dispatchDate`, `dianInvoiceNumber`, despacho a crédito crea/actualiza factura interna, disposición `PRODUCCION` crea OP vinculada.
+- `backend/src/routes/production.ts`: filtro por asignado y sincronización de pedido a `EMPACADO` cuando todas las OP vinculadas terminan.
+- `backend/src/routes/invoices.ts`: actualización automática de facturas vencidas al consultar cartera.
+- `backend/src/lib/audience-query.ts` y `backend/src/routes/campaigns.ts`: audiencias soportan `categories`; Marco acepta segmentos dinámicos.
+- `backend/src/lib/image-gen.ts`: modelo de imagen cambiado a `google/gemini-2.5-flash-image-preview`.
+- `backend/prisma/schema.prisma`: agregados `Client.previousNames` y `Order.dianInvoiceNumber`.
+- `frontend/src/lib/api.ts`, `frontend/src/lib/contracts.ts`, `frontend/src/types/index.ts`: contratos actualizados para que variables viajen tipadas.
+- `frontend/src/pages/Clients.tsx`: categorías/segmentos/etiquetas dinámicas, filtro real por etiqueta, edición inline de categoría.
+- `frontend/src/pages/ClientForm.tsx` y `ClientDetail.tsx`: captura y visualización de nombres anteriores.
+- `frontend/src/pages/Quotations.tsx`: tab Todas, transportadora Cualquiera, descarga PDF real con nombre `numero_cliente.pdf`.
+- `frontend/src/pages/QuotationForm.tsx`: aviso de salida sin guardar.
+- `frontend/src/pages/OrderForm.tsx`: transportadora Cualquiera.
+- `frontend/src/pages/OrderDetail.tsx`: despacho a crédito y OP con usuarios reales.
+- `frontend/src/pages/Production.tsx`: asignación con usuarios reales.
+- `frontend/src/pages/Inventory.tsx`: KPIs filtrables, edición rápida de stock y mínimo.
+- `frontend/src/pages/CampaignWizard.tsx`: categorías en audiencia y generación de imágenes activada.
+- `frontend/src/pages/Tareas.tsx` y `backend/src/routes/tasks.ts`: mensaje/estado por tarea editable por creador/asignado.
+
+### Riesgos identificados
+- Cambios de schema fueron aplicados con `prisma db push`; para producción conviene crear migración formal antes de deploy.
+- Fragmentación de pedidos requiere modelo dedicado; no se implementó en esta tanda porque cambia arquitectura de pedidos/despachos.
+- Ocultamiento completo de valores para LOGISTICA debe reforzarse en backend con serialización por rol antes de producción.
+
+### Próximos pasos
+- Crear migración formal Prisma.
+- Implementar modelo de fragmentos/envíos parciales.
+- Reforzar permisos/serialización para ocultar precios a logística.
+- Probar flujo manual: cliente -> cotización -> pedido -> producción -> despacho crédito -> cartera.
+
+---
+
 ## 2026-04-20 — Claude Code — Módulo cotizaciones: HTML render, firma, guía de envío, numeración
 
 ### Qué se hizo

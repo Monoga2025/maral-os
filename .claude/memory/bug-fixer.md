@@ -1,5 +1,38 @@
 # Bug Fixer Memory
 
+---
+
+### 2026-04-30 — WhatsApp CRM: usabilidad y contexto CRM
+
+**[WA-CRM-01] backend/whatsapp.ts: GET /chats sin datos de cliente vinculado**
+- Archivo: `backend/src/routes/whatsapp.ts` (GET /chats, ~línea 659)
+- Cambio: tras `findMany` de chats, se hace batch-lookup de clientes con `whatsapp != null`, matching por número normalizado (quita no-dígitos, endsWith en ambas direcciones). Luego batch-lookup de `campaignRecipient` más reciente por clientId. Response añade: `clientId`, `clientName`, `clientCategory`, `temperature`.
+- Antes: response solo tenía datos del chat (pushName, number, unread, etc.)
+- Después: incluye contexto CRM de MARAL para chats de tipo 'contacto'
+
+**[WA-CRM-02] types/index.ts: WaChat sin campos CRM**
+- Archivo: `frontend/src/types/index.ts` (interface WaChat, ~línea 410)
+- Cambio: añadidos 4 campos opcionales: `clientId?`, `clientName?`, `clientCategory?`, `temperature?`
+
+**[WA-CRM-03] Whatsapp.tsx: ChatFilter sin 'hot'**
+- Archivo: `frontend/src/pages/Whatsapp.tsx`
+- Cambio: type `ChatFilter` ampliado con `'hot'`; filtro `filter === 'hot' && c.temperature !== 'HOT'` añadido al bloque de filtrado
+
+**[WA-CRM-04] Whatsapp.tsx: sin stats bar de resumen**
+- Archivo: `frontend/src/pages/Whatsapp.tsx` (columna izquierda, entre search y tabs)
+- Cambio: añadida barra de 3 columnas (Total / Sin resp. / Hot) con `grid-cols-3 divide-x`
+
+**[WA-CRM-05] Whatsapp.tsx: tab 'hot' faltante en filter tabs**
+- Archivo: `frontend/src/pages/Whatsapp.tsx` (array de tabs)
+- Cambio: añadido tab `['hot', '🔥 Hot', allChats.filter(c => c.temperature === 'HOT').length]`
+
+**[WA-CRM-06] Whatsapp.tsx: ChatItem sin badges CRM**
+- Archivo: `frontend/src/pages/Whatsapp.tsx` (función ChatItem)
+- Cambio: reemplazado el bloque de nombre/número por: nombre principal, línea `clientName` con icono Building2 (si difiere del nombre), fila de badges (🔥 HOT / 🌡 WARM / pill categoría IM|DS|CF / número). Eliminado el fallback anterior `+{chat.number}` debajo del nombre.
+
+**Imports añadidos:** `Building2` de lucide-react en Whatsapp.tsx
+**TypeScript:** `npx tsc --noEmit` sin errores en frontend y backend.
+
 ## Correcciones aplicadas
 
 ### 2026-04-26 — 12 bugs P1 (UI + BE + DA)

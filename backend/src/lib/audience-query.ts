@@ -2,6 +2,7 @@ import prisma from './prisma'
 
 export interface AudienceFilter {
   segments?: string[]
+  categories?: string[]
   tagIds?: string[]
   cities?: string[]
   interestTags?: string[]
@@ -17,6 +18,7 @@ export interface AudienceFilter {
 export async function resolveAudience(filters: AudienceFilter) {
   const {
     segments,
+    categories,
     tagIds,
     cities,
     interestTags,
@@ -35,6 +37,8 @@ export async function resolveAudience(filters: AudienceFilter) {
   if (excludeOptedOut) AND.push({ optedOut: false })
 
   if (segments && segments.length > 0) AND.push({ segment: { in: segments } })
+
+  if (categories && categories.length > 0) AND.push({ category: { in: categories } })
 
   if (tagIds && tagIds.length > 0) AND.push({ clientTags: { some: { tagId: { in: tagIds } } } })
 

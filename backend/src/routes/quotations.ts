@@ -123,10 +123,12 @@ router.get('/', async (req: AuthRequest, res: Response) => {
     const status = req.query.status as string;
     const search = req.query.search as string;
     const sellerId = req.query.sellerId as string;
+    const clientId = req.query.clientId as string;
 
     const where: Record<string, unknown> = {};
     if (status) where.status = status;
     if (sellerId) where.sellerId = sellerId;
+    if (clientId) where.clientId = clientId;
     if (search) {
       where.client = { OR: [
         { name: { contains: search, mode: 'insensitive' } },
@@ -141,7 +143,7 @@ router.get('/', async (req: AuthRequest, res: Response) => {
         take: limit,
         orderBy: { createdAt: 'desc' },
         include: {
-          client: { select: { id: true, name: true, company: true, city: true } },
+          client: { select: { id: true, name: true, company: true, city: true, department: true, phone: true, whatsapp: true, address: true, category: true, segment: true } },
           seller: { select: { id: true, name: true } },
           _count: { select: { items: true } },
         },
@@ -478,13 +480,14 @@ router.post('/:id/convert-to-order', async (req: AuthRequest, res: Response) => 
     }
 
     const orderDataSchema = z.object({
-      recipientName: z.string().min(1),
-      address: z.string().min(1),
-      city: z.string().min(1),
-      phone: z.string().min(7),
-      carrier: z.string().min(1),
-      freightPayer: z.string().min(1),
-      freightPayment: z.string().min(1),
+      recipientName: z.string().optional(),
+      address: z.string().optional(),
+      city: z.string().optional(),
+      phone: z.string().optional(),
+      carrier: z.string().optional(),
+      freightPayer: z.string().optional(),
+      freightPayment: z.string().optional(),
+      confirmed: z.boolean().optional(),
       type: z.enum(['PEDIDO', 'GARANTIA', 'MUESTRA']).optional().default('PEDIDO'),
       notes: z.string().optional(),
     });
@@ -498,18 +501,29 @@ router.post('/:id/convert-to-order', async (req: AuthRequest, res: Response) => 
       return;
     }
 
+    const data = orderValidation.data;
     const [order] = await prisma.$transaction([
       prisma.order.create({
         data: {
           quotationId: quotation.id,
           clientId: quotation.clientId,
           total: quotation.total,
-          ...orderValidation.data,
+          sourceCampaignId: quotation.sourceCampaignId,
+          recipientName: data.recipientName || quotation.client.name,
+          address: data.address || quotation.shippingAddress || quotation.client.address || '',
+          city: data.city || quotation.client.city || '',
+          phone: data.phone || quotation.client.phone || quotation.client.whatsapp || '',
+          carrier: data.carrier || 'Cualquiera',
+          freightPayer: data.freightPayer || 'Destinatario',
+          freightPayment: data.freightPayment || 'Por definir',
+          confirmed: data.confirmed ?? quotation.status === 'APROBADA',
+          type: data.type,
+          notes: data.notes,
           items: {
             create: quotation.items.map((item) => ({
               productId: item.productId,
               qty: item.qty,
-              unitPrice: item.unitPrice,
+              unitPrice: item.unitPrice * (1 - (item.discount || 0) / 100),
             })),
           },
         },

@@ -12,7 +12,7 @@ import {
   X,
 } from 'lucide-react'
 import { toast } from 'sonner'
-import { clientsApi, tagsApi } from '../lib/api'
+import { categoriesApi, clientsApi, segmentsApi, tagsApi } from '../lib/api'
 import { formatDate, formatCOP } from '../lib/utils'
 import { Button } from '../components/ui/Button'
 import { TourButton } from '../components/tour/TourButton'
@@ -26,22 +26,14 @@ import {
   TableHead,
   TableCell,
 } from '../components/ui/Table'
-import { ClientCategoryBadge, FactoringStatusBadge } from '../components/ui/StatusBadge'
+import { FactoringStatusBadge } from '../components/ui/StatusBadge'
 import { Pagination } from '../components/ui/Pagination'
 import { EmptyState } from '../components/ui/EmptyState'
 import { TableSkeleton } from '../components/ui/LoadingSkeleton'
 import { Card } from '../components/ui/Card'
-import type { ClientCategory, PurchaseFrequency } from '../types'
+import type { PurchaseFrequency } from '../types'
 
-type Segment = 'IM' | 'DS' | 'CF'
-
-const SEGMENT_LABELS: Record<Segment, string> = {
-  IM: 'Importador (IM)',
-  DS: 'Distribuidor (DS)',
-  CF: 'Cliente Final (CF)',
-}
-
-const SEGMENT_COLORS: Record<Segment, string> = {
+const SEGMENT_COLORS: Record<string, string> = {
   IM: 'bg-blue-100 text-blue-700 border-blue-200',
   DS: 'bg-purple-100 text-purple-700 border-purple-200',
   CF: 'bg-green-100 text-green-700 border-green-200',
@@ -61,12 +53,15 @@ const FREQ_COLORS: Record<PurchaseFrequency, string> = {
   NINGUNA: 'text-gray-400',
 }
 
-function SegmentBadge({ segment }: { segment?: string | null }) {
+function SegmentBadge({ segment, segments }: { segment?: string | null; segments?: { code: string; name: string; color?: string }[] }) {
   if (!segment) return <span className="text-gray-400 text-xs">—</span>
-  const s = segment as Segment
+  const found = segments?.find((s) => s.code === segment)
   return (
-    <span className={`text-xs font-semibold px-2 py-0.5 rounded-full border ${SEGMENT_COLORS[s] ?? 'bg-gray-100 text-gray-600'}`}>
-      {s}
+    <span
+      className={`text-xs font-semibold px-2 py-0.5 rounded-full border ${found?.color ? '' : SEGMENT_COLORS[segment] ?? 'bg-gray-100 text-gray-600'}`}
+      style={found?.color ? { backgroundColor: `${found.color}20`, color: found.color, borderColor: `${found.color}55` } : undefined}
+    >
+      {found ? `${found.code} — ${found.name}` : segment}
     </span>
   )
 }
@@ -108,7 +103,7 @@ export default function Clients() {
     queryKey: ['clients', { search, category, city, tag, segmentFilter, page }],
     queryFn: () =>
       clientsApi
-        .getAll({ search: search || undefined, category: category || undefined, city: city || undefined, tag: tag || undefined, page, pageSize: 20 })
+        .getAll({ search: search || undefined, category: category || undefined, city: city || undefined, tagId: tag || undefined, segment: segmentFilter || undefined, page, pageSize: 20 })
         .then((r) => r.data),
     staleTime: 30_000,
   })
@@ -119,20 +114,26 @@ export default function Clients() {
     staleTime: 300_000,
   })
 
-  const { data: allTags } = useQuery({
-    queryKey: ['client-tags'],
-    queryFn: () => clientsApi.getTags().then((r) => r.data as string[]),
-    staleTime: 300_000,
-  })
-
   const { data: allTagEntities = [] } = useQuery<{ id: string; name: string; color: string }[]>({
     queryKey: ['tags'],
     queryFn: () => tagsApi.getAll().then((r) => r.data),
     staleTime: 60_000,
   })
 
+  const { data: allSegments = [] } = useQuery<{ id: string; code: string; name: string; color?: string; discount?: number }[]>({
+    queryKey: ['segments'],
+    queryFn: () => segmentsApi.getAll().then((r) => r.data),
+    staleTime: 60_000,
+  })
+
+  const { data: allCategories = [] } = useQuery<{ id: string; code: string; name: string; color?: string }[]>({
+    queryKey: ['categories'],
+    queryFn: () => categoriesApi.getAll().then((r) => r.data),
+    staleTime: 60_000,
+  })
+
   const bulkSegmentMutation = useMutation({
-    mutationFn: ({ ids, segment }: { ids: string[]; segment: Segment | null }) =>
+    mutationFn: ({ ids, segment }: { ids: string[]; segment: string | null }) =>
       clientsApi.bulkSegment(ids, segment),
     onSuccess: (res) => {
       toast.success(`${res.data.updated} clientes actualizados`)
@@ -141,6 +142,16 @@ export default function Clients() {
       qc.invalidateQueries({ queryKey: ['clients'] })
     },
     onError: () => toast.error('Error al actualizar segmentos'),
+  })
+
+  const categoryMutation = useMutation({
+    mutationFn: ({ id, category }: { id: string; category: string }) =>
+      clientsApi.update(id, { category }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['clients'] })
+      toast.success('Categoría actualizada')
+    },
+    onError: () => toast.error('Error al actualizar categoría'),
   })
 
   const bulkTagMutation = useMutation({
@@ -187,7 +198,7 @@ export default function Clients() {
 
   const applyBulkSegment = () => {
     const ids = Array.from(selectedIds)
-    const segment = bulkSegment === 'NINGUNA' ? null : (bulkSegment as Segment)
+    const segment = bulkSegment === 'NINGUNA' ? null : bulkSegment
     bulkSegmentMutation.mutate({ ids, segment })
   }
 
@@ -234,19 +245,15 @@ export default function Clients() {
           </div>
           <Select value={category} onChange={(e) => { setCategory(e.target.value); setPage(1) }} className="w-48">
             <option value="">Todas las categorías</option>
-            <option value="IMPORTADOR">Importador (IM)</option>
-            <option value="DISTRIBUIDOR">Distribuidor (DS)</option>
-            <option value="CLIENTE_FINAL">Cliente Final (CF)</option>
-            <option value="PROSPECTO">Prospecto</option>
-            <option value="ALIADO">Aliado</option>
-            <option value="FUNDADOR_HISTORICO">Fundador Histórico</option>
-            <option value="FUNDADOR_MARAL">Fundador Maral</option>
+            {allCategories.map((cat) => (
+              <option key={cat.code} value={cat.code}>{cat.name}</option>
+            ))}
           </Select>
           <Select value={segmentFilter} onChange={(e) => { setSegmentFilter(e.target.value); setPage(1) }} className="w-44">
             <option value="">Todos los segmentos</option>
-            <option value="IM">IM — Importador</option>
-            <option value="DS">DS — Distribuidor</option>
-            <option value="CF">CF — Cliente Final</option>
+            {allSegments.map((seg) => (
+              <option key={seg.code} value={seg.code}>{seg.code} — {seg.name}</option>
+            ))}
           </Select>
           <Select value={city} onChange={(e) => { setCity(e.target.value); setPage(1) }} className="w-40">
             <option value="">Todas las ciudades</option>
@@ -256,8 +263,8 @@ export default function Clients() {
           </Select>
           <Select value={tag} onChange={(e) => { setTag(e.target.value); setPage(1) }} className="w-44">
             <option value="">Todas las etiquetas</option>
-            {(allTags ?? []).map((t) => (
-              <option key={t} value={t}>{t}</option>
+            {allTagEntities.map((t) => (
+              <option key={t.id} value={t.id}>{t.name}</option>
             ))}
           </Select>
         </div>
@@ -303,9 +310,9 @@ export default function Clients() {
                 className="rounded-lg border border-blue-300 bg-white px-3 py-1.5 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <option value="">Asignar segmento…</option>
-                <option value="IM">IM — Importador (36% dto.)</option>
-                <option value="DS">DS — Distribuidor (26% dto.)</option>
-                <option value="CF">CF — Cliente Final (10% dto.)</option>
+                {allSegments.map((seg) => (
+                  <option key={seg.code} value={seg.code}>{seg.code} — {seg.name}{seg.discount ? ` (${seg.discount}% dto.)` : ''}</option>
+                ))}
                 <option value="NINGUNA">Sin segmento</option>
               </select>
               <Button
@@ -402,11 +409,21 @@ export default function Clients() {
                       <TableCell>
                         <span className="text-gray-600">{client.city ?? '—'}</span>
                       </TableCell>
-                      <TableCell>
-                        <ClientCategoryBadge category={client.category as ClientCategory} />
+                      <TableCell onClick={(e) => e.stopPropagation()}>
+                        <select
+                          value={client.category}
+                          onChange={(e) => categoryMutation.mutate({ id: client.id, category: e.target.value })}
+                          className="rounded-lg border border-gray-200 bg-white px-2 py-1 text-xs font-medium text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          title="Cambiar categoría"
+                        >
+                          {allCategories.length === 0 && <option value={client.category}>{client.category}</option>}
+                          {allCategories.map((cat) => (
+                            <option key={cat.code} value={cat.code}>{cat.name}</option>
+                          ))}
+                        </select>
                       </TableCell>
                       <TableCell>
-                        <SegmentBadge segment={(client as any).segment} />
+                        <SegmentBadge segment={(client as any).segment} segments={allSegments} />
                       </TableCell>
                       <TableCell>
                         <div className="flex flex-wrap gap-1">

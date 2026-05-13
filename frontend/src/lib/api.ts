@@ -97,10 +97,13 @@ export const clientsApi = {
     category?: string
     city?: string
     tag?: string
+    tagId?: string
+    segment?: string
     isActive?: boolean
+    active?: boolean
     page?: number
     pageSize?: number
-  }) => api.get<PaginatedResponse<Client>>('/clients', { params }),
+  }) => api.get<PaginatedResponse<Client>>('/clients', { params: params ? { ...params, active: params.active ?? params.isActive } : undefined }),
   getById: (id: string) => api.get<Client>(`/clients/${id}`),
   create: (data: CreateClientRequest) => api.post<Client>('/clients', data),
   update: (id: string, data: UpdateClientRequest) =>
@@ -108,7 +111,7 @@ export const clientsApi = {
   delete: (id: string) => api.delete(`/clients/${id}`),
   getCities: () => api.get<string[]>('/clients/cities'),
   getTags: () => api.get<string[]>('/clients/tags'),
-  bulkSegment: (ids: string[], segment: 'IM' | 'DS' | 'CF' | null) =>
+  bulkSegment: (ids: string[], segment: string | null) =>
     api.patch<{ updated: number }>('/clients/bulk-segment', { ids, segment }),
 }
 
@@ -188,11 +191,20 @@ export const quotationsApi = {
   duplicate: (id: string) => api.post<Quotation>(`/quotations/${id}/duplicate`),
   updateStatus: (id: string, status: string) =>
     api.patch<Quotation>(`/quotations/${id}/status`, { status }),
-  downloadPDF: async (id: string, _number: number | string): Promise<void> => {
+  downloadPDF: async (id: string, number: number | string, clientName?: string): Promise<void> => {
     const token = localStorage.getItem('token')
-    // Opens HTML in new tab — user prints/saves as PDF from browser
-    const url = `/api/quotations/${id}/html?token=${encodeURIComponent(token || '')}`
-    window.open(url, '_blank')
+    const res = await fetch(`/api/quotations/${id}/pdf?token=${encodeURIComponent(token || '')}`)
+    if (!res.ok) throw new Error('PDF error')
+    const blob = await res.blob()
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    const safeClient = (clientName || 'cliente').replace(/[^a-zA-Z0-9áéíóúÁÉÍÓÚñÑ_-]+/g, '_').replace(/^_+|_+$/g, '')
+    a.href = url
+    a.download = `${String(number).padStart(5, '0')}_${safeClient}.pdf`
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    URL.revokeObjectURL(url)
   },
   viewPDF: async (id: string): Promise<void> => {
     const token = localStorage.getItem('token')
@@ -229,8 +241,8 @@ export const ordersApi = {
   create: (data: CreateOrderRequest) => api.post<Order>('/orders', data),
   update: (id: string, data: Partial<CreateOrderRequest>) =>
     api.put<Order>(`/orders/${id}`, data),
-  updateStatus: (id: string, status: string) =>
-    api.patch<Order>(`/orders/${id}/status`, { status }),
+  updateStatus: (id: string, status: string, extra?: { guideNumber?: string; dispatchDate?: string; creditDispatch?: boolean; dianInvoiceNumber?: string }) =>
+    api.patch<Order>(`/orders/${id}/status`, { status, ...(extra ?? {}) }),
   updateItemDisposition: (orderId: string, itemId: string, disposition: string) =>
     api.patch(`/orders/${orderId}/items/${itemId}/disposition`, { disposition }),
   pickItem: (orderId: string, itemId: string, picked: boolean) =>
@@ -249,6 +261,7 @@ export const inventoryApi = {
     search?: string
     line?: string
     category?: string
+    stockStatus?: string
     page?: number
     pageSize?: number
   }) => api.get<PaginatedResponse<Product>>('/inventory', { params }),
@@ -308,6 +321,8 @@ export const invoicesApi = {
     pageSize?: number
   }) => api.get<PaginatedResponse<Invoice>>('/invoices', { params }),
   getById: (id: string) => api.get<Invoice>(`/invoices/${id}`),
+  create: (data: { orderId?: string; clientId: string; amount: number; dueDate: string }) =>
+    api.post<Invoice>('/invoices', data),
   registerPayment: (id: string, amount: number, notes?: string) =>
     api.put(`/invoices/${id}/pay`, { amount, notes }),
   getCreditSummary: () =>

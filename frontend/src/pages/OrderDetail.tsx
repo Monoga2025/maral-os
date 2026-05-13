@@ -6,7 +6,7 @@ import {
   MapPin, AlertTriangle, Check, Save, Copy, X, FileText,
   Factory, Plus, ChevronRight, Calendar,
 } from 'lucide-react'
-import { ordersApi, productionApi, productsApi } from '../lib/api'
+import { ordersApi, productionApi, productsApi, usersApi } from '../lib/api'
 import { formatCOP, formatDate, getStatusColor } from '../lib/utils'
 import type { Order, OrderStatus, ItemDisposition, ProductionStatus } from '../types'
 import { toast } from 'sonner'
@@ -16,7 +16,6 @@ const PHASES = [
   { key: 'PREENSAMBLE', label: 'Preensamble' },
   { key: 'ENSAMBLE_FINAL', label: 'Ensamble Final' },
 ]
-const ASSIGNEES = ['Angelo', 'Iván', 'Sin asignar']
 
 const PROD_STATUS_COLORS: Record<ProductionStatus, string> = {
   PENDIENTE: 'bg-yellow-100 text-yellow-700',
@@ -225,7 +224,7 @@ export default function OrderDetail() {
   const [opProductId, setOpProductId] = useState('')
   const [opQty, setOpQty] = useState(1)
   const [opPhase, setOpPhase] = useState('BASICO')
-  const [opAssignee, setOpAssignee] = useState('Angelo')
+  const [opAssignee, setOpAssignee] = useState('')
   const [opRequired, setOpRequired] = useState('')
 
   const { data, isLoading } = useQuery({
@@ -244,6 +243,12 @@ export default function OrderDetail() {
     mutationFn: (status: string) => ordersApi.updateStatus(id!, status),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['order', id] }); toast.success('Estado actualizado') },
     onError: () => toast.error('Error al actualizar'),
+  })
+
+  const dispatchCredit = useMutation({
+    mutationFn: () => ordersApi.updateStatus(id!, 'DESPACHADO', { creditDispatch: true }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['order', id] }); toast.success('Pedido despachado a crédito y registrado en cartera') },
+    onError: () => toast.error('Error al despachar a crédito'),
   })
 
   const uploadPhoto = useMutation({
@@ -302,6 +307,14 @@ export default function OrderDetail() {
     queryFn: () => productsApi.getAll({ pageSize: 200 }),
     enabled: showCreateOP,
   })
+
+  const { data: usersData } = useQuery({
+    queryKey: ['assignable-users'],
+    queryFn: () => usersApi.assignable().then((r) => r.data),
+    enabled: showCreateOP,
+  })
+
+  const assignees = (usersData ?? []).filter((u) => u.role === 'LOGISTICA' || u.role === 'GERENTE')
 
   const DISPOSITION_LABELS: Record<ItemDisposition, string> = {
     PENDIENTE: 'Pendiente',
@@ -392,6 +405,16 @@ export default function OrderDetail() {
             <FileText size={14} />
             Facturar en Merlin
           </button>
+          {order.status !== 'DESPACHADO' && order.status !== 'ENTREGADO' && (
+            <button
+              onClick={() => dispatchCredit.mutate()}
+              disabled={dispatchCredit.isPending}
+              className="flex items-center gap-2 px-3 py-2 border border-emerald-200 bg-emerald-50 text-emerald-700 rounded-lg hover:bg-emerald-100 text-sm font-medium transition-colors disabled:opacity-50"
+              title="Despachar sin consignación y crear cuenta por cobrar"
+            >
+              Cliente a crédito
+            </button>
+          )}
           <button
             onClick={printDispatch}
             className="flex items-center gap-2 px-4 py-2 border border-gray-200 rounded-lg hover:bg-gray-50 text-sm font-medium transition-colors"
@@ -724,7 +747,7 @@ export default function OrderDetail() {
                     <p className="text-sm font-medium text-gray-900 truncate">{op.product?.name ?? '—'}</p>
                   </div>
                   <p className="text-xs text-gray-500 mt-0.5">
-                    x{op.qty} · {op.assignedTo ?? 'Sin asignar'}
+                    x{op.qty} · {op.assignedUser?.name ?? 'Sin asignar'}
                     {op.requiredDate && <span className="ml-2 text-orange-600">· Req: {formatDate(op.requiredDate)}</span>}
                   </p>
                 </div>
@@ -756,7 +779,11 @@ export default function OrderDetail() {
                 <label className="text-xs text-gray-500 font-medium">Producto a fabricar</label>
                 <select
                   value={opProductId}
-                  onChange={(e) => setOpProductId(e.target.value)}
+                  onChange={(e) => {
+                    setOpProductId(e.target.value)
+                    const item = (order.items ?? []).find((i) => i.productId === e.target.value)
+                    if (item) setOpQty(item.qty)
+                  }}
                   className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="">Seleccionar...</option>
@@ -797,7 +824,8 @@ export default function OrderDetail() {
                   <label className="text-xs text-gray-500 font-medium">Asignar a</label>
                   <select value={opAssignee} onChange={(e) => setOpAssignee(e.target.value)}
                     className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    {ASSIGNEES.map(a => <option key={a}>{a}</option>)}
+                    <option value="">Sin asignar</option>
+                    {assignees.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
                   </select>
                 </div>
                 <div>

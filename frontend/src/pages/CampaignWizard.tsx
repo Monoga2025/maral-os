@@ -6,7 +6,7 @@ import {
   Users, Sparkles, CheckCircle, Megaphone, Target, FileText,
 } from 'lucide-react'
 import { toast } from 'sonner'
-import { campaignsApi, tagsApi, segmentsApi } from '../lib/api'
+import { campaignsApi, categoriesApi, tagsApi, segmentsApi } from '../lib/api'
 import type { AudienceFilter } from '../types'
 import { Button } from '../components/ui/Button'
 import { Input } from '../components/ui/Input'
@@ -73,6 +73,12 @@ export default function CampaignWizard() {
   const { data: allSegments = [] } = useQuery<{ id: string; code: string; name: string; color: string }[]>({
     queryKey: ['segments'],
     queryFn: () => segmentsApi.getAll().then((r) => r.data),
+    staleTime: 60_000,
+  })
+
+  const { data: allCategories = [] } = useQuery<{ id: string; code: string; name: string; color: string }[]>({
+    queryKey: ['categories'],
+    queryFn: () => categoriesApi.getAll().then((r) => r.data),
     staleTime: 60_000,
   })
 
@@ -171,7 +177,7 @@ export default function CampaignWizard() {
 
       await campaignsApi.applyMarco(campaignId, {
         steps: marcoRes.data.steps,
-        generateImages: false,
+        generateImages: true,
       })
 
       setDone(true)
@@ -399,6 +405,27 @@ export default function CampaignWizard() {
           </div>
 
           <div className="space-y-5">
+            {/* Segments */}
+            {allCategories.length > 0 && (
+              <div>
+                <p className="text-sm font-medium text-gray-700 mb-2">Categoría comercial</p>
+                <div className="flex flex-wrap gap-2">
+                  {allCategories.map((cat) => {
+                    const active = (filters.categories ?? []).includes(cat.code)
+                    return (
+                      <button key={cat.code} onClick={() => {
+                        const cats = filters.categories ?? []
+                        setFilters({ ...filters, categories: active ? cats.filter(c => c !== cat.code) : [...cats, cat.code] })
+                      }} className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-all ${active ? 'text-white border-transparent' : 'bg-white text-gray-600 border-gray-300 hover:border-gray-400'}`}
+                        style={active ? { backgroundColor: cat.color } : undefined}>
+                        {cat.name}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+
             {/* Segments */}
             <div>
               <p className="text-sm font-medium text-gray-700 mb-2">Segmento de cliente</p>

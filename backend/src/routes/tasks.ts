@@ -151,14 +151,16 @@ router.get('/:id', async (req: AuthRequest, res: Response) => {
 
 // PUT /api/tasks/:id
 router.put('/:id', async (req: AuthRequest, res: Response) => {
-  if (req.user!.role === 'LOGISTICA') {
-    res.status(403).json({ error: 'Solo GERENTE y VENTAS pueden modificar tareas' });
-    return;
-  }
   try {
     const existing = await prisma.task.findUnique({ where: { id: req.params.id } });
     if (!existing) {
       res.status(404).json({ error: 'Tarea no encontrada' });
+      return;
+    }
+
+    const canEdit = req.user!.role === 'GERENTE' || existing.createdById === req.user!.userId || existing.assignedToId === req.user!.userId;
+    if (!canEdit) {
+      res.status(403).json({ error: 'Sin permisos para modificar esta tarea' });
       return;
     }
 
@@ -169,6 +171,12 @@ router.put('/:id', async (req: AuthRequest, res: Response) => {
     }
 
     const { dueDate, ...rest } = validation.data;
+    if (req.user!.role === 'LOGISTICA') {
+      delete (rest as { assignedToId?: string }).assignedToId;
+      delete (rest as { priority?: string }).priority;
+      delete (rest as { clientId?: string }).clientId;
+      delete (rest as { orderId?: string }).orderId;
+    }
 
     const task = await prisma.task.update({
       where: { id: req.params.id },

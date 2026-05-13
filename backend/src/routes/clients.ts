@@ -25,6 +25,7 @@ const clientSchema = z.object({
   purchaseFrequency: z.enum(['FRECUENTE', 'INTERMITENTE', 'ESPORADICA', 'NINGUNA']).optional(),
   isProvider: z.boolean().optional(),
   notes: z.string().optional(),
+  previousNames: z.array(z.string().min(1).max(120)).optional(),
   merlinCode: z.string().optional(),
   interestTags: z.array(z.string().min(1).max(30)).optional(),
   optedOut: z.boolean().optional(),
@@ -37,10 +38,11 @@ router.get('/', async (req: AuthRequest, res: Response) => {
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt((req.query.pageSize || req.query.limit) as string) || 20;
     const search = req.query.search as string;
-    const category = req.query.category as string;
-    const city = req.query.city as string;
-    const tag = req.query.tag as string;
-    const active = req.query.active !== 'false';
+  const category = req.query.category as string;
+  const city = req.query.city as string;
+  const tagId = (req.query.tagId || req.query.tag) as string;
+  const segment = req.query.segment as string;
+  const active = req.query.active !== 'false';
 
     const where: Record<string, unknown> = { active, isProvider: false };
 
@@ -48,22 +50,27 @@ router.get('/', async (req: AuthRequest, res: Response) => {
       where.OR = [
         { name: { contains: search, mode: 'insensitive' } },
         { company: { contains: search, mode: 'insensitive' } },
+        { previousNames: { has: search } },
         { city: { contains: search, mode: 'insensitive' } },
         { rut: { contains: search, mode: 'insensitive' } },
       ];
     }
 
-    if (category) {
-      where.category = category;
-    }
+  if (category) {
+    where.category = category;
+  }
+
+  if (segment) {
+    where.segment = segment;
+  }
 
     if (city) {
       where.city = { contains: city, mode: 'insensitive' };
     }
 
-    if (tag) {
-      where.interestTags = { has: tag };
-    }
+  if (tagId) {
+    where.clientTags = { some: { tagId } };
+  }
 
     const [clients, total] = await Promise.all([
       prisma.client.findMany({
@@ -75,8 +82,10 @@ router.get('/', async (req: AuthRequest, res: Response) => {
           id: true,
           name: true,
           company: true,
+          rut: true,
           city: true,
           department: true,
+          address: true,
           phone: true,
           whatsapp: true,
           email: true,
@@ -86,6 +95,7 @@ router.get('/', async (req: AuthRequest, res: Response) => {
           paymentDays: true,
           purchaseFrequency: true,
           interestTags: true,
+          previousNames: true,
           segment: true,
           optedOut: true,
           active: true,
@@ -162,6 +172,14 @@ router.patch('/bulk-segment', requireRole('GERENTE', 'VENTAS'), async (req: Auth
       ids: z.array(z.string()).min(1).max(500),
       segment: z.string().min(1).max(10).nullable(),
     }).parse(req.body);
+
+    if (segment) {
+      const exists = await prisma.segment.findUnique({ where: { code: segment } });
+      if (!exists) {
+        res.status(400).json({ error: 'Segmento inválido' });
+        return;
+      }
+    }
 
     const result = await prisma.client.updateMany({
       where: { id: { in: ids }, active: true },

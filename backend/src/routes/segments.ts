@@ -49,7 +49,13 @@ router.post('/', async (req: AuthRequest, res: Response) => {
 // PUT /api/segments/:id
 router.put('/:id', async (req: AuthRequest, res: Response) => {
   try {
+    const existing = await prisma.segment.findUnique({ where: { id: req.params.id } })
+    if (!existing) return res.status(404).json({ error: 'Segmento no encontrado' })
     const data = segmentSchema.partial().parse(req.body)
+    if (data.code && data.code !== existing.code) {
+      const inUse = await prisma.client.count({ where: { segment: existing.code, active: true } })
+      if (inUse > 0) return res.status(409).json({ error: `No se puede cambiar el código: ${inUse} clientes activos usan este segmento` })
+    }
     const segment = await prisma.segment.update({ where: { id: req.params.id }, data })
     res.json(segment)
   } catch (error) {

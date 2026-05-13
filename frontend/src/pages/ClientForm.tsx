@@ -22,6 +22,7 @@ const schema = z.object({
   whatsapp: z.string().optional(),
   city: z.string().optional(),
   address: z.string().optional(),
+  previousNames: z.string().optional(),
   category: z.string().min(1),
   creditLimit: z.coerce.number().min(0),
   paymentDays: z.coerce.number().min(0),
@@ -73,6 +74,7 @@ export default function ClientForm() {
         whatsapp: client.whatsapp ?? '',
         city: client.city ?? '',
         address: client.address ?? '',
+        previousNames: (client.previousNames ?? []).join('\n'),
         category: client.category,
         creditLimit: client.creditLimit,
         paymentDays: client.paymentDays,
@@ -85,10 +87,18 @@ export default function ClientForm() {
   }, [client, reset])
 
   const mutation = useMutation({
-    mutationFn: (data: FormData) =>
-      isEditing
-        ? clientsApi.update(id!, data)
-        : clientsApi.create(data),
+    mutationFn: (data: FormData) => {
+      const payload = {
+        ...data,
+        previousNames: (data.previousNames ?? '')
+          .split('\n')
+          .map((name) => name.trim())
+          .filter(Boolean),
+      }
+      return isEditing
+        ? clientsApi.update(id!, payload)
+        : clientsApi.create(payload)
+    },
     onSuccess: (res) => {
       queryClient.invalidateQueries({ queryKey: ['clients'] })
       toast.success(
@@ -167,6 +177,14 @@ export default function ClientForm() {
               placeholder="Ej: Calle 45 # 23-12"
               {...register('address')}
             />
+            <div className="md:col-span-2">
+              <Textarea
+                label="Nombres anteriores de la empresa"
+                placeholder="Un nombre por línea. Ej:\nCeratel\nComunicaciones y Electrónica"
+                rows={3}
+                {...register('previousNames')}
+              />
+            </div>
           </CardContent>
         </Card>
 

@@ -85,7 +85,9 @@ export interface Client {
   whatsapp?: string
   city?: string
   address?: string
+  department?: string
   category: ClientCategory
+  segment?: string | null
   creditLimit: number
   creditUsed: number
   paymentDays: number
@@ -94,6 +96,7 @@ export interface Client {
   isProvider?: boolean
   active: boolean
   notes?: string
+  previousNames?: string[]
   merlinCode?: string
   interestTags?: string[]
   optedOut?: boolean
@@ -219,6 +222,7 @@ export interface Order {
   freightPayer?: string
   freightPayment?: string
   guideNumber?: string
+  dianInvoiceNumber?: string
   dispatchDate?: string
   photos?: OrderPhoto[]
   notes?: string
@@ -242,6 +246,7 @@ export interface ProductionOrder {
   phase: ProductionPhase
   status: ProductionStatus
   assignedTo?: string
+  assignedUser?: Pick<User, 'id' | 'name'>
   requiredDate?: string
   completedAt?: string
   notes?: string
@@ -547,6 +552,7 @@ export interface Campaign {
 
 export interface AudienceFilter {
   segments?: string[]
+  categories?: string[]
   tagIds?: string[]
   cities?: string[]
   interestTags?: string[]

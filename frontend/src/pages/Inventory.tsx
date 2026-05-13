@@ -20,6 +20,7 @@ export default function Inventory() {
   const qc = useQueryClient()
   const [search, setSearch] = useState('')
   const [category, setCategory] = useState('Todos')
+  const [stockStatus, setStockStatus] = useState('')
   const [showModal, setShowModal] = useState(false)
   const [mvType, setMvType] = useState<MovementType>('ENTRADA')
   const [mvProductId, setMvProductId] = useState('')
@@ -27,10 +28,11 @@ export default function Inventory() {
   const [mvReason, setMvReason] = useState('')
 
   const { data, isLoading } = useQuery({
-    queryKey: ['inventory', search, category],
+    queryKey: ['inventory', search, category, stockStatus],
     queryFn: () => inventoryApi.getAll({
       search: search || undefined,
       category: category !== 'Todos' ? category : undefined,
+      stockStatus: stockStatus || undefined,
       pageSize: 200,
     }),
   })
@@ -56,11 +58,17 @@ export default function Inventory() {
     onError: () => toast.error('Error al registrar movimiento'),
   })
 
+  const updateProduct = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: Partial<Product> }) => productsApi.update(id, data as never),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['inventory'] }); toast.success('Producto actualizado') },
+    onError: () => toast.error('Error al actualizar producto'),
+  })
+
   const products: Product[] = data?.data.data ?? []
   const allProds: Product[] = allProducts?.data.data ?? []
 
   const critical = products.filter((p) => p.minStock > 0 && p.stock <= p.minStock).length
-  const atMin = products.filter((p) => p.minStock > 0 && p.stock === p.minStock).length
+  const sinStock = products.filter((p) => p.minStock > 0 && p.stock === 0).length
   const totalValue = products.reduce((a, p) => a + p.stock * p.cost, 0)
 
   const rowColor = (p: Product) => {
@@ -114,7 +122,7 @@ export default function Inventory() {
             </div>
           </div>
         </div>
-        <div className="bg-white rounded-xl border border-gray-200 p-5">
+        <button type="button" onClick={() => setStockStatus(stockStatus === 'CRITICO' ? '' : 'CRITICO')} className={`text-left bg-white rounded-xl border p-5 transition-colors ${stockStatus === 'CRITICO' ? 'border-red-300 ring-2 ring-red-100' : 'border-gray-200 hover:bg-red-50'}`}>
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-red-100 rounded-xl flex items-center justify-center">
               <AlertTriangle size={20} className="text-red-600" />
@@ -124,18 +132,18 @@ export default function Inventory() {
               <p className="text-2xl font-bold text-red-600">{critical}</p>
             </div>
           </div>
-        </div>
-        <div className="bg-white rounded-xl border border-gray-200 p-5">
+        </button>
+        <button type="button" onClick={() => setStockStatus(stockStatus === 'SIN_STOCK' ? '' : 'SIN_STOCK')} className={`text-left bg-white rounded-xl border p-5 transition-colors ${stockStatus === 'SIN_STOCK' ? 'border-orange-300 ring-2 ring-orange-100' : 'border-gray-200 hover:bg-orange-50'}`}>
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-orange-100 rounded-xl flex items-center justify-center">
               <TrendingDown size={20} className="text-orange-600" />
             </div>
             <div>
-              <p className="text-xs text-gray-500">En Mínimo</p>
-              <p className="text-2xl font-bold text-orange-600">{atMin}</p>
+              <p className="text-xs text-gray-500">Sin stock</p>
+              <p className="text-2xl font-bold text-orange-600">{sinStock}</p>
             </div>
           </div>
-        </div>
+        </button>
         <div className="bg-white rounded-xl border border-gray-200 p-5">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-green-100 rounded-xl flex items-center justify-center">
@@ -200,9 +208,21 @@ export default function Inventory() {
                   <td className="px-4 py-3 font-medium text-gray-900">{p.name}</td>
                   <td className="px-4 py-3 text-gray-500 text-xs">{CAT_LABELS[p.category ?? ''] ?? p.category}</td>
                   <td className={`px-4 py-3 font-bold ${isCritical ? 'text-red-600' : isAtMin ? 'text-orange-600' : 'text-gray-900'}`}>
-                    {p.stock}
+                    <input
+                      type="number"
+                      value={p.stock}
+                      onChange={(e) => updateProduct.mutate({ id: p.id, data: { stock: Number(e.target.value) } })}
+                      className="w-20 rounded border border-gray-200 px-2 py-1 text-sm font-bold"
+                    />
                   </td>
-                  <td className="px-4 py-3 text-gray-500">{p.minStock}</td>
+                  <td className="px-4 py-3 text-gray-500">
+                    <input
+                      type="number"
+                      value={p.minStock}
+                      onChange={(e) => updateProduct.mutate({ id: p.id, data: { minStock: Number(e.target.value) } })}
+                      className="w-20 rounded border border-gray-200 px-2 py-1 text-sm"
+                    />
+                  </td>
                   <td className="px-4 py-3 text-gray-500">{p.unit}</td>
                   <td className="px-4 py-3 text-gray-600">{formatCOP(p.cost)}</td>
                   <td className="px-4 py-3 font-semibold text-gray-900">{formatCOP(p.stock * p.cost)}</td>

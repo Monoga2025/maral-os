@@ -188,7 +188,7 @@ export default function QuotationForm() {
   const [parsingImage, setParsingImage] = useState(false)
   const [parsedPreview, setParsedPreview] = useState<string | null>(null)
 
-  const { register, watch, setValue, reset } = useForm<FormValues>({
+  const { register, watch, setValue, reset, formState: { isDirty } } = useForm<FormValues>({
     defaultValues: {
       validityDays: 15,
       paymentTerms: 'Contado',
@@ -466,6 +466,22 @@ export default function QuotationForm() {
 
   const formData = watch()
   const isSaving = createMutation.isPending || updateMutation.isPending
+  const hasUnsavedChanges = !isSaving && (isDirty || items.length > 0)
+
+  useEffect(() => {
+    const handler = (event: BeforeUnloadEvent) => {
+      if (!hasUnsavedChanges) return
+      event.preventDefault()
+      event.returnValue = ''
+    }
+    window.addEventListener('beforeunload', handler)
+    return () => window.removeEventListener('beforeunload', handler)
+  }, [hasUnsavedChanges])
+
+  const leaveToQuotations = () => {
+    if (hasUnsavedChanges && !window.confirm('No has guardado esta cotización. ¿Salir sin guardar?')) return
+    navigate('/cotizaciones')
+  }
 
   // ── Loading state (edit mode only) ───────────────────────────
   if (isEditMode && loadingExisting) {
@@ -501,7 +517,7 @@ export default function QuotationForm() {
           variant="ghost"
           size="sm"
           leftIcon={<ArrowLeft className="h-4 w-4" />}
-          onClick={() => navigate('/cotizaciones')}
+          onClick={leaveToQuotations}
         >
           Cotizaciones
         </Button>

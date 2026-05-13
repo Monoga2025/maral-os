@@ -385,6 +385,18 @@ export default function ClientDetail() {
                         </div>
                       )
                   )}
+                  {(client.previousNames ?? []).length > 0 && (
+                    <div className="pt-2 border-t border-gray-100 text-sm">
+                      <dt className="text-gray-500 mb-1">Nombres anteriores</dt>
+                      <dd className="flex flex-wrap gap-1">
+                        {client.previousNames!.map((name) => (
+                          <span key={name} className="rounded-full bg-amber-50 border border-amber-200 px-2 py-0.5 text-xs font-medium text-amber-700">
+                            {name}
+                          </span>
+                        ))}
+                      </dd>
+                    </div>
+                  )}
                 </dl>
               </CardContent>
             </Card>

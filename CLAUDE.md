@@ -365,6 +365,42 @@ ARQUITECTURA DEFINITIVA: MARAL OS no escribe en Merlin. Merlin es solo lectura (
 
 ---
 
+## Estado al 2026-05-13 — Variables compartidas entre módulos core
+
+### Objetivo corregido
+John reportó que variables creadas o seleccionadas en un módulo no se compartían correctamente con los demás módulos. Se corrigieron cortes del flujo Cliente → Cotización → Pedido → Producción → Despacho/Crédito, y de Clientes → Campañas.
+
+### Cambios aplicados
+- `Client.previousNames String[]` agregado para guardar nombres anteriores de empresas.
+- `Order.dianInvoiceNumber String?` agregado para registrar factura DIAN manual.
+- `GET /api/clients` ahora devuelve y filtra datos completos de cliente: dirección, teléfono, NIT, departamento, segmento, categoría, etiquetas reales y nombres anteriores.
+- `GET /api/quotations` ahora soporta `clientId` y devuelve cliente completo para no perder dirección/teléfono al convertir a pedido.
+- Conversión de cotización a pedido ahora hereda `sourceCampaignId`, dirección de envío, teléfono, ciudad, estado confirmado y precio final con descuento aplicado.
+- `OrderItem.unitPrice` queda como precio final descontado cuando viene de cotización, evitando totales inconsistentes en pedido/remisión/Merlin.
+- Pedidos a crédito: al pasar a `DESPACHADO` con `creditDispatch`, el backend crea o actualiza factura interna en cartera con vencimiento según `Client.paymentDays`.
+- Producción: `assignedTo` vuelve a ser `User.id`; frontend carga usuarios asignables en vez de mandar textos como `Angelo`/`Iván`.
+- Si un ítem de pedido se marca como `PRODUCCION`, se crea automáticamente una orden de producción vinculada si no existe.
+- Cuando todas las órdenes de producción de un pedido llegan a `EMPACADO`, el pedido vinculado pasa a `EMPACADO`.
+- Campañas: audiencia soporta `categories`, `segments` dinámicos y `tagIds` reales de `Tag`/`ClientTag`.
+- Clientes: pantalla principal usa categorías/segmentos dinámicos; la categoría puede editarse inline desde la tabla.
+- Inventario: KPIs de stock filtran la tabla; stock actual y stock mínimo pueden editarse desde inventario.
+- Tareas: cada tarea tiene mensaje/estado editable por creador o asignado usando `description`.
+- Cotizaciones: descarga PDF real con nombre `numero_cliente.pdf`, transportadora `Cualquiera`, tab `Todas`, y aviso de salida sin guardar.
+- Nano Banana/imagen: modelo actualizado a `google/gemini-2.5-flash-image-preview`; wizard de campañas dispara generación de imágenes.
+
+### Validación
+- `backend npm run build` pasó.
+- `frontend npm run build` pasó.
+- `backend npm run db:push` aplicado en DB local.
+
+### Pendientes críticos
+- Crear migración formal Prisma antes de deploy en producción. El cambio local fue `db:push`.
+- Implementar fragmentación/división de pedidos con modelo propio de despachos parciales.
+- Reforzar ocultamiento de valores para rol `LOGISTICA` también desde backend, no solo UI.
+- Probar manualmente flujo completo: cliente → cotización → pedido → producción → despacho crédito → cartera.
+
+---
+
 ## Cambios solicitados por John — 2026-04-20 (PENDIENTES DE IMPLEMENTAR)
 
 John revisó la plataforma y solicitó los siguientes cambios. **No implementar hasta recibir orden explícita.**

@@ -39,6 +39,7 @@ export interface CreateQuotationRequest {
   followUpDate?: string            // ISO datetime string
   shippingAddress?: string         // dirección de envío para la etiqueta del PDF
   taxPercent?: number              // 0-100 (porcentaje, NO decimal). default 0
+  sourceCampaignId?: string
   items: QuotationItemRequest[]
 }
 
@@ -52,6 +53,7 @@ export interface ConvertToOrderRequest {
   carrier: string
   freightPayer: string
   freightPayment: string
+  confirmed?: boolean
   type?: 'PEDIDO' | 'GARANTIA' | 'MUESTRA'  // default 'PEDIDO'
   notes?: string
 }
@@ -76,6 +78,7 @@ export interface CreateOrderRequest {
   carrier?: string
   freightPayer?: string
   freightPayment?: string
+  sourceCampaignId?: string
   notes?: string
   items: OrderItemRequest[]
 }
@@ -83,7 +86,9 @@ export interface CreateOrderRequest {
 export interface UpdateOrderStatusRequest {
   status: OrderStatus
   guideNumber?: string
+  dianInvoiceNumber?: string
   dispatchDate?: string
+  creditDispatch?: boolean
 }
 
 // ─── Production ──────────────────────────────────────────────────────────────
@@ -138,10 +143,13 @@ export interface CreateClientRequest {
   whatsapp?: string
   city?: string
   address?: string
+  department?: string
   category: string
+  segment?: string | null
   creditLimit?: number
   paymentDays?: number
   notes?: string
+  previousNames?: string[]
 }
 
 export type UpdateClientRequest = Partial<CreateClientRequest>
@@ -153,7 +161,7 @@ export interface CreateProductRequest {
   reference: string
   name: string
   line?: string
-  category?: string
+  category: string
   priceList: number
   priceDistributor: number
   cost: number

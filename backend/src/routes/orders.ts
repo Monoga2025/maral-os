@@ -198,7 +198,10 @@ router.get('/:id', async (req: AuthRequest, res: Response) => {
         },
         photos: { orderBy: { uploadedAt: 'asc' } },
         productionOrders: {
-          include: { product: { select: { id: true, reference: true, name: true } } },
+          include: {
+            product: { select: { id: true, reference: true, name: true } },
+            assignedUser: { select: { id: true, name: true } },
+          },
         },
         invoices: { select: { id: true, number: true, amount: true, status: true, dueDate: true } },
       },
@@ -277,6 +280,7 @@ router.put('/:id', async (req: AuthRequest, res: Response) => {
       status: z.enum(['CONFIRMADO', 'EN_PRODUCCION', 'LISTO', 'EMPACADO', 'DESPACHADO', 'ENTREGADO', 'CANCELADO']).optional(),
       confirmed: z.boolean().optional(),
       guideNumber: z.string().optional(),
+      dianInvoiceNumber: z.string().optional(),
       dispatchDate: z.string().datetime().optional(),
       notes: z.string().optional(),
       recipientName: z.string().optional(),
@@ -328,7 +332,7 @@ router.put('/:id', async (req: AuthRequest, res: Response) => {
 // PATCH /api/orders/:id/status
 router.patch('/:id/status', async (req: AuthRequest, res: Response) => {
   try {
-    const { status, guideNumber } = req.body;
+    const { status, guideNumber, dispatchDate, creditDispatch, dianInvoiceNumber } = req.body;
     const validStatuses = ['CONFIRMADO', 'EN_PRODUCCION', 'LISTO', 'EMPACADO', 'DESPACHADO', 'ENTREGADO', 'CANCELADO'];
     if (!status || !validStatuses.includes(status)) {
       res.status(400).json({ error: 'Estado inválido' });
@@ -341,8 +345,30 @@ router.patch('/:id/status', async (req: AuthRequest, res: Response) => {
         status: status as never,
         updatedById: req.user!.userId,
         ...(guideNumber !== undefined ? { guideNumber } : {}),
+        ...(dispatchDate ? { dispatchDate: new Date(dispatchDate) } : {}),
+        ...(dianInvoiceNumber !== undefined ? { dianInvoiceNumber } : {}),
       },
     });
+
+    if (status === 'DESPACHADO' && creditDispatch) {
+      const client = await prisma.client.findUnique({
+        where: { id: order.clientId },
+        select: { paymentDays: true },
+      });
+      const dueDate = new Date();
+      dueDate.setDate(dueDate.getDate() + (client?.paymentDays || 30));
+      const existingInvoice = await prisma.invoice.findFirst({ where: { orderId: order.id } });
+      if (existingInvoice) {
+        await prisma.invoice.update({
+          where: { id: existingInvoice.id },
+          data: { amount: order.total, dueDate, clientId: order.clientId },
+        });
+      } else {
+        await prisma.invoice.create({
+          data: { orderId: order.id, clientId: order.clientId, amount: order.total, dueDate },
+        });
+      }
+    }
 
     await prisma.activityLog.create({
       data: {
@@ -439,7 +465,7 @@ router.patch('/:id/items/:itemId/pick', async (req: AuthRequest, res: Response) 
 router.patch('/:id/items/:itemId/disposition', async (req: AuthRequest, res: Response) => {
   try {
     const { disposition } = req.body;
-    const valid = ['PENDIENTE', 'STOCK', 'PRODUCCION'];
+      const valid = ['PENDIENTE', 'STOCK', 'PRODUCCION'];
     if (!disposition || !valid.includes(disposition)) {
       res.status(400).json({ error: 'Disposición inválida. Valores: PENDIENTE, STOCK, PRODUCCION' });
       return;
@@ -450,6 +476,23 @@ router.patch('/:id/items/:itemId/disposition', async (req: AuthRequest, res: Res
       data: { disposition: disposition as never },
       include: { product: { select: { id: true, reference: true, name: true, unit: true, stock: true } } },
     });
+
+    if (disposition === 'PRODUCCION') {
+      const existing = await prisma.productionOrder.findFirst({
+        where: { orderId: req.params.id, productId: item.productId, status: { not: 'EMPACADO' } },
+      });
+      if (!existing) {
+        await prisma.productionOrder.create({
+          data: {
+            orderId: req.params.id,
+            productId: item.productId,
+            qty: item.qty,
+            phase: 'BASICO',
+            status: 'PENDIENTE',
+          },
+        });
+      }
+    }
 
     res.json(item);
   } catch (error) {

@@ -60,6 +60,7 @@ const stepSchema = z.object({
 const audienceBodySchema = z.object({
   filters: z.object({
     segments: z.array(z.string()).optional(),
+    categories: z.array(z.string()).optional(),
     tagIds: z.array(z.string()).optional(),
     cities: z.array(z.string()).optional(),
     interestTags: z.array(z.string()).optional(),
@@ -588,7 +589,7 @@ router.get('/:id/live', requireRole('GERENTE', 'VENTAS'), async (req: AuthReques
 const marcoSchema = z.object({
   productDescription: z.string().min(10, 'Describe el producto con al menos 10 caracteres'),
   objective: z.enum(['top_of_mind', 'reactivacion', 'educativo', 'cierre', 'recuperacion', 'sector_especifico']),
-  targetSegment: z.array(z.enum(['IM', 'DS', 'CF'])).min(1),
+  targetSegment: z.array(z.string().min(1).max(30)).min(1),
   productPhotoUrls: z.array(z.string()).optional(),
   additionalContext: z.string().optional(),
   vendorName: z.enum(['John', 'Lady']).optional(),

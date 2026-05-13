@@ -48,7 +48,13 @@ router.post('/', async (req: AuthRequest, res: Response) => {
 // PUT /api/categories/:id
 router.put('/:id', async (req: AuthRequest, res: Response) => {
   try {
+    const existing = await prisma.category.findUnique({ where: { id: req.params.id } })
+    if (!existing) return res.status(404).json({ error: 'Categoría no encontrada' })
     const data = categorySchema.partial().parse(req.body)
+    if (data.code && data.code !== existing.code) {
+      const inUse = await prisma.client.count({ where: { category: existing.code, active: true } })
+      if (inUse > 0) return res.status(409).json({ error: `No se puede cambiar el código: ${inUse} clientes activos usan esta categoría` })
+    }
     const category = await prisma.category.update({ where: { id: req.params.id }, data })
     res.json(category)
   } catch (error) {

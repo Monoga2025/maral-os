@@ -25,11 +25,13 @@ router.get('/', async (req: AuthRequest, res: Response) => {
     const status = req.query.status as string;
     const phase = req.query.phase as string;
     const orderId = req.query.orderId as string;
+    const assignedTo = req.query.assignedTo as string;
 
     const where: Record<string, unknown> = {};
     if (status) where.status = status;
     if (phase) where.phase = phase;
     if (orderId) where.orderId = orderId;
+    if (assignedTo) where.assignedTo = assignedTo;
 
     const [productionOrders, total] = await Promise.all([
       prisma.productionOrder.findMany({
@@ -236,6 +238,18 @@ router.patch('/:id/status', async (req: AuthRequest, res: Response) => {
         metadata: { status: order.status },
       },
     });
+
+    if (status === 'EMPACADO' && order.orderId) {
+      const remaining = await prisma.productionOrder.count({
+        where: { orderId: order.orderId, status: { not: 'EMPACADO' } },
+      });
+      if (remaining === 0) {
+        await prisma.order.update({
+          where: { id: order.orderId },
+          data: { status: 'EMPACADO', updatedById: req.user!.userId },
+        }).catch(() => undefined);
+      }
+    }
 
     res.json(order);
   } catch (error: unknown) {

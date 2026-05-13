@@ -143,16 +143,18 @@ function OverdueBanner({ tasks }: { tasks: Task[] }) {
 // ─── Kanban Card ─────────────────────────────────────────────
 
 function TaskCard({
-  task, canDelete, onComplete, onDelete, onRemind, isCompleting, canRemind,
+  task, canDelete, onComplete, onDelete, onRemind, onMessage, isCompleting, canRemind,
 }: {
   task: Task
   canDelete: boolean
   onComplete: () => void
   onDelete: () => void
   onRemind: () => void
+  onMessage: (message: string) => void
   isCompleting: boolean
   canRemind: boolean
 }) {
+  const [message, setMessage] = useState(task.description ?? '')
   const isDone    = task.status === 'COMPLETADA' || task.status === 'CANCELADA'
   const isOverdue = !isDone && task.dueDate && daysUntil(task.dueDate) < 0
   const daysLeft  = task.dueDate ? daysUntil(task.dueDate) : null
@@ -175,6 +177,16 @@ function TaskCard({
           <p className={`text-sm font-medium leading-snug ${isDone ? 'line-through text-gray-400' : 'text-gray-900'}`}>
             {task.title}
           </p>
+
+          <textarea
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
+            onBlur={() => message.trim() !== (task.description ?? '') && onMessage(message.trim())}
+            placeholder="Mensaje o estado de esta tarea..."
+            rows={message ? 2 : 1}
+            disabled={isDone}
+            className="mt-2 w-full resize-none rounded-lg border border-gray-100 bg-gray-50 px-2 py-1 text-xs text-gray-600 placeholder-gray-300 focus:border-blue-300 focus:outline-none disabled:opacity-60"
+          />
 
           {/* Asignada por */}
           {task.createdBy && (
@@ -509,6 +521,12 @@ export default function Tareas() {
     onError: () => toast.error('No se pudo enviar el recordatorio'),
   })
 
+  const messageMutation = useMutation({
+    mutationFn: ({ id, description }: { id: string; description: string }) => tasksApi.update(id, { description }),
+    onSuccess: () => { toast.success('Mensaje actualizado'); invalidate() },
+    onError: () => toast.error('No se pudo actualizar el mensaje'),
+  })
+
   const canDelete = (task: Task) => user?.role === 'GERENTE' || task.createdById === user?.id
   const canRemind = (task: Task) => isGerente || task.createdById === user?.id
 
@@ -642,6 +660,7 @@ export default function Tareas() {
                       onComplete={() => completeMutation.mutate(task.id)}
                       onDelete={() => deleteMutation.mutate(task.id)}
                       onRemind={() => remindMutation.mutate(task.id)}
+                      onMessage={(description) => messageMutation.mutate({ id: task.id, description })}
                       isCompleting={completeMutation.isPending && completeMutation.variables === task.id}
                     />
                   ))}
