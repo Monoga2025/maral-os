@@ -160,7 +160,7 @@ export default function CampaignWizard() {
     if (!campaignId) return
     setGenerating(true)
     try {
-      const photoUrls = uploadedFiles.filter((f) => f.url).map((f) => `http://localhost:3001${f.url}`)
+      const photoUrls = uploadedFiles.filter((f) => f.url).map((f) => `${window.location.origin}${f.url}`)
       const additionalContext = [
         characteristics && `Características: ${characteristics}`,
         priceInfo && `Precio/descuento: ${priceInfo}`,
@@ -175,15 +175,20 @@ export default function CampaignWizard() {
         additionalContext: additionalContext || undefined,
       })
 
-      await campaignsApi.applyMarco(campaignId, {
+      const marcoApply = await campaignsApi.applyMarco(campaignId, {
         steps: marcoRes.data.steps,
         generateImages: true,
       })
 
       setDone(true)
-      toast.success('¡Mensajes generados! Revísalos en el editor.')
+      const imageErrors: string[] = (marcoApply.data as any).imageErrors ?? []
+      if (imageErrors.length > 0) {
+        toast.warning(`Mensajes creados, pero ${imageErrors.length} imagen(es) fallaron: ${imageErrors[0].slice(0, 120)}`, { duration: 10000 })
+      } else {
+        toast.success('¡Mensajes generados! Revísalos en el editor.')
+      }
     } catch (err: any) {
-      toast.error(err?.response?.data?.error ?? 'Error generando mensajes')
+      toast.error(err?.response?.data?.error ?? err?.message ?? 'Error generando mensajes')
     } finally {
       setGenerating(false)
     }

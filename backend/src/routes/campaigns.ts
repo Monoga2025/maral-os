@@ -323,7 +323,9 @@ router.post('/:id/reorder-steps', requireRole('GERENTE', 'VENTAS'), async (req: 
 router.post('/:id/audience', requireRole('GERENTE', 'VENTAS'), async (req: AuthRequest, res: Response) => {
   try {
     const { filters } = audienceBodySchema.parse(req.body)
+    console.log('[audience] filters:', JSON.stringify(filters))
     const clients = await resolveAudience(filters as any)
+    console.log('[audience] clients found:', clients.length)
 
     // Deduplication: exclude clients in other active campaigns
     const activeCampaignIds = (
@@ -660,32 +662,34 @@ router.post('/:id/apply-marco', requireRole('GERENTE', 'VENTAS'), async (req: Au
       }
     }
 
-    // Lanzar generación de imágenes en background
+    // Generar imágenes (esperar para poder reportar errores)
+    const imageErrors: string[] = []
     if (imageJobs.length > 0) {
-      ;(async () => {
-        for (const job of imageJobs) {
-          try {
-            const result = await generateCampaignImage({
-              prompt: job.prompt,
-              template: job.template as any,
-              aspectRatio: job.aspect as any,
-              brandLock: true,
-            })
-            await prisma.campaignStep.update({
-              where: { id: job.stepId },
-              data: { mediaUrl: result.fileUrl },
-            })
-          } catch (err) {
-            console.error(`[apply-marco] Image gen failed for step ${job.stepId}:`, err)
-          }
+      for (const job of imageJobs) {
+        try {
+          const result = await generateCampaignImage({
+            prompt: job.prompt,
+            template: job.template as any,
+            aspectRatio: job.aspect as any,
+            brandLock: true,
+          })
+          await prisma.campaignStep.update({
+            where: { id: job.stepId },
+            data: { mediaUrl: result.fileUrl },
+          })
+        } catch (err: any) {
+          const msg = err?.message ?? 'Error desconocido en generación de imagen'
+          console.error(`[apply-marco] Image gen failed for step ${job.stepId}:`, msg)
+          imageErrors.push(msg)
         }
-      })()
+      }
     }
 
     res.json({
       ok: true,
       stepsCreated: createdSteps.length,
       imageJobsQueued: imageJobs.length,
+      imageErrors,
     })
   } catch (err) {
     console.error('[apply-marco] error:', err)
