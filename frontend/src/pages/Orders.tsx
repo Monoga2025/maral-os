@@ -41,6 +41,8 @@ export default function Orders() {
   const [hiddenDelivered, setHiddenDelivered] = useState<Set<string>>(new Set())
   const [deliveredOpen, setDeliveredOpen] = useState(false)
   const draggedId = useRef<string | null>(null)
+  const clickTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const pendingNavId = useRef<string | null>(null)
 
   const { data, isLoading } = useQuery({
     queryKey: ['orders', search, statusFilter],
@@ -174,15 +176,25 @@ export default function Orders() {
                       draggable
                       onDragStart={(e) => onDragStart(e, order.id)}
                       onDragEnd={onDragEnd}
-                      onClick={() => navigate(`/pedidos/${order.id}`)}
-                      onDoubleClick={(e) => {
+                      onClick={() => {
                         if (key === 'ENTREGADO') {
-                          e.stopPropagation()
-                          setHiddenDelivered((prev) => { const s = new Set(prev); s.add(order.id); return s })
-                          setDeliveredOpen(true)
+                          if (clickTimer.current && pendingNavId.current === order.id) {
+                            clearTimeout(clickTimer.current)
+                            clickTimer.current = null
+                            setHiddenDelivered((prev) => { const s = new Set(prev); s.add(order.id); return s })
+                            setDeliveredOpen(true)
+                          } else {
+                            pendingNavId.current = order.id
+                            clickTimer.current = setTimeout(() => {
+                              clickTimer.current = null
+                              navigate(`/pedidos/${pendingNavId.current!}`)
+                            }, 280)
+                          }
+                        } else {
+                          navigate(`/pedidos/${order.id}`)
                         }
                       }}
-                      title={key === 'ENTREGADO' ? 'Doble clic para mover a la lista de entregados' : undefined}
+                      title={key === 'ENTREGADO' ? 'Clic: abrir | Doble clic: mover a lista de entregados' : undefined}
                       className="bg-white rounded-lg p-3 shadow-sm cursor-grab active:cursor-grabbing hover:shadow-md transition-all border border-gray-100 select-none"
                     >
                       <div className="flex items-start justify-between mb-2">

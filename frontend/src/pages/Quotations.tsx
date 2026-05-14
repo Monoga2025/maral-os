@@ -311,6 +311,19 @@ export default function Quotations() {
     id: string; clientName: string; clientPhone?: string; clientAddress?: string; clientCity?: string
   } | null>(null)
   const [productionQuotation, setProductionQuotation] = useState<QuotationType | null>(null)
+  const [loadingProductionId, setLoadingProductionId] = useState<string | null>(null)
+
+  const openProductionModal = async (q: { id: string }) => {
+    setLoadingProductionId(q.id)
+    try {
+      const res = await quotationsApi.getById(q.id)
+      setProductionQuotation(res.data as unknown as QuotationType)
+    } catch {
+      toast.error('Error al cargar cotización')
+    } finally {
+      setLoadingProductionId(null)
+    }
+  }
   const flashTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // Flash la fila recién creada si viene con state.newId
@@ -641,13 +654,16 @@ export default function Quotations() {
                               Pedido
                             </button>
                           )}
-                          {q.status === 'APROBADA' && q.items && q.items.length > 0 && (
+                          {q.status === 'APROBADA' && ((q as any)._count?.items ?? 0) > 0 && (
                             <button
-                              onClick={() => setProductionQuotation(q as unknown as QuotationType)}
-                              className="flex h-7 items-center gap-1 rounded-lg border border-orange-200 bg-orange-50 px-2 text-xs font-medium text-orange-700 hover:bg-orange-100 transition-colors"
+                              onClick={() => openProductionModal(q)}
+                              disabled={loadingProductionId === q.id}
+                              className="flex h-7 items-center gap-1 rounded-lg border border-orange-200 bg-orange-50 px-2 text-xs font-medium text-orange-700 hover:bg-orange-100 transition-colors disabled:opacity-50"
                               title="Enviar a producción"
                             >
-                              <Factory className="h-3.5 w-3.5" />
+                              {loadingProductionId === q.id
+                                ? <div className="h-3.5 w-3.5 border-2 border-orange-300 border-t-orange-600 rounded-full animate-spin" />
+                                : <Factory className="h-3.5 w-3.5" />}
                               Producción
                             </button>
                           )}

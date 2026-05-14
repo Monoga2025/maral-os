@@ -83,6 +83,16 @@ function LastOrdersDots({ dates }: { dates?: string[] }) {
   )
 }
 
+const FALLBACK_CATEGORIES = [
+  { id: 'IMPORTADOR',        code: 'IMPORTADOR',        name: 'Importador (IM)' },
+  { id: 'DISTRIBUIDOR',      code: 'DISTRIBUIDOR',      name: 'Distribuidor (DS)' },
+  { id: 'CLIENTE_FINAL',     code: 'CLIENTE_FINAL',     name: 'Cliente Final (CF)' },
+  { id: 'PROSPECTO',         code: 'PROSPECTO',         name: 'Prospecto' },
+  { id: 'ALIADO',            code: 'ALIADO',            name: 'Aliado' },
+  { id: 'FUNDADOR_HISTORICO',code: 'FUNDADOR_HISTORICO',name: 'Fundador Histórico' },
+  { id: 'FUNDADOR_MARAL',    code: 'FUNDADOR_MARAL',    name: 'Fundador Maral' },
+]
+
 export default function Clients() {
   const navigate = useNavigate()
   const qc = useQueryClient()
@@ -416,8 +426,7 @@ export default function Clients() {
                           className="rounded-lg border border-gray-200 bg-white px-2 py-1 text-xs font-medium text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
                           title="Cambiar categoría"
                         >
-                          {allCategories.length === 0 && <option value={client.category}>{client.category}</option>}
-                          {allCategories.map((cat) => (
+                          {(allCategories.length > 0 ? allCategories : FALLBACK_CATEGORIES).map((cat) => (
                             <option key={cat.code} value={cat.code}>{cat.name}</option>
                           ))}
                         </select>
