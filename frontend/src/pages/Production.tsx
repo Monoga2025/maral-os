@@ -56,7 +56,7 @@ export default function Production() {
       productId: newProductId,
       qty: newQty,
       phase: newPhase as never,
-      assignedTo: newAssignee,
+      assignedTo: newAssignee || undefined,
       requiredDate: newRequired ? new Date(newRequired + 'T12:00:00').toISOString() : undefined,
     } as never),
     onSuccess: () => {

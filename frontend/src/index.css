@@ -14,6 +14,18 @@ body {
   color: #0F172A;
   margin: 0;
   padding: 0;
+  cursor: default;
+}
+
+/* Prevent I-beam cursor from appearing on non-editable elements */
+p, h1, h2, h3, h4, h5, h6, span, td, th, li, div, label {
+  cursor: default;
+}
+a, button, [role="button"], .cursor-pointer {
+  cursor: pointer;
+}
+input, textarea, select, [contenteditable="true"] {
+  cursor: auto;
 }
 
 /* Scrollbar */

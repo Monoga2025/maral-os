@@ -214,10 +214,12 @@ router.get('/:id/pdf', async (req: AuthRequest, res: Response) => {
     }
 
     const num = String(quotation.number).padStart(5, '0');
+    const rawClient = (quotation.client?.company || quotation.client?.name || 'cliente').slice(0, 40);
+    const safeClient = rawClient.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-zA-Z0-9 _-]/g, '').trim().replace(/\s+/g, '_');
     const doc = new PDFDocument({ size: [612, 936], margin: 0 });
 
     res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename="COT-${num}.pdf"`);
+    res.setHeader('Content-Disposition', `attachment; filename="${num}_${safeClient}.pdf"`);
     doc.pipe(res);
 
     drawQuotationPDF(doc, quotation);

@@ -312,12 +312,12 @@ export default function OrderDetail() {
 
   const createOP = useMutation({
     mutationFn: () => productionApi.create({
-      orderId: order?.id,
+      orderId: order?.id || undefined,
       productId: opProductId,
       qty: opQty,
       phase: opPhase as never,
-      assignedTo: opAssignee,
-      requiredDate: opRequired ? new Date(opRequired).toISOString() : undefined,
+      assignedTo: opAssignee || undefined,
+      requiredDate: opRequired ? new Date(opRequired + 'T12:00:00').toISOString() : undefined,
     }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['order', id] })
