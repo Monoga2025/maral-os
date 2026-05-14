@@ -22,9 +22,36 @@ export type OrderStatus =
   | 'EN_PRODUCCION'
   | 'LISTO'
   | 'EMPACADO'
+  | 'DESPACHO_PARCIAL'
   | 'DESPACHADO'
   | 'ENTREGADO'
   | 'CANCELADO'
+
+export type ShipmentStatus = 'PREPARANDO' | 'DESPACHADO' | 'ENTREGADO' | 'CANCELADO'
+
+export interface ShipmentItem {
+  id: string
+  shipmentId: string
+  orderItemId: string
+  quantity: number
+  orderItem?: OrderItem & { product?: { id: string; name: string; reference: string } }
+}
+
+export interface Shipment {
+  id: string
+  number: number
+  orderId: string
+  status: ShipmentStatus
+  carrier?: string
+  trackingNumber?: string
+  notes?: string
+  creditDispatch: boolean
+  dispatchedAt?: string
+  createdAt: string
+  updatedAt: string
+  items: ShipmentItem[]
+  invoice?: { id: string; number: number; amount: number; status: string; dueDate: string }
+}
 
 export type ProductLine = 'ESTANDAR' | 'PREMIUM'
 
@@ -198,8 +225,9 @@ export interface OrderItem {
   orderId: string
   productId: string
   product?: Product
-  qty: number                      // campo Prisma: OrderItem.qty
+  qty: number
   unitPrice: number
+  quantityShipped: number
   picked: boolean
   disposition: ItemDisposition
 }
@@ -229,6 +257,7 @@ export interface Order {
   total: number
   items: OrderItem[]
   productionOrders?: ProductionOrder[]
+  shipments?: Shipment[]
   updatedBy?: Pick<User, 'id' | 'name'>
   createdAt: string
   updatedAt: string

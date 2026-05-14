@@ -28,6 +28,7 @@ import type {
   AspectRatio,
   AppNotification,
   CampaignLead,
+  Shipment,
 } from '../types'
 import type {
   CreateQuotationRequest,
@@ -253,6 +254,23 @@ export const ordersApi = {
     }),
   generateDispatchPdf: (id: string) =>
     api.get(`/orders/${id}/dispatch-pdf`, { responseType: 'arraybuffer' }),
+  getShipments: (orderId: string) =>
+    api.get<Shipment[]>(`/orders/${orderId}/shipments`),
+  createShipment: (orderId: string, data: {
+    carrier?: string
+    trackingNumber?: string
+    notes?: string
+    creditDispatch?: boolean
+    items: { orderItemId: string; quantity: number }[]
+  }) => api.post<Shipment>(`/orders/${orderId}/shipments`, data),
+  updateShipment: (orderId: string, shipmentId: string, data: {
+    status?: string
+    carrier?: string
+    trackingNumber?: string
+    notes?: string
+  }) => api.patch<Shipment>(`/orders/${orderId}/shipments/${shipmentId}`, data),
+  deleteShipment: (orderId: string, shipmentId: string) =>
+    api.delete(`/orders/${orderId}/shipments/${shipmentId}`),
 }
 
 // Inventory

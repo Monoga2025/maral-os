@@ -683,4 +683,258 @@ router.get('/:id/dispatch-pdf', async (req: AuthRequest, res: Response) => {
   }
 });
 
+// ── Shipments (despachos parciales) ──────────────────────────────────────────
+
+// GET /api/orders/:id/shipments
+router.get('/:id/shipments', async (req: AuthRequest, res: Response) => {
+  try {
+    const shipments = await prisma.shipment.findMany({
+      where: { orderId: req.params.id },
+      include: {
+        items: {
+          include: {
+            orderItem: { include: { product: { select: { id: true, name: true, reference: true } } } },
+          },
+        },
+        invoice: { select: { id: true, number: true, amount: true, status: true, dueDate: true } },
+      },
+      orderBy: { number: 'asc' },
+    });
+    res.json(shipments);
+  } catch (error) {
+    console.error('GET shipments error:', error);
+    res.status(500).json({ error: 'Error al obtener despachos' });
+  }
+});
+
+const CreateShipmentSchema = z.object({
+  carrier: z.string().optional(),
+  trackingNumber: z.string().optional(),
+  notes: z.string().optional(),
+  creditDispatch: z.boolean().optional().default(false),
+  items: z.array(z.object({
+    orderItemId: z.string(),
+    quantity: z.number().positive(),
+  })).min(1),
+});
+
+// POST /api/orders/:id/shipments
+router.post('/:id/shipments', async (req: AuthRequest, res: Response) => {
+  try {
+    const parsed = CreateShipmentSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: 'Datos inválidos', details: parsed.error.flatten() });
+      return;
+    }
+    const { carrier, trackingNumber, notes, creditDispatch, items } = parsed.data;
+
+    const order = await prisma.order.findUnique({
+      where: { id: req.params.id },
+      include: {
+        items: true,
+        client: { select: { id: true, paymentDays: true } },
+      },
+    });
+    if (!order) { res.status(404).json({ error: 'Pedido no encontrado' }); return; }
+    if (order.status === 'CANCELADO' || order.status === 'ENTREGADO') {
+      res.status(400).json({ error: 'No se puede despachar un pedido cancelado o ya entregado' });
+      return;
+    }
+
+    // Validate quantities
+    for (const si of items) {
+      const oi = order.items.find(i => i.id === si.orderItemId);
+      if (!oi) { res.status(400).json({ error: `Ítem ${si.orderItemId} no pertenece a este pedido` }); return; }
+      const remaining = oi.qty - oi.quantityShipped;
+      if (si.quantity > remaining) {
+        res.status(400).json({ error: `Ítem ${oi.id}: se intentan despachar ${si.quantity} pero solo quedan ${remaining} pendientes` });
+        return;
+      }
+    }
+
+    const shipmentAmount = items.reduce((sum, si) => {
+      const oi = order.items.find(i => i.id === si.orderItemId)!;
+      return sum + oi.unitPrice * si.quantity;
+    }, 0);
+
+    const shipment = await prisma.$transaction(async (tx) => {
+      // Create shipment
+      const s = await tx.shipment.create({
+        data: {
+          orderId: order.id,
+          carrier,
+          trackingNumber,
+          notes,
+          creditDispatch,
+          status: 'DESPACHADO',
+          dispatchedAt: new Date(),
+          items: {
+            create: items.map(si => ({ orderItemId: si.orderItemId, quantity: si.quantity })),
+          },
+        },
+        include: {
+          items: {
+            include: {
+              orderItem: { include: { product: { select: { id: true, name: true, reference: true } } } },
+            },
+          },
+        },
+      });
+
+      // Update quantityShipped on each OrderItem
+      for (const si of items) {
+        const oi = order.items.find(i => i.id === si.orderItemId)!;
+        await tx.orderItem.update({
+          where: { id: si.orderItemId },
+          data: { quantityShipped: oi.quantityShipped + si.quantity },
+        });
+        // Inventory movement
+        await tx.inventoryMovement.create({
+          data: {
+            productId: oi.productId,
+            type: 'SALIDA',
+            qty: si.quantity,
+            reason: `Despacho #${s.number} — Pedido #${order.number}`,
+            referenceId: s.id,
+            referenceType: 'Shipment',
+          },
+        });
+        // Decrement stock
+        await tx.product.update({
+          where: { id: oi.productId },
+          data: { stock: { decrement: si.quantity } },
+        });
+      }
+
+      // Determine new order status
+      const updatedItems = await tx.orderItem.findMany({ where: { orderId: order.id } });
+      const allShipped = updatedItems.every(i => i.quantityShipped >= i.qty);
+      const newOrderStatus = allShipped ? 'DESPACHADO' : 'DESPACHO_PARCIAL';
+      await tx.order.update({
+        where: { id: order.id },
+        data: { status: newOrderStatus as never, updatedById: req.user!.userId },
+      });
+
+      // Credit invoice per shipment
+      if (creditDispatch) {
+        const dueDate = new Date();
+        dueDate.setDate(dueDate.getDate() + (order.client.paymentDays || 30));
+        await tx.invoice.create({
+          data: {
+            orderId: order.id,
+            shipmentId: s.id,
+            clientId: order.clientId,
+            amount: shipmentAmount,
+            dueDate,
+          },
+        });
+      }
+
+      await tx.activityLog.create({
+        data: {
+          userId: req.user!.userId,
+          action: 'CREATE',
+          entityType: 'Shipment',
+          entityId: s.id,
+          metadata: { orderNumber: order.number, shipmentNumber: s.number, amount: shipmentAmount },
+        },
+      });
+
+      return s;
+    });
+
+    res.status(201).json(shipment);
+  } catch (error) {
+    console.error('POST shipment error:', error);
+    res.status(500).json({ error: 'Error al crear despacho' });
+  }
+});
+
+// PATCH /api/orders/:id/shipments/:shipmentId
+router.patch('/:id/shipments/:shipmentId', async (req: AuthRequest, res: Response) => {
+  try {
+    const { status, carrier, trackingNumber, notes } = req.body;
+    const validStatuses = ['PREPARANDO', 'DESPACHADO', 'ENTREGADO', 'CANCELADO'];
+    if (status && !validStatuses.includes(status)) {
+      res.status(400).json({ error: 'Estado inválido' });
+      return;
+    }
+
+    const shipment = await prisma.shipment.update({
+      where: { id: req.params.shipmentId },
+      data: {
+        ...(status ? { status: status as never } : {}),
+        ...(carrier !== undefined ? { carrier } : {}),
+        ...(trackingNumber !== undefined ? { trackingNumber } : {}),
+        ...(notes !== undefined ? { notes } : {}),
+        ...(status === 'DESPACHADO' ? { dispatchedAt: new Date() } : {}),
+      },
+    });
+
+    // If all shipments of the order are ENTREGADO, set order to ENTREGADO
+    if (status === 'ENTREGADO') {
+      const allShipments = await prisma.shipment.findMany({ where: { orderId: req.params.id } });
+      const allDelivered = allShipments.every(s => s.status === 'ENTREGADO');
+      if (allDelivered) {
+        await prisma.order.update({
+          where: { id: req.params.id },
+          data: { status: 'ENTREGADO' as never, updatedById: req.user!.userId },
+        });
+      }
+    }
+
+    res.json(shipment);
+  } catch (error) {
+    console.error('PATCH shipment error:', error);
+    res.status(500).json({ error: 'Error al actualizar despacho' });
+  }
+});
+
+// DELETE /api/orders/:id/shipments/:shipmentId — solo si está en PREPARANDO
+router.delete('/:id/shipments/:shipmentId', async (req: AuthRequest, res: Response) => {
+  try {
+    const shipment = await prisma.shipment.findUnique({
+      where: { id: req.params.shipmentId },
+      include: { items: { include: { orderItem: true } } },
+    });
+    if (!shipment) { res.status(404).json({ error: 'Despacho no encontrado' }); return; }
+    if (shipment.status !== 'PREPARANDO') {
+      res.status(400).json({ error: 'Solo se pueden eliminar despachos en estado PREPARANDO' });
+      return;
+    }
+
+    await prisma.$transaction(async (tx) => {
+      // Revert quantityShipped
+      for (const si of shipment.items) {
+        await tx.orderItem.update({
+          where: { id: si.orderItemId },
+          data: { quantityShipped: { decrement: si.quantity } },
+        });
+        // Revert stock
+        await tx.product.update({
+          where: { id: si.orderItem.productId },
+          data: { stock: { increment: si.quantity } },
+        });
+      }
+      await tx.shipment.delete({ where: { id: shipment.id } });
+
+      // Recalculate order status
+      const updatedItems = await tx.orderItem.findMany({ where: { orderId: req.params.id } });
+      const anyShipped = updatedItems.some(i => i.quantityShipped > 0);
+      if (!anyShipped) {
+        await tx.order.update({
+          where: { id: req.params.id },
+          data: { status: 'EMPACADO' as never },
+        });
+      }
+    });
+
+    res.json({ ok: true });
+  } catch (error) {
+    console.error('DELETE shipment error:', error);
+    res.status(500).json({ error: 'Error al eliminar despacho' });
+  }
+});
+
 export default router;
+

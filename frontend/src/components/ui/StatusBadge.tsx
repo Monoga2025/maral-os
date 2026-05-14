@@ -40,6 +40,7 @@ const orderStatusMap: Record<
   EN_PRODUCCION: { label: 'En Producción', variant: 'orange' },
   LISTO: { label: 'Listo', variant: 'green' },
   EMPACADO: { label: 'Empacado', variant: 'purple' },
+  DESPACHO_PARCIAL: { label: 'Despacho Parcial', variant: 'yellow' },
   DESPACHADO: { label: 'Despachado', variant: 'indigo' },
   ENTREGADO: { label: 'Entregado', variant: 'green' },
   CANCELADO: { label: 'Cancelado', variant: 'red' },

@@ -4,11 +4,11 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   ArrowLeft, Circle, Upload, Printer, Package,
   MapPin, AlertTriangle, Check, Save, Copy, X, FileText,
-  Factory, Plus, ChevronRight, Calendar,
+  Factory, Plus, ChevronRight, Calendar, Truck, CreditCard,
 } from 'lucide-react'
 import { ordersApi, productionApi, productsApi, usersApi } from '../lib/api'
 import { formatCOP, formatDate, getStatusColor } from '../lib/utils'
-import type { Order, OrderStatus, ItemDisposition, ProductionStatus } from '../types'
+import type { Order, OrderStatus, ItemDisposition, ProductionStatus, Shipment, ShipmentStatus } from '../types'
 import { toast } from 'sonner'
 
 const PHASES = [
@@ -40,7 +40,20 @@ const STEPS: { status: OrderStatus; label: string }[] = [
 ]
 
 const ORDER_INDEX: Record<string, number> = {
-  CONFIRMADO: 0, EN_PRODUCCION: 1, LISTO: 2, EMPACADO: 3, DESPACHADO: 4, ENTREGADO: 5,
+  CONFIRMADO: 0, EN_PRODUCCION: 1, LISTO: 2, EMPACADO: 3, DESPACHO_PARCIAL: 4, DESPACHADO: 4, ENTREGADO: 5,
+}
+
+const SHIPMENT_STATUS_COLORS: Record<ShipmentStatus, string> = {
+  PREPARANDO: 'bg-yellow-100 text-yellow-700',
+  DESPACHADO: 'bg-blue-100 text-blue-700',
+  ENTREGADO: 'bg-green-100 text-green-700',
+  CANCELADO: 'bg-red-100 text-red-700',
+}
+const SHIPMENT_STATUS_LABELS: Record<ShipmentStatus, string> = {
+  PREPARANDO: 'Preparando',
+  DESPACHADO: 'Despachado',
+  ENTREGADO: 'Entregado',
+  CANCELADO: 'Cancelado',
 }
 
 function CopyButton({ text, label }: { text: string; label?: string }) {
@@ -227,6 +240,14 @@ export default function OrderDetail() {
   const [opAssignee, setOpAssignee] = useState('')
   const [opRequired, setOpRequired] = useState('')
 
+  // Shipment state
+  const [showCreateShipment, setShowCreateShipment] = useState(false)
+  const [shipmentItems, setShipmentItems] = useState<{ orderItemId: string; quantity: number }[]>([])
+  const [shipmentCarrier, setShipmentCarrier] = useState('')
+  const [shipmentTracking, setShipmentTracking] = useState('')
+  const [shipmentNotes, setShipmentNotes] = useState('')
+  const [shipmentCredit, setShipmentCredit] = useState(false)
+
   const { data, isLoading } = useQuery({
     queryKey: ['order', id],
     queryFn: () => ordersApi.getById(id!),
@@ -234,6 +255,13 @@ export default function OrderDetail() {
   })
 
   const order = data?.data
+
+  const { data: shipmentsData, refetch: refetchShipments } = useQuery({
+    queryKey: ['shipments', id],
+    queryFn: () => ordersApi.getShipments(id!),
+    enabled: !!id,
+  })
+  const shipments: Shipment[] = shipmentsData?.data ?? []
 
   useEffect(() => {
     if (order?.guideNumber) setGuideNumberDraft(order.guideNumber)
@@ -300,6 +328,52 @@ export default function OrderDetail() {
       setOpQty(1)
     },
     onError: () => toast.error('Error al crear orden de producción'),
+  })
+
+  const createShipmentMutation = useMutation({
+    mutationFn: () => ordersApi.createShipment(id!, {
+      carrier: shipmentCarrier || undefined,
+      trackingNumber: shipmentTracking || undefined,
+      notes: shipmentNotes || undefined,
+      creditDispatch: shipmentCredit,
+      items: shipmentItems,
+    }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['order', id] })
+      refetchShipments()
+      toast.success('Despacho registrado')
+      setShowCreateShipment(false)
+      setShipmentItems([])
+      setShipmentCarrier('')
+      setShipmentTracking('')
+      setShipmentNotes('')
+      setShipmentCredit(false)
+    },
+    onError: (e: unknown) => {
+      const msg = (e as { response?: { data?: { error?: string } } })?.response?.data?.error
+      toast.error(msg ?? 'Error al registrar despacho')
+    },
+  })
+
+  const updateShipmentMutation = useMutation({
+    mutationFn: ({ shipmentId, status }: { shipmentId: string; status: string }) =>
+      ordersApi.updateShipment(id!, shipmentId, { status }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['order', id] })
+      refetchShipments()
+      toast.success('Despacho actualizado')
+    },
+    onError: () => toast.error('Error al actualizar despacho'),
+  })
+
+  const deleteShipmentMutation = useMutation({
+    mutationFn: (shipmentId: string) => ordersApi.deleteShipment(id!, shipmentId),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['order', id] })
+      refetchShipments()
+      toast.success('Despacho eliminado')
+    },
+    onError: () => toast.error('Error al eliminar despacho'),
   })
 
   const { data: productsData } = useQuery({
@@ -852,6 +926,237 @@ export default function OrderDetail() {
                 className="px-5 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
               >
                 {createOP.isPending ? 'Creando...' : 'Crear Orden'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Shipments panel */}
+      <div className="bg-white rounded-xl border border-gray-200 p-5">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="font-semibold text-gray-900 flex items-center gap-2">
+            <Truck size={16} className="text-emerald-600" />
+            Despachos
+            {shipments.length > 0 && (
+              <span className="ml-1 text-xs bg-emerald-100 text-emerald-700 font-semibold px-2 py-0.5 rounded-full">
+                {shipments.length}
+              </span>
+            )}
+          </h2>
+          {order.status !== 'CANCELADO' && order.status !== 'ENTREGADO' && (
+            <button
+              onClick={() => {
+                const initialItems = (order.items ?? [])
+                  .filter(i => (i.qty - (i.quantityShipped ?? 0)) > 0)
+                  .map(i => ({ orderItemId: i.id, quantity: i.qty - (i.quantityShipped ?? 0) }))
+                setShipmentItems(initialItems)
+                setShipmentCarrier(order.carrier ?? '')
+                setShowCreateShipment(true)
+              }}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-xs font-medium hover:bg-emerald-700 transition-colors"
+            >
+              <Plus size={13} />
+              Nuevo Despacho
+            </button>
+          )}
+        </div>
+
+        {/* Progress bar */}
+        {(order.items ?? []).length > 0 && (() => {
+          const totalQty = (order.items ?? []).reduce((s, i) => s + i.qty, 0)
+          const shippedQty = (order.items ?? []).reduce((s, i) => s + (i.quantityShipped ?? 0), 0)
+          const pct = totalQty > 0 ? Math.round((shippedQty / totalQty) * 100) : 0
+          return (
+            <div className="mb-4">
+              <div className="flex justify-between text-xs text-gray-500 mb-1">
+                <span>Despachado</span>
+                <span className="font-medium">{shippedQty} / {totalQty} unidades ({pct}%)</span>
+              </div>
+              <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-emerald-500 rounded-full transition-all"
+                  style={{ width: `${pct}%` }}
+                />
+              </div>
+            </div>
+          )
+        })()}
+
+        {shipments.length === 0 ? (
+          <div className="border-2 border-dashed border-gray-200 rounded-xl p-6 text-center text-gray-400 text-sm">
+            <Truck size={28} className="mx-auto mb-2 opacity-30" />
+            Sin despachos registrados
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {shipments.map((s) => (
+              <div key={s.id} className="border border-gray-100 rounded-xl p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold text-emerald-600">D-{String(s.number).padStart(3, '0')}</span>
+                    <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${SHIPMENT_STATUS_COLORS[s.status as ShipmentStatus]}`}>
+                      {SHIPMENT_STATUS_LABELS[s.status as ShipmentStatus] ?? s.status}
+                    </span>
+                    {s.creditDispatch && (
+                      <span className="text-xs flex items-center gap-0.5 text-purple-600 bg-purple-50 px-1.5 py-0.5 rounded-full">
+                        <CreditCard size={10} />
+                        Crédito
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {s.status === 'DESPACHADO' && (
+                      <button
+                        onClick={() => updateShipmentMutation.mutate({ shipmentId: s.id, status: 'ENTREGADO' })}
+                        className="text-xs px-2 py-1 bg-green-50 text-green-700 hover:bg-green-100 rounded-lg transition-colors"
+                      >
+                        Marcar entregado
+                      </button>
+                    )}
+                    {s.status === 'PREPARANDO' && (
+                      <button
+                        onClick={() => { if (confirm('¿Eliminar este despacho?')) deleteShipmentMutation.mutate(s.id) }}
+                        className="text-xs px-2 py-1 bg-red-50 text-red-600 hover:bg-red-100 rounded-lg transition-colors"
+                      >
+                        Eliminar
+                      </button>
+                    )}
+                  </div>
+                </div>
+                <div className="text-xs text-gray-500 space-y-0.5">
+                  {s.carrier && <p>Transportadora: <span className="text-gray-700">{s.carrier}</span></p>}
+                  {s.trackingNumber && <p>Guía: <span className="font-mono text-gray-700">{s.trackingNumber}</span></p>}
+                  {s.dispatchedAt && <p>Despachado: {formatDate(s.dispatchedAt)}</p>}
+                </div>
+                <div className="mt-2 space-y-1">
+                  {(s.items ?? []).map((si) => (
+                    <div key={si.id} className="flex justify-between text-xs bg-gray-50 rounded-lg px-3 py-1.5">
+                      <span className="text-gray-700">{si.orderItem?.product?.name ?? si.orderItemId}</span>
+                      <span className="font-medium text-gray-900">x{si.quantity}</span>
+                    </div>
+                  ))}
+                </div>
+                {s.invoice && (
+                  <div className="mt-2 flex items-center gap-2 text-xs text-purple-700 bg-purple-50 px-3 py-1.5 rounded-lg">
+                    <CreditCard size={11} />
+                    Factura #{s.invoice.number} — {formatCOP(s.invoice.amount)} — {s.invoice.status}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Create Shipment Modal */}
+      {showCreateShipment && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between p-5 border-b border-gray-100">
+              <div>
+                <h3 className="text-base font-semibold text-gray-900">Registrar Despacho</h3>
+                <p className="text-xs text-gray-400 mt-0.5">Pedido #{order.number} — {order.client?.name ?? order.clientId}</p>
+              </div>
+              <button onClick={() => setShowCreateShipment(false)} className="text-gray-400 hover:text-gray-600">
+                <X size={20} />
+              </button>
+            </div>
+            <div className="p-5 space-y-4">
+              {/* Items */}
+              <div>
+                <label className="text-xs text-gray-500 font-medium block mb-2">Productos a despachar</label>
+                <div className="space-y-2">
+                  {(order.items ?? []).map((oi) => {
+                    const remaining = oi.qty - (oi.quantityShipped ?? 0)
+                    const entry = shipmentItems.find(e => e.orderItemId === oi.id)
+                    return (
+                      <div key={oi.id} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-gray-900 truncate">{oi.product?.name ?? oi.productId}</p>
+                          <p className="text-xs text-gray-400">Pendiente: {remaining} / {oi.qty}</p>
+                        </div>
+                        <input
+                          type="number"
+                          min={0}
+                          max={remaining}
+                          value={entry?.quantity ?? 0}
+                          onChange={(e) => {
+                            const val = Math.min(Number(e.target.value), remaining)
+                            setShipmentItems(prev => {
+                              const without = prev.filter(x => x.orderItemId !== oi.id)
+                              return val > 0 ? [...without, { orderItemId: oi.id, quantity: val }] : without
+                            })
+                          }}
+                          className="w-20 border border-gray-200 rounded-lg px-2 py-1.5 text-sm text-center focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                        />
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+
+              {/* Carrier & tracking */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs text-gray-500 font-medium">Transportadora</label>
+                  <input
+                    type="text"
+                    value={shipmentCarrier}
+                    onChange={e => setShipmentCarrier(e.target.value)}
+                    placeholder="Servientrega, TCC..."
+                    className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-gray-500 font-medium">Número de guía</label>
+                  <input
+                    type="text"
+                    value={shipmentTracking}
+                    onChange={e => setShipmentTracking(e.target.value)}
+                    placeholder="Opcional"
+                    className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs text-gray-500 font-medium">Notas</label>
+                <textarea
+                  value={shipmentNotes}
+                  onChange={e => setShipmentNotes(e.target.value)}
+                  rows={2}
+                  className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                />
+              </div>
+
+              {/* Credit dispatch toggle */}
+              <label className="flex items-center gap-3 cursor-pointer p-3 bg-purple-50 rounded-xl">
+                <input
+                  type="checkbox"
+                  checked={shipmentCredit}
+                  onChange={e => setShipmentCredit(e.target.checked)}
+                  className="w-4 h-4 accent-purple-600"
+                />
+                <div>
+                  <p className="text-sm font-medium text-purple-900">Despacho a crédito</p>
+                  <p className="text-xs text-purple-600">Crea factura en cartera con vencimiento según días de pago del cliente</p>
+                </div>
+              </label>
+            </div>
+            <div className="flex justify-end gap-3 p-5 border-t border-gray-100">
+              <button
+                onClick={() => setShowCreateShipment(false)}
+                className="px-4 py-2 border border-gray-200 rounded-lg text-sm hover:bg-gray-50"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={() => createShipmentMutation.mutate()}
+                disabled={shipmentItems.length === 0 || createShipmentMutation.isPending}
+                className="px-5 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 disabled:opacity-50"
+              >
+                {createShipmentMutation.isPending ? 'Registrando...' : 'Registrar Despacho'}
               </button>
             </div>
           </div>

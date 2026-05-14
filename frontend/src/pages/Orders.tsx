@@ -13,12 +13,13 @@ import { TourButton } from '../components/tour/TourButton'
 import { Hint } from '../components/ui/Hint'
 
 const STATUSES: { key: OrderStatus; label: string; icon: React.ReactNode; color: string; dropColor: string }[] = [
-  { key: 'CONFIRMADO',    label: 'Confirmado',    icon: <Clock size={14} />,        color: 'border-blue-400 bg-blue-50',   dropColor: 'bg-blue-100' },
-  { key: 'EN_PRODUCCION', label: 'En Producción', icon: <Package size={14} />,      color: 'border-orange-400 bg-orange-50', dropColor: 'bg-orange-100' },
-  { key: 'LISTO',         label: 'Listo',         icon: <CheckCircle2 size={14} />, color: 'border-teal-400 bg-teal-50',   dropColor: 'bg-teal-100' },
-  { key: 'EMPACADO',      label: 'Empacado',      icon: <Package size={14} />,      color: 'border-purple-400 bg-purple-50', dropColor: 'bg-purple-100' },
-  { key: 'DESPACHADO',    label: 'Despachado',    icon: <Truck size={14} />,        color: 'border-indigo-400 bg-indigo-50', dropColor: 'bg-indigo-100' },
-  { key: 'ENTREGADO',     label: 'Entregado',     icon: <CheckCircle2 size={14} />, color: 'border-green-400 bg-green-50',  dropColor: 'bg-green-100' },
+  { key: 'CONFIRMADO',      label: 'Confirmado',       icon: <Clock size={14} />,        color: 'border-blue-400 bg-blue-50',    dropColor: 'bg-blue-100' },
+  { key: 'EN_PRODUCCION',   label: 'En Producción',    icon: <Package size={14} />,      color: 'border-orange-400 bg-orange-50', dropColor: 'bg-orange-100' },
+  { key: 'LISTO',           label: 'Listo',            icon: <CheckCircle2 size={14} />, color: 'border-teal-400 bg-teal-50',    dropColor: 'bg-teal-100' },
+  { key: 'EMPACADO',        label: 'Empacado',         icon: <Package size={14} />,      color: 'border-purple-400 bg-purple-50', dropColor: 'bg-purple-100' },
+  { key: 'DESPACHO_PARCIAL', label: 'Desp. Parcial',  icon: <Truck size={14} />,        color: 'border-yellow-400 bg-yellow-50', dropColor: 'bg-yellow-100' },
+  { key: 'DESPACHADO',      label: 'Despachado',       icon: <Truck size={14} />,        color: 'border-indigo-400 bg-indigo-50', dropColor: 'bg-indigo-100' },
+  { key: 'ENTREGADO',       label: 'Entregado',        icon: <CheckCircle2 size={14} />, color: 'border-green-400 bg-green-50',  dropColor: 'bg-green-100' },
 ]
 
 const nextStatus: Record<string, OrderStatus> = {
@@ -26,6 +27,7 @@ const nextStatus: Record<string, OrderStatus> = {
   EN_PRODUCCION: 'LISTO',
   LISTO: 'EMPACADO',
   EMPACADO: 'DESPACHADO',
+  DESPACHO_PARCIAL: 'DESPACHADO',
   DESPACHADO: 'ENTREGADO',
 }
 
@@ -85,7 +87,7 @@ export default function Orders() {
     return (
       <div className="animate-pulse space-y-4">
         <div className="h-8 bg-gray-200 rounded w-48" />
-        <div className="grid grid-cols-6 gap-4">
+        <div className="grid grid-cols-7 gap-4">
           {[...Array(6)].map((_, i) => <div key={i} className="h-64 bg-gray-200 rounded-xl" />)}
         </div>
       </div>
@@ -138,7 +140,7 @@ export default function Orders() {
 
       {/* KANBAN VIEW */}
       {view === 'kanban' && (
-        <div data-tour="kanban-board" className="grid grid-cols-6 gap-4 overflow-x-auto">
+        <div data-tour="kanban-board" className="grid grid-cols-7 gap-4 overflow-x-auto">
           {STATUSES.map(({ key, label, color, dropColor }) => {
             const col = byStatus(key)
             const isOver = dragOverCol === key

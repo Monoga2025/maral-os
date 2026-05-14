@@ -319,6 +319,7 @@ model Order {
   productionOrders ProductionOrder[]
   invoices         Invoice[]
   tasks            Task[]
+  shipments        Shipment[]
 }
 
 enum OrderStatus {
@@ -326,6 +327,7 @@ enum OrderStatus {
   EN_PRODUCCION
   LISTO
   EMPACADO
+  DESPACHO_PARCIAL
   DESPACHADO
   ENTREGADO
   CANCELADO
@@ -338,15 +340,17 @@ enum OrderType {
 }
 
 model OrderItem {
-  id          String          @id @default(cuid())
-  orderId     String
-  productId   String
-  qty         Float
-  unitPrice   Float
-  picked      Boolean         @default(false)
-  disposition ItemDisposition @default(PENDIENTE)
-  order       Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  product     Product         @relation(fields: [productId], references: [id], onDelete: Restrict)
+  id              String          @id @default(cuid())
+  orderId         String
+  productId       String
+  qty             Float
+  unitPrice       Float
+  quantityShipped Float           @default(0)
+  picked          Boolean         @default(false)
+  disposition     ItemDisposition @default(PENDIENTE)
+  order           Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product         Product         @relation(fields: [productId], references: [id], onDelete: Restrict)
+  shipmentItems   ShipmentItem[]
 }
 
 enum ItemDisposition {
@@ -475,6 +479,7 @@ model Invoice {
   id           String           @id @default(cuid())
   number       Int              @default(autoincrement())
   orderId      String?
+  shipmentId   String?          @unique
   clientId     String
   amount       Float
   dueDate      DateTime
@@ -486,6 +491,7 @@ model Invoice {
   merlinSynced Boolean          @default(false)
   createdAt    DateTime         @default(now())
   order        Order?           @relation(fields: [orderId], references: [id])
+  shipment     Shipment?        @relation(fields: [shipmentId], references: [id])
   client       Client           @relation(fields: [clientId], references: [id])
   syncQueue    MerlinSyncQueue?
   dianInvoice  DIANInvoice?
@@ -629,6 +635,46 @@ model DIANInvoice {
   createdAt    DateTime    @default(now())
   updatedAt    DateTime    @updatedAt
   invoice      Invoice     @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+}
+
+// ── Shipments (despachos parciales) ─────────────────────────
+
+enum ShipmentStatus {
+  PREPARANDO
+  DESPACHADO
+  ENTREGADO
+  CANCELADO
+}
+
+model Shipment {
+  id           String         @id @default(cuid())
+  number       Int            @default(autoincrement())
+  orderId      String
+  status       ShipmentStatus @default(PREPARANDO)
+  carrier      String?
+  trackingNumber String?
+  notes        String?
+  /// Si el pedido es a crédito, se crea factura vinculada a este despacho
+  creditDispatch Boolean      @default(false)
+  dispatchedAt DateTime?
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  order        Order          @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  items        ShipmentItem[]
+  invoice      Invoice?
+
+  @@index([orderId])
+}
+
+model ShipmentItem {
+  id           String    @id @default(cuid())
+  shipmentId   String
+  orderItemId  String
+  quantity     Float
+  shipment     Shipment  @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+  orderItem    OrderItem @relation(fields: [orderItemId], references: [id], onDelete: Restrict)
+
+  @@unique([shipmentId, orderItemId])
 }
 
 // ── WhatsApp Inbox ───────────────────────────────────────────
