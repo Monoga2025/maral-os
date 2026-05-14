@@ -192,6 +192,8 @@ export const quotationsApi = {
   delete: (id: string) => api.delete(`/quotations/${id}`),
   convertToOrder: (id: string, data: import('./contracts').ConvertToOrderRequest) =>
     api.post<Order>(`/quotations/${id}/convert-to-order`, data),
+  createProductionOrder: (id: string, items: { productId: string; qty: number; notes?: string; assignedTo?: string; requiredDate?: string }[]) =>
+    api.post<{ productionOrders: ProductionOrder[] }>(`/quotations/${id}/production-order`, { items }),
   duplicate: (id: string) => api.post<Quotation>(`/quotations/${id}/duplicate`),
   updateStatus: (id: string, status: string) =>
     api.patch<Quotation>(`/quotations/${id}/status`, { status }),

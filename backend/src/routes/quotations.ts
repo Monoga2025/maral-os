@@ -1328,4 +1328,51 @@ function drawShippingLabel(
      .text(destCity, dX, dY, { width: dW, lineBreak: false, ellipsis: true });
 }
 
+// POST /api/quotations/:id/production-order — crea OPs desde cotización
+router.post('/:id/production-order', async (req: AuthRequest, res: Response) => {
+  try {
+    const quotation = await prisma.quotation.findUnique({
+      where: { id: req.params.id },
+      include: { items: { include: { product: true } } },
+    });
+    if (!quotation) { res.status(404).json({ error: 'Cotización no encontrada' }); return; }
+
+    const schema = z.object({
+      items: z.array(z.object({
+        productId: z.string(),
+        qty: z.number().positive(),
+        notes: z.string().optional(),
+        assignedTo: z.string().optional(),
+        requiredDate: z.string().optional(),
+      })).min(1, 'Selecciona al menos un ítem'),
+    });
+
+    const parsed = schema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: 'Datos inválidos', details: parsed.error.flatten() });
+      return;
+    }
+
+    const created = await prisma.$transaction(
+      parsed.data.items.map((item) =>
+        prisma.productionOrder.create({
+          data: {
+            productId: item.productId,
+            qty: item.qty,
+            notes: item.notes,
+            assignedTo: item.assignedTo || null,
+            requiredDate: item.requiredDate ? new Date(item.requiredDate) : null,
+          },
+          include: { product: { select: { id: true, name: true, reference: true } } },
+        })
+      )
+    );
+
+    res.status(201).json({ productionOrders: created });
+  } catch (error) {
+    console.error('Create production order from quotation error:', error);
+    res.status(500).json({ error: 'Error al crear órdenes de producción' });
+  }
+});
+
 export default router;

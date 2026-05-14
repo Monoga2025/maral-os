@@ -12,6 +12,7 @@ import {
   Download,
   Pencil,
   Eye,
+  Factory,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { quotationsApi } from '../lib/api'
@@ -32,7 +33,7 @@ import { Pagination } from '../components/ui/Pagination'
 import { EmptyState } from '../components/ui/EmptyState'
 import { TableSkeleton } from '../components/ui/LoadingSkeleton'
 import { Card } from '../components/ui/Card'
-import type { QuotationStatus } from '../types'
+import type { QuotationStatus, Quotation as QuotationType } from '../types'
 import type { ConvertToOrderRequest } from '../lib/contracts'
 import { TourButton } from '../components/tour/TourButton'
 
@@ -209,6 +210,92 @@ function ConvertModal({ quotationId: _id, clientName, clientPhone, clientAddress
   )
 }
 
+function ProductionOrderModal({
+  quotation, loading, onClose, onConfirm,
+}: {
+  quotation: QuotationType
+  loading: boolean
+  onClose: () => void
+  onConfirm: (items: { productId: string; qty: number }[]) => void
+}) {
+  const [selected, setSelected] = useState<Record<string, { checked: boolean; qty: number }>>(
+    Object.fromEntries((quotation.items ?? []).map((i) => [i.productId, { checked: true, qty: i.qty }]))
+  )
+
+  const toggle = (productId: string) =>
+    setSelected((prev) => ({ ...prev, [productId]: { ...prev[productId], checked: !prev[productId].checked } }))
+
+  const setQty = (productId: string, qty: number) =>
+    setSelected((prev) => ({ ...prev, [productId]: { ...prev[productId], qty: Math.max(1, qty) } }))
+
+  const handleSubmit = () => {
+    const items = Object.entries(selected)
+      .filter(([, v]) => v.checked)
+      .map(([productId, v]) => ({ productId, qty: v.qty }))
+    if (items.length === 0) return
+    onConfirm(items)
+  }
+
+  const checkedCount = Object.values(selected).filter((v) => v.checked).length
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div className="w-full max-w-lg rounded-2xl bg-white shadow-2xl overflow-hidden">
+        <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4">
+          <div>
+            <h2 className="text-base font-bold text-gray-900">Enviar a Producción</h2>
+            <p className="text-xs text-gray-500 mt-0.5">Selecciona los ítems a producir</p>
+          </div>
+          <button onClick={onClose} className="h-7 w-7 flex items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 text-xl">×</button>
+        </div>
+
+        <div className="px-5 py-4 space-y-2 max-h-80 overflow-y-auto">
+          {(quotation.items ?? []).map((item) => {
+            const sel = selected[item.productId]
+            return (
+              <div key={item.productId} className={`flex items-center gap-3 rounded-xl border p-3 transition-colors ${sel?.checked ? 'border-orange-200 bg-orange-50' : 'border-gray-100 bg-gray-50'}`}>
+                <input
+                  type="checkbox"
+                  checked={sel?.checked ?? false}
+                  onChange={() => toggle(item.productId)}
+                  className="h-4 w-4 rounded accent-orange-500"
+                />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-gray-900 truncate">{item.product?.name ?? item.productId}</p>
+                  <p className="text-xs text-gray-400">{item.product?.reference}</p>
+                </div>
+                <input
+                  type="number"
+                  min={1}
+                  value={sel?.qty ?? item.qty}
+                  onChange={(e) => setQty(item.productId, Number(e.target.value))}
+                  disabled={!sel?.checked}
+                  className="w-16 rounded-lg border border-gray-200 px-2 py-1 text-sm text-center focus:outline-none focus:ring-1 focus:ring-orange-400 disabled:opacity-40"
+                />
+                <span className="text-xs text-gray-400 w-8">{item.product?.unit ?? 'und'}</span>
+              </div>
+            )
+          })}
+        </div>
+
+        <div className="flex justify-end gap-3 border-t border-gray-100 px-5 py-4">
+          <button onClick={onClose} className="rounded-xl border border-gray-200 px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50">
+            Cancelar
+          </button>
+          <button
+            onClick={handleSubmit}
+            disabled={loading || checkedCount === 0}
+            className="flex items-center gap-2 rounded-xl bg-orange-600 px-5 py-2 text-sm font-semibold text-white hover:bg-orange-700 disabled:opacity-50 transition-colors"
+          >
+            {loading ? <div className="h-4 w-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <Factory className="h-4 w-4" />}
+            Crear {checkedCount} OP{checkedCount !== 1 ? 's' : ''}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function Quotations() {
   const navigate = useNavigate()
   const location = useLocation()
@@ -223,6 +310,7 @@ export default function Quotations() {
   const [convertingQuotation, setConvertingQuotation] = useState<{
     id: string; clientName: string; clientPhone?: string; clientAddress?: string; clientCity?: string
   } | null>(null)
+  const [productionQuotation, setProductionQuotation] = useState<QuotationType | null>(null)
   const flashTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // Flash la fila recién creada si viene con state.newId
@@ -287,6 +375,16 @@ export default function Quotations() {
     onError: () => toast.error('Error al convertir cotización'),
   })
 
+  const productionOrderMutation = useMutation({
+    mutationFn: ({ id, items }: { id: string; items: { productId: string; qty: number }[] }) =>
+      quotationsApi.createProductionOrder(id, items),
+    onSuccess: (res) => {
+      toast.success(`${res.data.productionOrders.length} orden(es) de producción creadas`)
+      setProductionQuotation(null)
+    },
+    onError: () => toast.error('Error al crear órdenes de producción'),
+  })
+
   const duplicateMutation = useMutation({
     mutationFn: (id: string) => quotationsApi.duplicate(id),
     onSuccess: () => {
@@ -328,6 +426,15 @@ export default function Quotations() {
           loading={convertMutation.isPending}
           onClose={() => setConvertingQuotation(null)}
           onConfirm={(formData) => convertMutation.mutate({ id: convertingQuotation.id, data: formData })}
+        />
+      )}
+
+      {productionQuotation && (
+        <ProductionOrderModal
+          quotation={productionQuotation}
+          loading={productionOrderMutation.isPending}
+          onClose={() => setProductionQuotation(null)}
+          onConfirm={(items) => productionOrderMutation.mutate({ id: productionQuotation.id, items })}
         />
       )}
 
@@ -532,6 +639,16 @@ export default function Quotations() {
                             >
                               <ArrowRight className="h-3.5 w-3.5" />
                               Pedido
+                            </button>
+                          )}
+                          {q.status === 'APROBADA' && q.items && q.items.length > 0 && (
+                            <button
+                              onClick={() => setProductionQuotation(q as unknown as QuotationType)}
+                              className="flex h-7 items-center gap-1 rounded-lg border border-orange-200 bg-orange-50 px-2 text-xs font-medium text-orange-700 hover:bg-orange-100 transition-colors"
+                              title="Enviar a producción"
+                            >
+                              <Factory className="h-3.5 w-3.5" />
+                              Producción
                             </button>
                           )}
                           {q.status !== 'CONVERTIDA' && (
