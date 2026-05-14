@@ -165,6 +165,8 @@ export const productsApi = {
     api.put<Product>(`/products/${id}`, data),
   delete: (id: string) => api.delete(`/products/${id}`),
   getCritical: () => api.get<Product[]>('/products/low-stock'),
+  adjustStock: (id: string, data: { qty: number; type: 'ENTRADA' | 'SALIDA' | 'AJUSTE' | 'DEVOLUCION'; reason?: string }) =>
+    api.post<{ product: Product }>(`/products/${id}/adjust-stock`, data),
   // Kit components (BOM)
   getComponents: (id: string) =>
     api.get<ProductComponent[]>(`/products/${id}/components`),

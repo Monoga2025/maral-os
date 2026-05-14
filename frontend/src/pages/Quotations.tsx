@@ -214,7 +214,7 @@ export default function Quotations() {
   const location = useLocation()
   const queryClient = useQueryClient()
   const [search, setSearch] = useState('')
-  const [statusTab, setStatusTab] = useState('active')
+  const [statusTab, setStatusTab] = useState('all')
   const [page, setPage] = useState(1)
   const [flashId, setFlashId] = useState<string | null>(null)
   const [downloadingId, setDownloadingId] = useState<string | null>(null)

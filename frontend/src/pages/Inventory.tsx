@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { AlertTriangle, TrendingDown, Package, DollarSign, Plus, X } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { AlertTriangle, TrendingDown, Package, DollarSign, Plus, X, ExternalLink } from 'lucide-react'
 import { inventoryApi, productsApi } from '../lib/api'
 import { formatCOP } from '../lib/utils'
 import type { Product } from '../types'
@@ -18,6 +19,7 @@ const CAT_LABELS: Record<string, string> = {
 
 export default function Inventory() {
   const qc = useQueryClient()
+  const navigate = useNavigate()
   const [search, setSearch] = useState('')
   const [category, setCategory] = useState('Todos')
   const [stockStatus, setStockStatus] = useState('')
@@ -58,10 +60,18 @@ export default function Inventory() {
     onError: () => toast.error('Error al registrar movimiento'),
   })
 
-  const updateProduct = useMutation({
-    mutationFn: ({ id, data }: { id: string; data: Partial<Product> }) => productsApi.update(id, data as never),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['inventory'] }); toast.success('Producto actualizado') },
-    onError: () => toast.error('Error al actualizar producto'),
+  const adjustStock = useMutation({
+    mutationFn: ({ id, qty }: { id: string; qty: number }) =>
+      productsApi.adjustStock(id, { qty, type: 'AJUSTE', reason: 'Ajuste manual desde inventario' }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['inventory'] }); toast.success('Stock actualizado') },
+    onError: () => toast.error('Error al actualizar stock'),
+  })
+
+  const updateMinStock = useMutation({
+    mutationFn: ({ id, minStock }: { id: string; minStock: number }) =>
+      productsApi.update(id, { minStock } as never),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['inventory'] }) },
+    onError: () => toast.error('Error al actualizar stock mínimo'),
   })
 
   const products: Product[] = data?.data.data ?? []
@@ -99,12 +109,25 @@ export default function Inventory() {
         <div className="flex items-center gap-2">
           <TourButton tourId="inventario" />
           <button
+            onClick={() => navigate('/catalogo/nuevo')}
+            className="flex items-center gap-2 px-3 py-2 border border-gray-200 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium text-sm"
+          >
+            <ExternalLink size={15} />
+            Nuevo Producto
+          </button>
+          <button
+            onClick={() => { setMvType('ENTRADA'); setShowModal(true) }}
+            className="flex items-center gap-2 px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium text-sm"
+          >
+            <Plus size={15} />
+            Registrar Entrada
+          </button>
+          <button
             data-tour="register-movement-btn"
             onClick={() => setShowModal(true)}
             className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium text-sm"
           >
-            <Plus size={16} />
-            Registrar Movimiento
+            Otros Movimientos
           </button>
         </div>
       </div>
@@ -122,24 +145,24 @@ export default function Inventory() {
             </div>
           </div>
         </div>
-        <button type="button" onClick={() => setStockStatus(stockStatus === 'CRITICO' ? '' : 'CRITICO')} className={`text-left bg-white rounded-xl border p-5 transition-colors ${stockStatus === 'CRITICO' ? 'border-red-300 ring-2 ring-red-100' : 'border-gray-200 hover:bg-red-50'}`}>
+        <button type="button" title="Clic para filtrar por stock crítico" onClick={() => setStockStatus(stockStatus === 'CRITICO' ? '' : 'CRITICO')} className={`text-left bg-white rounded-xl border p-5 transition-colors ${stockStatus === 'CRITICO' ? 'border-red-300 ring-2 ring-red-100' : 'border-gray-200 hover:bg-red-50'}`}>
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-red-100 rounded-xl flex items-center justify-center">
               <AlertTriangle size={20} className="text-red-600" />
             </div>
             <div>
-              <p className="text-xs text-gray-500">Stock Crítico</p>
+              <p className="text-xs text-gray-500">Stock Crítico {stockStatus === 'CRITICO' && <span className="text-red-500 font-bold">● filtrando</span>}</p>
               <p className="text-2xl font-bold text-red-600">{critical}</p>
             </div>
           </div>
         </button>
-        <button type="button" onClick={() => setStockStatus(stockStatus === 'SIN_STOCK' ? '' : 'SIN_STOCK')} className={`text-left bg-white rounded-xl border p-5 transition-colors ${stockStatus === 'SIN_STOCK' ? 'border-orange-300 ring-2 ring-orange-100' : 'border-gray-200 hover:bg-orange-50'}`}>
+        <button type="button" title="Clic para filtrar por sin stock" onClick={() => setStockStatus(stockStatus === 'SIN_STOCK' ? '' : 'SIN_STOCK')} className={`text-left bg-white rounded-xl border p-5 transition-colors ${stockStatus === 'SIN_STOCK' ? 'border-orange-300 ring-2 ring-orange-100' : 'border-gray-200 hover:bg-orange-50'}`}>
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-orange-100 rounded-xl flex items-center justify-center">
               <TrendingDown size={20} className="text-orange-600" />
             </div>
             <div>
-              <p className="text-xs text-gray-500">Sin stock</p>
+              <p className="text-xs text-gray-500">Sin stock {stockStatus === 'SIN_STOCK' && <span className="text-orange-500 font-bold">● filtrando</span>}</p>
               <p className="text-2xl font-bold text-orange-600">{sinStock}</p>
             </div>
           </div>
@@ -182,10 +205,17 @@ export default function Inventory() {
       </div>
 
       {/* Legend */}
-      <div className="flex items-center gap-4 text-xs text-gray-500">
+      <div className="flex items-center gap-4 text-xs text-gray-500 flex-wrap">
         <div className="flex items-center gap-1.5"><div className="w-3 h-3 bg-red-400 rounded" />Por debajo del mínimo</div>
         <div className="flex items-center gap-1.5"><div className="w-3 h-3 bg-orange-400 rounded" />En nivel mínimo</div>
         <div className="flex items-center gap-1.5"><div className="w-3 h-3 bg-green-400 rounded" />Stock OK</div>
+        <span className="text-gray-400">·</span>
+        <span className="italic">Stock mínimo = 0 → quita alerta de crítico</span>
+        {stockStatus && (
+          <button onClick={() => setStockStatus('')} className="flex items-center gap-1 px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full font-medium hover:bg-blue-200">
+            <X size={10} /> Limpiar filtro "{stockStatus}"
+          </button>
+        )}
       </div>
 
       {/* Table */}
@@ -210,16 +240,23 @@ export default function Inventory() {
                   <td className={`px-4 py-3 font-bold ${isCritical ? 'text-red-600' : isAtMin ? 'text-orange-600' : 'text-gray-900'}`}>
                     <input
                       type="number"
-                      value={p.stock}
-                      onChange={(e) => updateProduct.mutate({ id: p.id, data: { stock: Number(e.target.value) } })}
+                      defaultValue={p.stock}
+                      onBlur={(e) => {
+                        const val = Number(e.target.value)
+                        if (val !== p.stock) adjustStock.mutate({ id: p.id, qty: val })
+                      }}
                       className="w-20 rounded border border-gray-200 px-2 py-1 text-sm font-bold"
                     />
                   </td>
                   <td className="px-4 py-3 text-gray-500">
                     <input
                       type="number"
-                      value={p.minStock}
-                      onChange={(e) => updateProduct.mutate({ id: p.id, data: { minStock: Number(e.target.value) } })}
+                      title="Stock mínimo — pon 0 para quitar alerta de crítico"
+                      defaultValue={p.minStock}
+                      onBlur={(e) => {
+                        const val = Number(e.target.value)
+                        if (val !== p.minStock) updateMinStock.mutate({ id: p.id, minStock: val })
+                      }}
                       className="w-20 rounded border border-gray-200 px-2 py-1 text-sm"
                     />
                   </td>
