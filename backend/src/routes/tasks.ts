@@ -59,6 +59,10 @@ router.get('/', async (req: AuthRequest, res: Response) => {
         assignedTo: { select: { id: true, name: true, whatsapp: true } },
         client: { select: { id: true, name: true, company: true } },
         order: { select: { id: true, number: true } },
+        comments: {
+          include: { user: { select: { id: true, name: true } } },
+          orderBy: { createdAt: 'asc' },
+        },
       },
     });
 
@@ -282,6 +286,34 @@ router.post('/:id/remind', async (req: AuthRequest, res: Response) => {
   } catch (error) {
     console.error('Remind task error:', error);
     res.status(500).json({ error: 'Error al enviar recordatorio' });
+  }
+});
+
+// POST /api/tasks/:id/comments
+router.post('/:id/comments', async (req: AuthRequest, res: Response) => {
+  try {
+    const { body } = req.body;
+    if (!body?.trim()) {
+      res.status(400).json({ error: 'El comentario no puede estar vacío' });
+      return;
+    }
+
+    const task = await prisma.task.findUnique({ where: { id: req.params.id } });
+    if (!task) { res.status(404).json({ error: 'Tarea no encontrada' }); return; }
+
+    const comment = await prisma.taskComment.create({
+      data: {
+        taskId: req.params.id,
+        userId: req.user!.userId,
+        body: body.trim(),
+      },
+      include: { user: { select: { id: true, name: true } } },
+    });
+
+    res.status(201).json(comment);
+  } catch (error) {
+    console.error('Create task comment error:', error);
+    res.status(500).json({ error: 'Error al crear comentario' });
   }
 });
 

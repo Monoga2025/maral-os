@@ -14,6 +14,7 @@ import type {
   InventoryMovement,
   User,
   Task,
+  TaskComment,
   Expense,
   WaChat,
   WaMessage,
@@ -407,6 +408,7 @@ export const tasksApi = {
     api.patch<Task>(`/tasks/${id}/status`, { status }),
   delete: (id: string) => api.delete(`/tasks/${id}`),
   remind: (id: string) => api.post(`/tasks/${id}/remind`, {}),
+  addComment: (id: string, body: string) => api.post<TaskComment>(`/tasks/${id}/comments`, { body }),
 }
 
 // Expenses (caja menor / gastos)

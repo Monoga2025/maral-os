@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { ArrowLeft, ArrowRight, AlertTriangle, Plus, Trash2, Check } from 'lucide-react'
-import { ordersApi, clientsApi, productsApi } from '../lib/api'
+import { ordersApi, clientsApi, productsApi, quotationsApi } from '../lib/api'
 import { formatCOP } from '../lib/utils'
 import type { Client, Product } from '../types'
 import { toast } from 'sonner'
@@ -35,16 +35,40 @@ export default function OrderForm() {
   const [showAdvanced, setShowAdvanced] = useState(false)
 
   useEffect(() => {
-    const navClientId = (location.state as { clientId?: string } | null)?.clientId
-    if (!navClientId) return
-    clientsApi.getById(navClientId).then((r) => {
-      const c = r.data
-      setSelectedClient(c)
-      setRecipientName(c.name)
-      setPhone(c.phone ?? '')
-      setAddress(c.address ?? '')
-      setCity(c.city ?? '')
-    }).catch(() => {/* silently ignore */})
+    const state = location.state as { clientId?: string; quotationId?: string } | null
+    const navClientId = state?.clientId
+    const navQuotationId = state?.quotationId
+
+    if (navQuotationId) {
+      quotationsApi.getById(navQuotationId).then((r) => {
+        const q = r.data
+        if (q.client) {
+          const c = q.client as unknown as import('../types').Client
+          setSelectedClient(c)
+          setRecipientName(c.name)
+          setPhone(c.phone ?? '')
+          setAddress(c.address ?? '')
+          setCity(c.city ?? '')
+        }
+        if (q.items && q.items.length > 0) {
+          setItems(q.items.map((qi) => ({
+            productId: qi.productId,
+            product: qi.product,
+            qty: qi.qty,
+            unitPrice: qi.unitPrice,
+          })))
+        }
+      }).catch(() => {})
+    } else if (navClientId) {
+      clientsApi.getById(navClientId).then((r) => {
+        const c = r.data
+        setSelectedClient(c)
+        setRecipientName(c.name)
+        setPhone(c.phone ?? '')
+        setAddress(c.address ?? '')
+        setCity(c.city ?? '')
+      }).catch(() => {})
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.state])
 

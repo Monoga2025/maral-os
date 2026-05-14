@@ -38,11 +38,19 @@ export default function Orders() {
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
   const [dragOverCol, setDragOverCol] = useState<OrderStatus | null>(null)
+  const [hiddenDelivered, setHiddenDelivered] = useState<Set<string>>(new Set())
+  const [deliveredOpen, setDeliveredOpen] = useState(false)
   const draggedId = useRef<string | null>(null)
 
   const { data, isLoading } = useQuery({
     queryKey: ['orders', search, statusFilter],
     queryFn: () => ordersApi.getAll({ search: search || undefined, status: statusFilter || undefined, pageSize: 100 }),
+  })
+
+  const { data: deliveredData } = useQuery({
+    queryKey: ['orders-delivered'],
+    queryFn: () => ordersApi.getAll({ status: 'ENTREGADO', pageSize: 50 }),
+    staleTime: 60_000,
   })
 
   const updateStatus = useMutation({
@@ -160,13 +168,21 @@ export default function Orders() {
                   </span>
                 </div>
                 <div className={`rounded-b-xl p-2 space-y-2 min-h-[400px] transition-colors ${isOver ? dropColor : 'bg-gray-100'}`}>
-                  {col.map((order) => (
+                  {col.filter((o) => key !== 'ENTREGADO' || !hiddenDelivered.has(o.id)).map((order) => (
                     <div
                       key={order.id}
                       draggable
                       onDragStart={(e) => onDragStart(e, order.id)}
                       onDragEnd={onDragEnd}
                       onClick={() => navigate(`/pedidos/${order.id}`)}
+                      onDoubleClick={(e) => {
+                        if (key === 'ENTREGADO') {
+                          e.stopPropagation()
+                          setHiddenDelivered((prev) => { const s = new Set(prev); s.add(order.id); return s })
+                          setDeliveredOpen(true)
+                        }
+                      }}
+                      title={key === 'ENTREGADO' ? 'Doble clic para mover a la lista de entregados' : undefined}
                       className="bg-white rounded-lg p-3 shadow-sm cursor-grab active:cursor-grabbing hover:shadow-md transition-all border border-gray-100 select-none"
                     >
                       <div className="flex items-start justify-between mb-2">
@@ -208,6 +224,55 @@ export default function Orders() {
           })}
         </div>
       )}
+
+      {/* DELIVERED SECTION — below kanban */}
+      {(() => {
+        const delivered: Order[] = deliveredData?.data.data ?? []
+        const count = delivered.length
+        if (count === 0) return null
+        return (
+          <div className="border border-gray-200 rounded-xl overflow-hidden">
+            <button
+              onClick={() => setDeliveredOpen(!deliveredOpen)}
+              className="flex w-full items-center justify-between px-4 py-3 bg-green-50 hover:bg-green-100 transition-colors"
+            >
+              <div className="flex items-center gap-2 text-sm font-semibold text-green-800">
+                <CheckCircle2 size={16} />
+                Pedidos Entregados
+                <span className="text-xs bg-green-200 text-green-800 rounded-full px-2 py-0.5 font-bold">{count}</span>
+              </div>
+              <ChevronRight size={16} className={`text-green-600 transition-transform ${deliveredOpen ? 'rotate-90' : ''}`} />
+            </button>
+            {deliveredOpen && (
+              <table className="w-full text-sm bg-white">
+                <thead className="bg-gray-50 border-b border-gray-200">
+                  <tr>
+                    {['#', 'Cliente', 'Ciudad', 'Transportadora', 'Fecha', 'Total'].map((h) => (
+                      <th key={h} className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {delivered.map((o) => (
+                    <tr
+                      key={o.id}
+                      onClick={() => navigate(`/pedidos/${o.id}`)}
+                      className="hover:bg-gray-50 cursor-pointer transition-colors"
+                    >
+                      <td className="px-4 py-2.5 font-bold text-blue-600">#{o.number}</td>
+                      <td className="px-4 py-2.5 font-medium text-gray-900">{o.client?.name ?? o.client?.company ?? '—'}</td>
+                      <td className="px-4 py-2.5 text-gray-500">{o.city ?? '—'}</td>
+                      <td className="px-4 py-2.5 text-gray-500">{o.carrier ?? '—'}</td>
+                      <td className="px-4 py-2.5 text-gray-400">{formatDate(o.createdAt)}</td>
+                      <td className="px-4 py-2.5 font-semibold text-gray-900">{formatCOP(o.total)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        )
+      })()}
 
       {/* TABLE VIEW */}
       {view === 'table' && (

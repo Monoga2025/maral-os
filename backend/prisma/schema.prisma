@@ -28,6 +28,7 @@ model User {
   productionUpdated ProductionOrder[] @relation("ProductionUpdater")
   tasksCreated      Task[]           @relation("TasksCreated")
   tasksAssigned     Task[]           @relation("TasksAssigned")
+  taskComments      TaskComment[]    @relation("TaskComments")
   expensesCreated   Expense[]        @relation("ExpensesCreated")
   expensesApproved  Expense[]        @relation("ExpensesApproved")
   campaignsCreated  Campaign[]       @relation("CampaignsCreated")
@@ -538,23 +539,36 @@ model ActivityLog {
 // ── Tasks (comunicación interna) ─────────────────────────────
 
 model Task {
-  id           String       @id @default(cuid())
+  id           String        @id @default(cuid())
   title        String
   description  String?
-  priority     TaskPriority @default(NORMAL)
-  status       TaskStatus   @default(PENDIENTE)
+  priority     TaskPriority  @default(NORMAL)
+  status       TaskStatus    @default(PENDIENTE)
   createdById  String
   assignedToId String
   clientId     String?
   orderId      String?
   dueDate      DateTime?
   completedAt  DateTime?
-  createdAt    DateTime     @default(now())
-  updatedAt    DateTime     @updatedAt
-  createdBy    User         @relation("TasksCreated", fields: [createdById], references: [id])
-  assignedTo   User         @relation("TasksAssigned", fields: [assignedToId], references: [id])
-  client       Client?      @relation(fields: [clientId], references: [id])
-  order        Order?       @relation(fields: [orderId], references: [id])
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  createdBy    User          @relation("TasksCreated", fields: [createdById], references: [id])
+  assignedTo   User          @relation("TasksAssigned", fields: [assignedToId], references: [id])
+  client       Client?       @relation(fields: [clientId], references: [id])
+  order        Order?        @relation(fields: [orderId], references: [id])
+  comments     TaskComment[]
+}
+
+model TaskComment {
+  id        String   @id @default(cuid())
+  taskId    String
+  userId    String
+  body      String
+  createdAt DateTime @default(now())
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user      User     @relation("TaskComments", fields: [userId], references: [id])
+
+  @@index([taskId])
 }
 
 enum TaskPriority {

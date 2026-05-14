@@ -403,6 +403,15 @@ export interface ApiError {
   statusCode: number
 }
 
+export interface TaskComment {
+  id: string
+  taskId: string
+  userId: string
+  body: string
+  createdAt: string
+  user?: Pick<User, 'id' | 'name'>
+}
+
 export interface Task {
   id: string
   title: string
@@ -421,6 +430,7 @@ export interface Task {
   assignedTo?: Pick<User, 'id' | 'name'>
   client?: Pick<Client, 'id' | 'name' | 'company'>
   order?: Pick<Order, 'id' | 'number'>
+  comments?: TaskComment[]
 }
 
 export interface Expense {

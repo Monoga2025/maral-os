@@ -1,9 +1,9 @@
 import { useState, useRef, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
-  Plus, Trash2, Check, ClipboardList, Columns3, Sparkles,
+  Plus, Trash2, Check, ClipboardList, Sparkles,
   Bell, BarChart2, ChevronDown, ChevronUp, ArrowRight, Users,
-  AlertCircle,
+  AlertCircle, MessageSquare, Send,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { tasksApi } from '../lib/api'
@@ -13,7 +13,7 @@ import { formatDate } from '../lib/utils'
 import { Card } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
 import { TourButton } from '../components/tour/TourButton'
-import type { Task, TaskPriority, User } from '../types'
+import type { Task, TaskComment, TaskPriority, User } from '../types'
 
 // ─── Helpers ─────────────────────────────────────────────────
 
@@ -142,8 +142,74 @@ function OverdueBanner({ tasks }: { tasks: Task[] }) {
 
 // ─── Kanban Card ─────────────────────────────────────────────
 
+function CommentThread({
+  comments, taskId, onAdd, currentUserId,
+}: {
+  comments: TaskComment[]
+  taskId: string
+  onAdd: (taskId: string, body: string) => void
+  currentUserId: string
+}) {
+  const [text, setText] = useState('')
+  const endRef = useRef<HTMLDivElement>(null)
+
+  const submit = () => {
+    const trimmed = text.trim()
+    if (!trimmed) return
+    onAdd(taskId, trimmed)
+    setText('')
+  }
+
+  useEffect(() => {
+    endRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [comments.length])
+
+  return (
+    <div className="mt-2 border-t border-gray-100 pt-2">
+      {comments.length > 0 && (
+        <div className="space-y-1.5 mb-2 max-h-32 overflow-y-auto pr-1">
+          {comments.map((c) => {
+            const isMe = c.user?.id === currentUserId
+            return (
+              <div key={c.id} className={`flex gap-1.5 ${isMe ? 'flex-row-reverse' : ''}`}>
+                <div className={`flex-shrink-0 h-5 w-5 rounded-full flex items-center justify-center text-[9px] font-bold text-white ${avatarColor(c.user?.name ?? '?')}`}>
+                  {(c.user?.name ?? '?')[0].toUpperCase()}
+                </div>
+                <div className={`max-w-[80%] rounded-xl px-2 py-1 text-[11px] leading-snug ${isMe ? 'bg-blue-600 text-white rounded-tr-sm' : 'bg-gray-100 text-gray-700 rounded-tl-sm'}`}>
+                  {c.body}
+                  <span className={`block text-[9px] mt-0.5 ${isMe ? 'text-blue-200' : 'text-gray-400'}`}>
+                    {new Date(c.createdAt).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                </div>
+              </div>
+            )
+          })}
+          <div ref={endRef} />
+        </div>
+      )}
+      <div className="flex items-center gap-1.5">
+        <input
+          type="text"
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && submit()}
+          placeholder="Escribir comentario..."
+          className="flex-1 rounded-lg border border-gray-200 bg-gray-50 px-2 py-1 text-xs focus:border-blue-300 focus:outline-none"
+        />
+        <button
+          onClick={submit}
+          disabled={!text.trim()}
+          className="flex h-6 w-6 items-center justify-center rounded-lg bg-blue-600 text-white disabled:opacity-40 hover:bg-blue-700 transition-colors"
+        >
+          <Send className="h-3 w-3" />
+        </button>
+      </div>
+    </div>
+  )
+}
+
 function TaskCard({
-  task, canDelete, onComplete, onDelete, onRemind, onMessage, isCompleting, canRemind,
+  task, canDelete, onComplete, onDelete, onRemind, onMessage, onAddComment, isCompleting, canRemind, currentUserId,
 }: {
   task: Task
   canDelete: boolean
@@ -151,13 +217,17 @@ function TaskCard({
   onDelete: () => void
   onRemind: () => void
   onMessage: (message: string) => void
+  onAddComment: (taskId: string, body: string) => void
   isCompleting: boolean
   canRemind: boolean
+  currentUserId: string
 }) {
   const [message, setMessage] = useState(task.description ?? '')
+  const [showComments, setShowComments] = useState(false)
   const isDone    = task.status === 'COMPLETADA' || task.status === 'CANCELADA'
   const isOverdue = !isDone && task.dueDate && daysUntil(task.dueDate) < 0
   const daysLeft  = task.dueDate ? daysUntil(task.dueDate) : null
+  const commentCount = task.comments?.length ?? 0
 
   return (
     <div className={`rounded-xl border p-3 shadow-sm transition-all ${isDone ? 'bg-gray-50 border-gray-100 opacity-55' : isOverdue ? 'bg-white border-red-200' : 'bg-white border-gray-200'}`}>
@@ -178,15 +248,9 @@ function TaskCard({
             {task.title}
           </p>
 
-          <textarea
-            value={message}
-            onChange={(e) => setMessage(e.target.value)}
-            onBlur={() => message.trim() !== (task.description ?? '') && onMessage(message.trim())}
-            placeholder="Mensaje o estado de esta tarea..."
-            rows={message ? 2 : 1}
-            disabled={isDone}
-            className="mt-2 w-full resize-none rounded-lg border border-gray-100 bg-gray-50 px-2 py-1 text-xs text-gray-600 placeholder-gray-300 focus:border-blue-300 focus:outline-none disabled:opacity-60"
-          />
+          {task.description && (
+            <p className="mt-1 text-xs text-gray-500 leading-snug">{task.description}</p>
+          )}
 
           {/* Asignada por */}
           {task.createdBy && (
@@ -208,18 +272,41 @@ function TaskCard({
               </span>
             )}
 
-            {/* Remind button */}
-            {canRemind && !isDone && (
+            <div className="flex items-center gap-1 ml-auto">
+              {/* Comments toggle */}
               <button
-                onClick={onRemind}
-                title="Enviar recordatorio WhatsApp"
-                className="flex items-center gap-1 text-[10px] text-green-600 hover:text-green-700 hover:bg-green-50 rounded-full px-1.5 py-0.5 transition-colors border border-transparent hover:border-green-200"
+                onClick={() => setShowComments(!showComments)}
+                className={`flex items-center gap-1 text-[10px] rounded-full px-1.5 py-0.5 transition-colors border ${
+                  showComments ? 'bg-blue-50 text-blue-600 border-blue-200' : 'text-gray-400 border-transparent hover:border-gray-200 hover:text-gray-600'
+                }`}
               >
-                <Bell className="h-3 w-3" />
-                Recordar
+                <MessageSquare className="h-3 w-3" />
+                {commentCount > 0 ? commentCount : ''}
               </button>
-            )}
+
+              {/* Remind button */}
+              {canRemind && !isDone && (
+                <button
+                  onClick={onRemind}
+                  title="Enviar recordatorio WhatsApp"
+                  className="flex items-center gap-1 text-[10px] text-green-600 hover:text-green-700 hover:bg-green-50 rounded-full px-1.5 py-0.5 transition-colors border border-transparent hover:border-green-200"
+                >
+                  <Bell className="h-3 w-3" />
+                  Recordar
+                </button>
+              )}
+            </div>
           </div>
+
+          {/* Comment thread (expandable) */}
+          {showComments && (
+            <CommentThread
+              comments={task.comments ?? []}
+              taskId={task.id}
+              onAdd={onAddComment}
+              currentUserId={currentUserId}
+            />
+          )}
         </div>
 
         {/* Delete */}
@@ -527,6 +614,12 @@ export default function Tareas() {
     onError: () => toast.error('No se pudo actualizar el mensaje'),
   })
 
+  const addCommentMutation = useMutation({
+    mutationFn: ({ taskId, body }: { taskId: string; body: string }) => tasksApi.addComment(taskId, body),
+    onSuccess: () => { invalidate() },
+    onError: () => toast.error('No se pudo enviar el comentario'),
+  })
+
   const canDelete = (task: Task) => user?.role === 'GERENTE' || task.createdById === user?.id
   const canRemind = (task: Task) => isGerente || task.createdById === user?.id
 
@@ -657,10 +750,12 @@ export default function Tareas() {
                       task={task}
                       canDelete={canDelete(task)}
                       canRemind={canRemind(task)}
+                      currentUserId={user?.id ?? ''}
                       onComplete={() => completeMutation.mutate(task.id)}
                       onDelete={() => deleteMutation.mutate(task.id)}
                       onRemind={() => remindMutation.mutate(task.id)}
                       onMessage={(description) => messageMutation.mutate({ id: task.id, description })}
+                      onAddComment={(taskId, body) => addCommentMutation.mutate({ taskId, body })}
                       isCompleting={completeMutation.isPending && completeMutation.variables === task.id}
                     />
                   ))}
