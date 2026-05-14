@@ -1,8 +1,8 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { CreditCard, AlertTriangle, Clock, TrendingUp, Check, X } from 'lucide-react'
+import { CreditCard, AlertTriangle, Clock, TrendingUp, Check, X, Bell } from 'lucide-react'
 import { invoicesApi } from '../lib/api'
 import { formatCOP, formatDate, getDaysAgo } from '../lib/utils'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { toast } from 'sonner'
 import { TourButton } from '../components/tour/TourButton'
 import { Hint } from '../components/ui/Hint'
@@ -46,6 +46,22 @@ export default function Credit() {
 
   const summary = summaryData?.data
   const invoices = invoicesData?.data.data ?? []
+
+  const nearDue = invoices.filter((inv) => {
+    if (inv.status !== 'VIGENTE') return false
+    const days = Math.ceil((new Date(inv.dueDate).getTime() - Date.now()) / 86400000)
+    return days >= 0 && days <= 3
+  })
+
+  useEffect(() => {
+    if (nearDue.length > 0 && !invoicesLoading) {
+      toast.warning(
+        `⚠️ ${nearDue.length} factura${nearDue.length !== 1 ? 's' : ''} vence${nearDue.length !== 1 ? 'n' : ''} en los próximos 3 días`,
+        { duration: 6000, id: 'near-due-alert' }
+      )
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [invoicesLoading])
 
   if ((summaryLoading && !summaryData) || (invoicesLoading && !invoicesData)) {
     return (
@@ -107,6 +123,28 @@ export default function Credit() {
           </div>
         </div>
       </div>
+
+      {/* 3-day alert banner */}
+      {nearDue.length > 0 && (
+        <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+          <Bell className="h-5 w-5 text-amber-500 shrink-0 mt-0.5" />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-amber-800">
+              {nearDue.length === 1 ? '1 factura vence en los próximos 3 días' : `${nearDue.length} facturas vencen en los próximos 3 días`}
+            </p>
+            <div className="mt-1 flex flex-wrap gap-1.5">
+              {nearDue.map((inv) => {
+                const days = Math.ceil((new Date(inv.dueDate).getTime() - Date.now()) / 86400000)
+                return (
+                  <span key={inv.id} className="text-xs bg-amber-100 text-amber-700 rounded-full px-2 py-0.5">
+                    {inv.client?.name ?? `#${inv.number}`} — vence {days === 0 ? 'hoy' : `en ${days}d`}
+                  </span>
+                )
+              })}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Credit rules */}
       <div data-tour="credit-rules" className="bg-white rounded-xl border border-gray-200 p-5">
@@ -197,13 +235,22 @@ export default function Credit() {
             {invoices.map((inv) => {
               const isOverdue = inv.status === 'VENCIDA'
               const daysOverdue = isOverdue ? getDaysAgo(inv.dueDate) : 0
+              const daysUntilDue = inv.status === 'VIGENTE'
+                ? Math.ceil((new Date(inv.dueDate).getTime() - Date.now()) / 86400000)
+                : null
+              const isNearDue = daysUntilDue !== null && daysUntilDue >= 0 && daysUntilDue <= 3
               return (
-                <tr key={inv.id} className={`hover:bg-gray-50 transition-colors ${isOverdue ? 'bg-red-50' : ''}`}>
+                <tr key={inv.id} className={`hover:bg-gray-50 transition-colors ${isOverdue ? 'bg-red-50' : isNearDue ? 'bg-amber-50' : ''}`}>
                   <td className="px-4 py-3 font-bold text-blue-600 text-xs">#{inv.number}</td>
                   <td className="px-4 py-3 font-medium text-gray-900">{inv.client?.name ?? '—'}</td>
                   <td className="px-4 py-3 text-gray-500 text-xs">{formatDate(inv.createdAt)}</td>
-                  <td className={`px-4 py-3 text-xs font-medium ${isOverdue ? 'text-red-600' : 'text-gray-600'}`}>
+                  <td className={`px-4 py-3 text-xs font-medium ${isOverdue ? 'text-red-600' : isNearDue ? 'text-amber-600' : 'text-gray-600'}`}>
                     {formatDate(inv.dueDate)}
+                    {isNearDue && (
+                      <span className="ml-1.5 bg-amber-100 text-amber-700 rounded-full px-1.5 py-0.5 text-[10px] font-semibold">
+                        Vence pronto
+                      </span>
+                    )}
                   </td>
                   <td className="px-4 py-3 font-semibold text-gray-900">{formatCOP(inv.amount)}</td>
                   <td className="px-4 py-3">
@@ -254,9 +301,12 @@ export default function Credit() {
           </tbody>
         </table>
         {invoices.length === 0 && (
-          <div className="py-16 text-center text-gray-400">
-            <CreditCard size={40} className="mx-auto mb-2 opacity-40" />
-            <p className="font-medium">Sin facturas registradas</p>
+          <div className="py-16 text-center text-gray-400 max-w-sm mx-auto">
+            <CreditCard size={40} className="mx-auto mb-3 opacity-30" />
+            <p className="font-semibold text-gray-600">No hay facturas por cobrar</p>
+            <p className="text-sm mt-1 text-gray-400 leading-relaxed">
+              Los pedidos despachados a crédito aparecerán aquí. Para crear una factura de crédito, activa la opción al registrar un despacho en el detalle del pedido.
+            </p>
           </div>
         )}
       </div>
