@@ -17,15 +17,15 @@ export class ErrorBoundary extends Component<Props, State> {
             <AlertTriangle className="h-8 w-8 text-red-600" />
           </div>
           <div>
-            <h2 className="text-lg font-semibold text-gray-900">Algo salió mal</h2>
-            <p className="text-sm text-gray-500 mt-1">Recarga la página para intentar de nuevo</p>
+            <h2 className="text-lg font-semibold text-gray-900">Algo salió mal en este módulo</h2>
+            <p className="text-sm text-gray-500 mt-1">Navega a otro módulo o recarga si el problema persiste</p>
             <p className="text-xs text-red-400 mt-2 font-mono">{this.state.error?.message}</p>
           </div>
           <button
-            onClick={() => { this.setState({ hasError: false }); window.location.reload() }}
+            onClick={() => { window.location.href = '/' }}
             className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700"
           >
-            Recargar
+            Ir al inicio
           </button>
         </div>
       )

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Outlet } from 'react-router-dom'
+import { Outlet, useLocation } from 'react-router-dom'
 import { Sidebar } from './Sidebar'
 import { Header } from './Header'
 import { ErrorBoundary } from '../ErrorBoundary'
@@ -10,6 +10,7 @@ import HotLeadsToast from '../HotLeadsToast'
 
 export default function AppLayout() {
   const [hotCount, setHotCount] = useState(0)
+  const { pathname } = useLocation()
   return (
     <div className="flex bg-[#F8FAFC]" style={{ height: '100dvh' }}>
       <div className="relative shrink-0">
@@ -19,7 +20,7 @@ export default function AppLayout() {
       <div className="flex flex-1 flex-col min-w-0 overflow-hidden">
         <Header />
         <main className="flex-1 overflow-y-auto p-6">
-          <ErrorBoundary>
+          <ErrorBoundary key={pathname}>
             <Outlet />
           </ErrorBoundary>
         </main>
