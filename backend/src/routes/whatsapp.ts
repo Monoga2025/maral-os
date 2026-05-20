@@ -599,7 +599,8 @@ router.post('/webhook', async (req: Request, res: Response) => {
 
   try {
     const body = req.body as Record<string, unknown>;
-    if (body.event !== 'messages.upsert') return;
+    const event = String(body.event ?? '').toLowerCase().replace(/_/g, '.');
+    if (event !== 'messages.upsert') return;
 
     const data = body.data as Record<string, unknown>;
     if (!data) return;
@@ -1281,9 +1282,13 @@ router.post('/configure-webhook', async (req: AuthRequest, res: Response) => {
     method: 'POST',
     headers: evolHeaders(),
     body: JSON.stringify({
-      url: webhookUrl,
-      webhook_by_events: true,
-      events: ['messages.upsert', 'messages.update'],
+      webhook: {
+        enabled: true,
+        url: webhookUrl,
+        webhookByEvents: true,
+        webhookBase64: false,
+        events: ['MESSAGES_UPSERT', 'MESSAGES_UPDATE'],
+      },
     }),
   });
 
