@@ -15,6 +15,7 @@ const router = Router();
 const EVOL_BASE  = process.env.EVOLUTION_API_URL ?? '';
 const EVOL_KEY   = process.env.EVOLUTION_API_KEY ?? '';
 const EVOL_INST  = process.env.EVOLUTION_INSTANCE ?? 'maral-info';
+const EVOL_INST_PATH = encodeURIComponent(EVOL_INST);
 const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
 const OPENROUTER_MODEL = 'google/gemini-2.5-flash';
 
@@ -422,7 +423,7 @@ async function sendHumanizedText(number: string, text: string) {
     const part = parts[i];
 
     // Simulate composing presence before each message
-    await fetch(`${EVOL_BASE}/message/sendText/${EVOL_INST}`, {
+    await fetch(`${EVOL_BASE}/message/sendText/${EVOL_INST_PATH}`, {
       method: 'POST',
       headers: evolHeaders(),
       body: JSON.stringify({
@@ -827,7 +828,7 @@ router.post('/send', async (req: AuthRequest, res: Response) => {
       }
     } else if (type === 'audio') {
       if (!mediaBase64) { res.status(400).json({ error: 'mediaBase64 requerido' }); return; }
-      await fetch(`${EVOL_BASE}/message/sendWhatsAppAudio/${EVOL_INST}`, {
+      await fetch(`${EVOL_BASE}/message/sendWhatsAppAudio/${EVOL_INST_PATH}`, {
         method: 'POST',
         headers: evolHeaders(),
         body: JSON.stringify({ number, audio: mediaBase64, encoding: true }),
@@ -844,7 +845,7 @@ router.post('/send', async (req: AuthRequest, res: Response) => {
       }
     } else if (type === 'sticker') {
       if (!mediaBase64) { res.status(400).json({ error: 'mediaBase64 requerido' }); return; }
-      await fetch(`${EVOL_BASE}/message/sendSticker/${EVOL_INST}`, {
+      await fetch(`${EVOL_BASE}/message/sendSticker/${EVOL_INST_PATH}`, {
         method: 'POST',
         headers: evolHeaders(),
         body: JSON.stringify({ number, sticker: mediaBase64 }),
@@ -863,7 +864,7 @@ router.post('/send', async (req: AuthRequest, res: Response) => {
       // image / video / document
       if (!mediaBase64) { res.status(400).json({ error: 'mediaBase64 requerido' }); return; }
       const mediatype = type === 'image' ? 'image' : type === 'video' ? 'video' : 'document';
-      await fetch(`${EVOL_BASE}/message/sendMedia/${EVOL_INST}`, {
+      await fetch(`${EVOL_BASE}/message/sendMedia/${EVOL_INST_PATH}`, {
         method: 'POST',
         headers: evolHeaders(),
         body: JSON.stringify({
@@ -913,7 +914,7 @@ router.get('/media/:messageId', async (req: AuthRequest, res: Response) => {
   if (!EVOL_BASE) { res.status(503).json({ error: 'Evolution API no configurada' }); return; }
 
   try {
-    const result = await fetch(`${EVOL_BASE}/chat/getBase64FromMediaMessage/${EVOL_INST}`, {
+    const result = await fetch(`${EVOL_BASE}/chat/getBase64FromMediaMessage/${EVOL_INST_PATH}`, {
       method: 'POST',
       headers: evolHeaders(),
       body: JSON.stringify({ message: msg.rawMessage }),
@@ -1033,7 +1034,7 @@ router.get('/profile-pic/:number', async (req: AuthRequest, res: Response) => {
   if (!EVOL_BASE || !EVOL_KEY) { res.status(503).json({ error: 'Evolution no configurado' }); return; }
   try {
     const result = await fetch(
-      `${EVOL_BASE}/chat/fetchProfilePictureUrl/${EVOL_INST}?number=${encodeURIComponent(number)}`,
+      `${EVOL_BASE}/chat/fetchProfilePictureUrl/${EVOL_INST_PATH}?number=${encodeURIComponent(number)}`,
       { headers: evolHeaders() },
     );
     if (!result.ok) { res.status(404).json({ error: 'No encontrado' }); return; }
@@ -1276,7 +1277,7 @@ router.post('/configure-webhook', async (req: AuthRequest, res: Response) => {
     return;
   }
 
-  const result = await fetch(`${EVOL_BASE}/webhook/set/${EVOL_INST}`, {
+  const result = await fetch(`${EVOL_BASE}/webhook/set/${EVOL_INST_PATH}`, {
     method: 'POST',
     headers: evolHeaders(),
     body: JSON.stringify({

@@ -12,6 +12,7 @@
 const BASE_URL = (process.env.EVOLUTION_API_URL ?? '').replace(/\/+$/, '');  // strip trailing slash
 const API_KEY  = process.env.EVOLUTION_API_KEY  ?? '';
 const INSTANCE = process.env.EVOLUTION_INSTANCE ?? 'maral-info';
+const INSTANCE_PATH = encodeURIComponent(INSTANCE);
 
 const COMPANY_PHONE = process.env.COMPANY_PHONE ?? '3167760692';
 
@@ -43,7 +44,7 @@ async function sendMedia(
   try {
     const number = formatPhone(phone);
     const mediatype = type.toLowerCase() as 'image' | 'video' | 'audio' | 'document';
-    const response = await fetch(`${BASE_URL}/message/sendMedia/${INSTANCE}`, {
+    const response = await fetch(`${BASE_URL}/message/sendMedia/${INSTANCE_PATH}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', apikey: API_KEY },
       body: JSON.stringify({ number, mediatype, media: mediaUrl, caption, fileName }),
@@ -62,7 +63,7 @@ async function sendTextMessage(phone: string, message: string): Promise<void> {
   if (!BASE_URL || !API_KEY || !phone) return;
   try {
     const number = formatPhone(phone);
-    const url = `${BASE_URL}/message/sendText/${INSTANCE}`;
+    const url = `${BASE_URL}/message/sendText/${INSTANCE_PATH}`;
     const response = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', apikey: API_KEY },
