@@ -20,37 +20,33 @@ Sistema de gestión completo para Maral Tecnología y Comunicaciones S.A.S.
 - Catálogo de productos
 - Reportes y exportación
 
-## Usuarios demo
-| Rol | Email | Contraseña |
-|---|---|---|
-| Gerente | john@maral.com | maral2024 |
-| Ventas | lady@maral.com | maral2024 |
-| Logística | angelo@maral.com | maral2024 |
+## Acceso inicial
+No hay cuentas ni credenciales predeterminadas publicadas. Creá el acceso inicial mediante un proceso administrativo seguro y rotá las credenciales que hubieran estado expuestas anteriormente.
 
 ## Desarrollo local
 
 ```bash
-# 1. Clonar y configurar variables
+# 1. Clonar y preparar la configuración local
 cp .env.example .env
 
-# 2. Levantar con Docker Compose
-docker compose up -d
+# 2. Reemplazar todos los placeholders de .env con valores locales seguros
 
-# 3. Correr migraciones y seed
-docker exec maral-os-backend npx prisma migrate deploy
-docker exec maral-os-backend npm run db:seed
+# 3. Levantar con Docker Compose
+docker compose up -d
 
 # App disponible en: http://localhost
 # API en: http://localhost:3001
 ```
 
+`DATABASE_URL` debe ser una URL completa de PostgreSQL y sus credenciales deben estar codificadas para URL si contienen caracteres reservados. Las migraciones no se ejecutan automáticamente al iniciar el contenedor: aplicalas mediante un proceso de despliegue revisado, con una estrategia de baseline validada para el entorno objetivo. Ejecutá el seed únicamente cuando necesites cargar datos no productivos de forma intencional; nunca lo uses para un despliegue de producción.
+
 ## Deploy en EasyPanel
 
 1. Subir el código a un repositorio Git
 2. En EasyPanel crear:
-   - Servicio **PostgreSQL** (usar las credenciales del .env)
-   - Servicio **App** desde el repositorio (usa docker-compose.yml)
-3. Configurar las variables de entorno en EasyPanel
+   - Servicio **PostgreSQL** configurado con variables de entorno seguras
+   - Servicio **App** desde el repositorio (usa `docker-compose.yml`)
+3. Configurar las variables de entorno requeridas en EasyPanel
 4. Deploy → EasyPanel construye y levanta todo automáticamente
 
 ## Estructura
