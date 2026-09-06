@@ -34,5 +34,6 @@ jobs:
           POSTGRES_USER: ci_user
           POSTGRES_PASSWORD: ci_placeholder_only
           POSTGRES_DB: ci_database
+          DATABASE_URL: postgresql://ci_user:ci_placeholder_only@postgres:5432/ci_database
           JWT_SECRET: ci_placeholder_only
         run: docker compose config --quiet

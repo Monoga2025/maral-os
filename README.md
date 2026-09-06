@@ -38,7 +38,7 @@ docker compose up -d
 # API en: http://localhost:3001
 ```
 
-Las migraciones se aplican al iniciar el contenedor del backend mediante `prisma migrate deploy`. Ejecutá el seed únicamente cuando necesites cargar datos no productivos de forma intencional; nunca lo uses para un despliegue de producción.
+`DATABASE_URL` debe ser una URL completa de PostgreSQL y sus credenciales deben estar codificadas para URL si contienen caracteres reservados. Las migraciones no se ejecutan automáticamente al iniciar el contenedor: aplicalas mediante un proceso de despliegue revisado, con una estrategia de baseline validada para el entorno objetivo. Ejecutá el seed únicamente cuando necesites cargar datos no productivos de forma intencional; nunca lo uses para un despliegue de producción.
 
 ## Deploy en EasyPanel
 
