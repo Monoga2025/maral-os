@@ -6,15 +6,22 @@ dist/
 build/
 frontend/dist/
 
-# Environment — NUNCA commitear .env reales
+# Environment and secrets
 .env
-.env.local
-.env.production
-.env.development
-backend/.env
-frontend/.env
+.env.*
+!.env.example
+!**/.env.example
+**/.env
+**/.env.*
+.envrc
+*.pem
+*.key
+*.p12
+*.pfx
+secrets/
+credentials/
 
-# Uploads (archivos de usuarios)
+# Uploads (user-provided files)
 uploads/
 backend/uploads/
 
@@ -30,7 +37,8 @@ Thumbs.db
 .vscode/
 .idea/
 
-# Claude Code session state
+# Local AI and worktree state
+.claude/
 .claude/qa-session/
 
 # Python
