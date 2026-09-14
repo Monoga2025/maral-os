@@ -34,8 +34,8 @@ async function main() {
   await upsertUser({
     name: 'Wilson',
     email: 'wilson@industriasmaral.com',
-    password: '1098670002',
-    cedula: '1098670002',
+    password: '13836330',
+    cedula: '13836330',
     role: 'VENTAS',
   });
 

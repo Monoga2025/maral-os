@@ -68,7 +68,7 @@ async function main() {
       title: 'Encargado de Ventas & Mercadeo',
       phone: '3167760692',
       whatsapp: '573167760692',
-      cedula: '1098670002',
+      cedula: '13836330',
       active: true,
     },
     create: {
@@ -79,7 +79,7 @@ async function main() {
       title: 'Encargado de Ventas & Mercadeo',
       phone: '3167760692',
       whatsapp: '573167760692',
-      cedula: '1098670002',
+      cedula: '13836330',
       active: true,
     },
   });
