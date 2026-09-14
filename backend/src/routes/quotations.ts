@@ -671,189 +671,623 @@ function generateQuotationHTML(q: any): string {
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Cotización COT-${num}</title>
+<title>Cotización COT-${num} · ${destCompany}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <style>
-*{margin:0;padding:0;box-sizing:border-box;}
-body{font-family:'Segoe UI',system-ui,Arial,sans-serif;font-size:13px;background:#d1d5db;color:#111827;line-height:1.5;}
-.no-print{position:fixed;top:16px;right:16px;z-index:999;display:flex;gap:8px;}
-.btn{padding:10px 20px;border:none;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;box-shadow:0 2px 8px rgba(0,0,0,.2);}
-.btn-print{background:#1e3a5f;color:white;}
-.btn-print:hover{background:#1d4ed8;}
-.page{width:21cm;min-height:29.7cm;margin:20px auto;background:white;padding:1.3cm 1.5cm 1.5cm;box-shadow:0 4px 32px rgba(0,0,0,.15);border-radius:2px;}
-.header{display:flex;align-items:flex-start;gap:16px;margin-bottom:18px;}
-.header-info{flex:1;}
-.company-name{font-weight:800;color:#1e3a5f;font-size:14px;margin-bottom:3px;text-transform:uppercase;letter-spacing:.5px;}
-.company-meta{font-size:11px;color:#6b7280;line-height:1.8;}
-.badge{background:#1e3a5f;color:white;padding:12px 18px;border-radius:8px;text-align:center;min-width:148px;flex-shrink:0;}
-.badge-label{font-size:9px;text-transform:uppercase;letter-spacing:2px;opacity:.75;}
-.badge-number{font-size:27px;font-weight:800;margin:2px 0;letter-spacing:-.5px;}
-.badge-date{font-size:10px;color:#bfdbfe;margin-top:3px;}
-hr{border:none;border-top:1px solid #e5e7eb;margin:14px 0;}
-.info-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:14px;}
-.section-title{font-size:9.5px;font-weight:800;color:#1e3a5f;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:8px;padding-bottom:5px;border-bottom:2px solid #1e3a5f;}
-.info-table{width:100%;border-collapse:collapse;}
-table.products{width:100%;border-collapse:collapse;font-size:12px;margin-bottom:16px;}
-table.products thead tr{background:#1e3a5f;}
-table.products th{color:white;padding:9px 8px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;}
-table.products td{border-bottom:1px solid #e5e7eb;vertical-align:top;}
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box;}
+body{
+  font-family:'Inter',system-ui,-apple-system,sans-serif;
+  font-size:12.5px;
+  background:#0B132B;
+  color:#1E293B;
+  line-height:1.5;
+  -webkit-font-smoothing:antialiased;
+  padding:24px 12px;
+}
+.floating-bar{
+  position:fixed;
+  top:18px;
+  right:20px;
+  z-index:999;
+  display:flex;
+  gap:10px;
+  background:rgba(15,23,42,0.85);
+  backdrop-filter:blur(12px);
+  padding:8px 12px;
+  border-radius:14px;
+  border:1px solid rgba(255,255,255,0.15);
+  box-shadow:0 10px 30px rgba(0,0,0,0.35);
+}
+.btn{
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  padding:8px 16px;
+  border:none;
+  border-radius:9px;
+  cursor:pointer;
+  font-size:12px;
+  font-weight:700;
+  font-family:'Plus Jakarta Sans',sans-serif;
+  transition:all 0.2s cubic-bezier(0.16,1,0.3,1);
+  text-decoration:none;
+}
+.btn-print{background:linear-gradient(135deg,#2563EB,#1D4ED8);color:#FFFFFF;box-shadow:0 3px 12px rgba(37,99,235,0.4);}
+.btn-print:hover{transform:translateY(-1px);box-shadow:0 5px 16px rgba(37,99,235,0.6);}
+.btn-back{background:rgba(255,255,255,0.12);color:#F8FAFC;border:1px solid rgba(255,255,255,0.15);}
+.btn-back:hover{background:rgba(255,255,255,0.22);color:#FFFFFF;}
+
+.sheet{
+  width:21.5cm;
+  min-height:28cm;
+  margin:0 auto;
+  background:#FFFFFF;
+  padding:36px 42px;
+  border-radius:16px;
+  box-shadow:0 20px 60px rgba(0,0,0,0.25), 0 0 0 1px rgba(255,255,255,0.1);
+  position:relative;
+}
+
+/* Header */
+.top-header{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:20px;
+  padding-bottom:22px;
+  border-bottom:2px solid #F1F5F9;
+}
+.brand-block{
+  display:flex;
+  align-items:center;
+  gap:16px;
+}
+.logo-box{
+  width:54px;
+  height:54px;
+  border-radius:14px;
+  background:linear-gradient(135deg,#0F172A,#1E293B);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  color:#38BDF8;
+  box-shadow:0 4px 14px rgba(15,23,42,0.2);
+}
+.brand-name{
+  font-family:'Plus Jakarta Sans',sans-serif;
+  font-size:15px;
+  font-weight:800;
+  color:#0F172A;
+  letter-spacing:-0.3px;
+  text-transform:uppercase;
+}
+.brand-meta{
+  font-size:11px;
+  color:#64748B;
+  margin-top:3px;
+  line-height:1.6;
+}
+
+.badge-box{
+  background:linear-gradient(135deg,#0F172A 0%,#1E293B 100%);
+  color:#FFFFFF;
+  padding:14px 22px;
+  border-radius:14px;
+  text-align:right;
+  min-width:185px;
+  box-shadow:0 6px 18px rgba(15,23,42,0.18);
+  border:1px solid rgba(255,255,255,0.08);
+}
+.badge-tag{
+  font-size:9.5px;
+  font-weight:800;
+  text-transform:uppercase;
+  letter-spacing:1.8px;
+  color:#38BDF8;
+}
+.badge-number{
+  font-family:'Plus Jakarta Sans',sans-serif;
+  font-size:24px;
+  font-weight:800;
+  color:#FFFFFF;
+  letter-spacing:-0.5px;
+  margin:2px 0;
+}
+.badge-date{
+  font-size:10.5px;
+  color:#94A3B8;
+  font-weight:500;
+}
+
+/* Bento Grid */
+.bento-grid{
+  display:grid;
+  grid-template-columns:1.1fr 1.1fr 0.95fr;
+  gap:14px;
+  margin:20px 0;
+}
+.bento-card{
+  background:#F8FAFC;
+  border:1px solid #E2E8F0;
+  border-radius:12px;
+  padding:14px 16px;
+}
+.bento-title{
+  font-family:'Plus Jakarta Sans',sans-serif;
+  font-size:9.5px;
+  font-weight:800;
+  text-transform:uppercase;
+  letter-spacing:1.2px;
+  color:#0284C7;
+  margin-bottom:10px;
+  display:flex;
+  align-items:center;
+  gap:6px;
+}
+.bento-title::before{
+  content:'';
+  display:inline-block;
+  width:6px;
+  height:6px;
+  border-radius:50%;
+  background:#0284C7;
+}
+.bento-table{width:100%;border-collapse:collapse;}
+.bento-label{
+  color:#64748B;
+  font-size:11px;
+  padding:3px 0;
+  white-space:nowrap;
+  vertical-align:top;
+  font-weight:500;
+}
+.bento-value{
+  padding:3px 0 3px 8px;
+  font-size:11.5px;
+  color:#0F172A;
+  font-weight:600;
+  vertical-align:top;
+}
+
+/* Products Table */
+.table-wrap{
+  border:1px solid #E2E8F0;
+  border-radius:12px;
+  overflow:hidden;
+  margin:20px 0 16px;
+}
+table.products{
+  width:100%;
+  border-collapse:collapse;
+  font-size:11.5px;
+}
+table.products thead th{
+  background:#0F172A;
+  color:#F8FAFC;
+  padding:10px 10px;
+  font-family:'Plus Jakarta Sans',sans-serif;
+  font-size:9.5px;
+  font-weight:700;
+  text-transform:uppercase;
+  letter-spacing:0.8px;
+}
+table.products tbody td{
+  padding:9px 10px;
+  border-bottom:1px solid #F1F5F9;
+  vertical-align:middle;
+  color:#334155;
+}
 table.products tbody tr:last-child td{border-bottom:none;}
-.totals{display:flex;justify-content:flex-end;margin-bottom:6px;}
-.totals-box{width:290px;border:1px solid #e5e7eb;border-radius:8px;padding:12px 14px;background:#f9fafb;}
-.total-final{background:#1e3a5f;color:white;padding:10px 14px;border-radius:6px;display:flex;justify-content:space-between;align-items:center;margin-top:10px;}
-.signature-block{border-top:2px solid #e5e7eb;padding-top:16px;margin-top:16px;display:flex;justify-content:space-between;align-items:flex-start;gap:20px;}
-.signature-left{flex:1;}
-.signature-right{text-align:right;font-size:11px;color:#6b7280;line-height:1.8;}
-.signature-right strong{color:#1e3a5f;display:block;}
-.signature-name{font-size:16px;font-weight:800;color:#1e3a5f;margin-bottom:2px;}
-.signature-line{font-size:12px;color:#374151;line-height:1.9;}
-.signature-company{font-weight:700;color:#1e3a5f;}
-.signature-tagline{font-style:italic;color:#9ca3af;font-size:11px;}
-.strip{background:#1e3a5f;color:white;padding:8px 12px;text-align:center;font-size:10px;margin-top:18px;border-radius:4px;letter-spacing:.3px;}
-/* Shipping label */
-.shipping-section{margin-top:26px;padding-top:18px;border-top:2px dashed #9ca3af;}
-.shipping-title{text-align:center;font-size:10px;color:#9ca3af;text-transform:uppercase;letter-spacing:2px;margin-bottom:12px;}
-.shipping-card{border:2px solid #1e3a5f;border-radius:8px;overflow:hidden;}
-.remite-box{background:#f0f4f8;padding:14px 16px;}
-.destino-box{padding:14px 16px;}
-.sh-badge{display:inline-block;background:#1e3a5f;color:white;font-size:9px;font-weight:800;padding:3px 10px;border-radius:3px;letter-spacing:1.5px;margin-bottom:8px;text-transform:uppercase;}
-.sh-company{font-size:16px;font-weight:800;color:#1e3a5f;margin-bottom:3px;word-break:break-word;}
-.sh-meta{font-size:12px;color:#374151;line-height:2.1;}
-.dest-company{font-size:18px;font-weight:800;color:#111827;margin-bottom:4px;word-break:break-word;}
-.cut-divider{border:none;border-top:1.5px dashed #9ca3af;margin:0;}
-.cut-label{text-align:center;font-size:10px;color:#9ca3af;padding:3px 0;letter-spacing:1px;background:white;}
+table.products tbody tr:nth-child(even){background:#F8FAFC;}
+.ref-pill{
+  display:inline-block;
+  font-family:monospace;
+  font-size:10.5px;
+  font-weight:700;
+  background:#EFF6FF;
+  color:#1D4ED8;
+  padding:2px 6px;
+  border-radius:5px;
+  border:1px solid #DBEAFE;
+}
+.disc-pill{
+  display:inline-block;
+  font-size:10px;
+  font-weight:700;
+  background:#FEF2F2;
+  color:#DC2626;
+  padding:2px 5px;
+  border-radius:4px;
+}
+
+/* Totals Box */
+.summary-container{
+  display:flex;
+  justify-content:flex-end;
+  margin-top:6px;
+}
+.summary-box{
+  width:320px;
+  background:#F8FAFC;
+  border:1px solid #E2E8F0;
+  border-radius:14px;
+  padding:14px 18px;
+}
+.summary-row{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  padding:4px 0;
+  font-size:12px;
+  color:#64748B;
+  font-weight:500;
+}
+.summary-row.bold{
+  color:#0F172A;
+  font-weight:700;
+}
+.summary-total{
+  background:linear-gradient(135deg,#0F172A,#1E293B);
+  color:#FFFFFF;
+  margin-top:10px;
+  padding:12px 14px;
+  border-radius:10px;
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  box-shadow:0 4px 12px rgba(15,23,42,0.15);
+}
+.total-label{
+  font-family:'Plus Jakarta Sans',sans-serif;
+  font-size:11px;
+  font-weight:800;
+  letter-spacing:1px;
+  text-transform:uppercase;
+  color:#38BDF8;
+}
+.total-amount{
+  font-family:'Plus Jakarta Sans',sans-serif;
+  font-size:20px;
+  font-weight:800;
+  color:#FFFFFF;
+  letter-spacing:-0.5px;
+}
+
+/* Observaciones */
+.notes-box{
+  margin-top:16px;
+  background:#FFFBEB;
+  border:1px solid #FDE68A;
+  border-left:4px solid #D97706;
+  padding:12px 16px;
+  border-radius:10px;
+}
+.notes-title{
+  font-family:'Plus Jakarta Sans',sans-serif;
+  font-size:9.5px;
+  font-weight:800;
+  text-transform:uppercase;
+  letter-spacing:1.2px;
+  color:#B45309;
+  margin-bottom:4px;
+}
+.notes-text{
+  font-size:11.5px;
+  color:#92400E;
+  line-height:1.6;
+}
+
+/* Signature & Guarantees */
+.signature-section{
+  margin-top:22px;
+  padding-top:18px;
+  border-top:1px solid #E2E8F0;
+  display:flex;
+  justify-content:space-between;
+  align-items:flex-end;
+  gap:24px;
+}
+.sig-card{
+  flex:1;
+}
+.sig-name{
+  font-family:'Plus Jakarta Sans',sans-serif;
+  font-size:15px;
+  font-weight:800;
+  color:#0F172A;
+}
+.sig-role{
+  font-size:11px;
+  color:#0284C7;
+  font-weight:600;
+  margin-top:1px;
+}
+.sig-firm{
+  font-size:11px;
+  color:#64748B;
+  margin-top:3px;
+  line-height:1.6;
+}
+.sig-guarantee{
+  font-size:10px;
+  color:#059669;
+  font-weight:600;
+  background:#ECFDF5;
+  border:1px solid #A7F3D0;
+  display:inline-block;
+  padding:3px 8px;
+  border-radius:6px;
+  margin-top:6px;
+}
+.sig-right{
+  text-align:right;
+  font-size:10.5px;
+  color:#64748B;
+  line-height:1.7;
+}
+.sig-right strong{
+  color:#0F172A;
+  font-weight:700;
+}
+
+/* Shipping Cutout Guide */
+.shipping-block{
+  margin-top:28px;
+  padding-top:18px;
+  border-top:2px dashed #CBD5E1;
+  position:relative;
+}
+.cut-tag{
+  text-align:center;
+  font-family:'Plus Jakarta Sans',sans-serif;
+  font-size:9.5px;
+  font-weight:800;
+  text-transform:uppercase;
+  letter-spacing:1.8px;
+  color:#64748B;
+  margin-bottom:12px;
+}
+.shipping-container{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:12px;
+  border:2px solid #0F172A;
+  border-radius:12px;
+  overflow:hidden;
+  background:#FFFFFF;
+}
+.sh-box{
+  padding:16px 18px;
+}
+.sh-remite{
+  background:#F1F5F9;
+  border-right:1px solid #CBD5E1;
+}
+.sh-pill{
+  display:inline-block;
+  font-family:'Plus Jakarta Sans',sans-serif;
+  font-size:9px;
+  font-weight:800;
+  text-transform:uppercase;
+  letter-spacing:1.5px;
+  padding:3px 8px;
+  border-radius:5px;
+  margin-bottom:8px;
+}
+.sh-pill.rem{background:#0F172A;color:#FFFFFF;}
+.sh-pill.dest{background:#0284C7;color:#FFFFFF;}
+.sh-name{
+  font-family:'Plus Jakarta Sans',sans-serif;
+  font-size:14px;
+  font-weight:800;
+  color:#0F172A;
+  margin-bottom:4px;
+}
+.sh-details{
+  font-size:11px;
+  color:#334155;
+  line-height:1.7;
+}
+
 @media print{
-  body{background:white;}
-  .no-print{display:none!important;}
-  .page{margin:0;box-shadow:none;padding:.8cm 1cm;width:100%;}
-  @page{size:A4;margin:0;}
+  body{background:#FFFFFF;padding:0;}
+  .floating-bar{display:none!important;}
+  .sheet{
+    box-shadow:none;
+    padding:0;
+    width:100%;
+    margin:0;
+    border-radius:0;
+  }
+  @page{size:letter;margin:1cm 1.2cm;}
 }
 </style>
 </head>
 <body>
-<div class="no-print">
+
+<div class="floating-bar">
+  <a href="/cotizaciones" class="btn btn-back">← Volver</a>
   <button class="btn btn-print" onclick="window.print()">🖨 Imprimir / Guardar PDF</button>
 </div>
 
-<div class="page">
-  <div class="header">
-    <div style="flex-shrink:0;">${logoHtml}</div>
-    <div class="header-info">
-      <div class="company-name">${escape(COMPANY.name)}</div>
-      <div class="company-meta">
-        NIT: ${escape(COMPANY.nit)}<br>
-        ${escape(COMPANY.address)}<br>
-        ${escape(COMPANY.city)}<br>
-        ${escape(COMPANY.phone)} &nbsp;·&nbsp; ${escape(COMPANY.email)}
+<div class="sheet">
+  <!-- Header -->
+  <div class="top-header">
+    <div class="brand-block">
+      <div class="logo-box">
+        <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M4.9 19.1C1 15.2 1 8.8 4.9 4.9"/>
+          <path d="M7.8 16.2c-2.3-2.3-2.3-6.1 0-8.5"/>
+          <circle cx="12" cy="12" r="2"/>
+          <path d="M16.2 7.8c2.3 2.3 2.3 6.1 0 8.5"/>
+          <path d="M19.1 4.9C23 8.8 23 15.2 19.1 19.1"/>
+        </svg>
       </div>
-    </div>
-    <div class="badge">
-      <div class="badge-label">Cotización</div>
-      <div class="badge-number"># ${num}</div>
-      <div class="badge-date">${fmtDate(q.createdAt)}</div>
-    </div>
-  </div>
-
-  <hr>
-
-  <div class="info-grid">
-    <div>
-      <div class="section-title">Empresa</div>
-      <table class="info-table">${makeInfoTable(empresaRows)}</table>
-    </div>
-    <div>
-      <div class="section-title">Contacto</div>
-      <table class="info-table">${makeInfoTable(contactoRows)}</table>
-    </div>
-    <div>
-      <div class="section-title">Condiciones</div>
-      <table class="info-table">${makeInfoTable(condRowPairs)}</table>
-    </div>
-  </div>
-
-  <hr>
-
-  <table class="products">
-    <thead>
-      <tr>
-        <th style="text-align:right;width:48px;">Cant</th>
-        <th style="text-align:left;width:68px;">Referencia</th>
-        <th style="text-align:left;">Descripción</th>
-        <th style="text-align:center;width:38px;">Und</th>
-        <th style="text-align:right;width:88px;">P. Unit</th>
-        <th style="text-align:right;width:44px;">Desc%</th>
-        <th style="text-align:right;width:88px;">P. c/dto</th>
-        <th style="text-align:right;width:88px;">Subtotal</th>
-      </tr>
-    </thead>
-    <tbody>${itemRows}</tbody>
-  </table>
-
-  <div class="totals">
-    <div class="totals-box">
-      <div style="display:flex;justify-content:space-between;padding:4px 0;font-size:13px;">
-        <span style="color:#6b7280;">Subtotal:</span>
-        <span>${fmtCOP(q.subtotal)}</span>
-      </div>
-      ${taxRow}
-      <div class="total-final">
-        <span style="font-size:12px;font-weight:700;">TOTAL</span>
-        <span style="font-size:18px;font-weight:800;">${fmtCOP(q.total)}</span>
-      </div>
-    </div>
-  </div>
-
-  ${notesBlock}
-
-  <div class="signature-block">
-    <div class="signature-left">
-      <div class="signature-name">${escape(sig.name)}</div>
-      <div class="signature-line">${escape(sig.title)}</div>
-      <div class="signature-line signature-company">${escape(COMPANY.name)}</div>
-      <div class="signature-line">${escape(sig.phone)} &nbsp;·&nbsp; ${escape(sig.email)}</div>
-      <div class="signature-line signature-tagline">Apoyando el mercado de las telecomunicaciones desde 2003</div>
-    </div>
-    <div class="signature-right">
-      Documento oficial de cotización válida por ${q.validityDays} días<br>
-      Válida hasta: <strong>${expiryLong}</strong><br>
-      Este documento no constituye factura de venta.
-    </div>
-  </div>
-
-  <div class="strip">
-    ${escape(COMPANY.address)} &nbsp;-&nbsp; ${escape(COMPANY.phone)} &nbsp;-&nbsp; ${escape(COMPANY.email)} &nbsp;-&nbsp; ${escape(COMPANY.website)} &nbsp;-&nbsp; ${escape(COMPANY.city)}
-  </div>
-
-  <div class="shipping-section">
-    <div class="shipping-title">✂ &nbsp;Etiqueta de envío — recortar y pegar en el paquete</div>
-    <div class="shipping-card">
-      <div class="remite-box">
-        <span class="sh-badge">Remite</span>
-        <div class="sh-company">${escape(COMPANY.name)}</div>
-        <div class="sh-meta">
-          ${escape(COMPANY.nit)}<br>
-          ${escape(COMPANY.address)}<br>
-          ${escape(COMPANY.phone)}<br>
-          ${escape(COMPANY.email)}<br>
-          ${escape(COMPANY.city)}
+      <div>
+        <div class="brand-name">${escape(COMPANY.name)}</div>
+        <div class="brand-meta">
+          <strong>NIT:</strong> ${escape(COMPANY.nit)} &nbsp;·&nbsp; ${escape(COMPANY.city)}<br>
+          ${escape(COMPANY.address)} &nbsp;·&nbsp; <strong>Cel / WhatsApp:</strong> ${escape(COMPANY.phone)}<br>
+          <strong>Email:</strong> ${escape(COMPANY.email)} &nbsp;·&nbsp; ${escape(COMPANY.website)}
         </div>
       </div>
-      <div class="cut-label">— — — — — — — — — — CORTAR AQUÍ — — — — — — — — — —</div>
-      <hr class="cut-divider">
-      <div class="destino-box">
-        <span class="sh-badge">Destino</span>
-        ${destContact ? `<div class="sh-meta" style="font-size:13px;font-weight:700;color:#111827;margin-bottom:2px;">${destContact}</div>` : ''}
-        <div class="dest-company">${destCompany}</div>
-        <div class="sh-meta">
-          ${destNIT}<br>
-          ${destAddress}<br>
-          ${destPhone}<br>
-          ${destEmail}<br>
-          ${destCity}
+    </div>
+    <div class="badge-box">
+      <div class="badge-tag">Cotización Oficial</div>
+      <div class="badge-number">COT-${num}</div>
+      <div class="badge-date">Fecha: ${fmtDate(q.createdAt)}</div>
+    </div>
+  </div>
+
+  <!-- Bento Grid Info -->
+  <div class="bento-grid">
+    <div class="bento-card">
+      <div class="bento-title">Cliente / Razón Social</div>
+      <table class="bento-table">
+        ${empresaRows.map(([lbl, val]) => `
+          <tr>
+            <td class="bento-label">${lbl}:</td>
+            <td class="bento-value">${val}</td>
+          </tr>
+        `).join('')}
+      </table>
+    </div>
+
+    <div class="bento-card">
+      <div class="bento-title">Contacto & Envío</div>
+      <table class="bento-table">
+        ${contactoRows.map(([lbl, val]) => `
+          <tr>
+            <td class="bento-label">${lbl}:</td>
+            <td class="bento-value">${val}</td>
+          </tr>
+        `).join('')}
+        <tr>
+          <td class="bento-label">Dirección:</td>
+          <td class="bento-value">${destAddress}</td>
+        </tr>
+      </table>
+    </div>
+
+    <div class="bento-card">
+      <div class="bento-title">Condiciones Comerciales</div>
+      <table class="bento-table">
+        ${condRowPairs.map(([lbl, val]) => `
+          <tr>
+            <td class="bento-label">${lbl}:</td>
+            <td class="bento-value">${val}</td>
+          </tr>
+        `).join('')}
+      </table>
+    </div>
+  </div>
+
+  <!-- Product Table -->
+  <div class="table-wrap">
+    <table class="products">
+      <thead>
+        <tr>
+          <th style="text-align:right;width:44px;">Cant</th>
+          <th style="text-align:left;width:95px;">Referencia</th>
+          <th style="text-align:left;">Descripción del Producto</th>
+          <th style="text-align:center;width:44px;">Und</th>
+          <th style="text-align:right;width:90px;">P. Lista</th>
+          <th style="text-align:center;width:55px;">Dcto</th>
+          <th style="text-align:right;width:90px;">P. Unit</th>
+          <th style="text-align:right;width:105px;">Subtotal</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${(q.items as any[]).map((item) => {
+          const prod = item.product;
+          const finalPrice = item.unitPrice * (1 - (item.discount || 0) / 100);
+          return `<tr>
+            <td style="text-align:right;font-weight:700;color:#0F172A;">${item.qty % 1 === 0 ? item.qty : item.qty.toFixed(2)}</td>
+            <td><span class="ref-pill">${escape(prod.reference || '—')}</span></td>
+            <td style="font-weight:600;color:#0F172A;line-height:1.4;">${escape(prod.name)}</td>
+            <td style="text-align:center;color:#64748B;font-size:10.5px;">${escape(prod.unit || 'UND')}</td>
+            <td style="text-align:right;color:#64748B;">${fmtCOP(item.unitPrice)}</td>
+            <td style="text-align:center;">${item.discount > 0 ? `<span class="disc-pill">-${item.discount}%</span>` : '<span style="color:#CBD5E1;">0%</span>'}</td>
+            <td style="text-align:right;font-weight:600;color:#0F172A;">${fmtCOP(finalPrice)}</td>
+            <td style="text-align:right;font-weight:800;color:#0F172A;">${fmtCOP(item.subtotal)}</td>
+          </tr>`;
+        }).join('')}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Financial Summary -->
+  <div class="summary-container">
+    <div class="summary-box">
+      <div class="summary-row">
+        <span>Subtotal Bruto:</span>
+        <span class="summary-row bold">${fmtCOP(q.subtotal)}</span>
+      </div>
+      ${taxRow}
+      <div class="summary-total">
+        <div>
+          <div class="total-label">Total Propuesta</div>
+          <div style="font-size:9px;color:#94A3B8;margin-top:1px;">Moneda: Pesos Colombianos (COP)</div>
+        </div>
+        <div class="total-amount">${fmtCOP(q.total)}</div>
+      </div>
+    </div>
+  </div>
+
+  ${notesBlock ? `
+  <div class="notes-box">
+    <div class="notes-title">Observaciones & Instrucciones Especiales</div>
+    <div class="notes-text">${escape(q.notes)}</div>
+  </div>` : ''}
+
+  <!-- Signatures -->
+  <div class="signature-section">
+    <div class="sig-card">
+      <div class="sig-name">${escape(sig.name)}</div>
+      <div class="sig-role">${escape(sig.title)} · ${escape(COMPANY.name)}</div>
+      <div class="sig-firm">
+        Tel / WhatsApp: <strong>${escape(sig.phone)}</strong> &nbsp;·&nbsp; Email: <strong>${escape(sig.email)}</strong>
+      </div>
+      <div class="sig-guarantee">✓ Garantía directa de fábrica MARAL · Industria Colombiana desde 2003</div>
+    </div>
+    <div class="sig-right">
+      Propuesta comercial válida por ${q.validityDays} días calendario<br>
+      Fecha límite de validez: <strong>${expiryLong}</strong><br>
+      <em>Fabricación y despachos nacionales desde Curití, Santander</em>
+    </div>
+  </div>
+
+  <!-- Shipping Label Cutout -->
+  <div class="shipping-block">
+    <div class="cut-tag">✂ &nbsp;Rótulo de Despacho Logístico (Recortar y fijar en el paquete)</div>
+    <div class="shipping-container">
+      <div class="sh-box sh-remite">
+        <span class="sh-pill rem">Remitente</span>
+        <div class="sh-name">${escape(COMPANY.name)}</div>
+        <div class="sh-details">
+          <strong>NIT:</strong> ${escape(COMPANY.nit)}<br>
+          <strong>Dirección:</strong> ${escape(COMPANY.address)}<br>
+          <strong>Ciudad:</strong> ${escape(COMPANY.city)}<br>
+          <strong>Teléfono:</strong> ${escape(COMPANY.phone)}
+        </div>
+      </div>
+      <div class="sh-box">
+        <span class="sh-pill dest">Destinatario</span>
+        <div class="sh-name">${destCompany}</div>
+        <div class="sh-details">
+          ${destContact ? `<strong>Atención:</strong> ${destContact}<br>` : ''}
+          <strong>NIT / Cédula:</strong> ${destNIT}<br>
+          <strong>Dirección de Entrega:</strong> ${destAddress}<br>
+          <strong>Ciudad / Depto:</strong> ${destCity}<br>
+          <strong>Teléfono Contacto:</strong> ${destPhone}
         </div>
       </div>
     </div>
   </div>
 </div>
+
 </body>
 </html>`;
 }

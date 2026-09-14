@@ -118,8 +118,19 @@ app.use('/api/prospecting', prospectingRoutes);
 if (process.env.NODE_ENV === 'production') {
   const frontendDist = path.resolve(__dirname, '../../frontend/dist');
   if (fs.existsSync(frontendDist)) {
-    app.use(express.static(frontendDist));
+    app.use(express.static(frontendDist, {
+      setHeaders: (res, pathUrl) => {
+        if (pathUrl.endsWith('.html')) {
+          res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+          res.setHeader('Pragma', 'no-cache');
+          res.setHeader('Expires', '0');
+        }
+      }
+    }));
     app.get('*', (_req, res) => {
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
       res.sendFile(path.join(frontendDist, 'index.html'));
     });
   }

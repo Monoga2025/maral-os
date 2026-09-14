@@ -6,6 +6,16 @@ import { Toaster } from 'sonner'
 import App from './App'
 import './index.css'
 
+// Purge stale SW caches on fresh build version
+if (typeof window !== 'undefined' && 'caches' in window) {
+  const BUILD_VERSION = 'maral-2026.09.14-v4'
+  const currentVersion = localStorage.getItem('maral_build_ver')
+  if (currentVersion !== BUILD_VERSION) {
+    localStorage.setItem('maral_build_ver', BUILD_VERSION)
+    caches.keys().then((keys) => Promise.all(keys.map((k) => caches.delete(k)))).catch(() => {})
+  }
+}
+
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
