@@ -426,8 +426,8 @@ export interface Task {
   completedAt?: string
   createdAt: string
   updatedAt: string
-  createdBy?: Pick<User, 'id' | 'name'>
-  assignedTo?: Pick<User, 'id' | 'name'>
+  createdBy?: Pick<User, 'id' | 'name' | 'role' | 'phone' | 'whatsapp'>
+  assignedTo?: Pick<User, 'id' | 'name' | 'role' | 'phone' | 'whatsapp'>
   client?: Pick<Client, 'id' | 'name' | 'company'>
   order?: Pick<Order, 'id' | 'number'>
   comments?: TaskComment[]
@@ -661,4 +661,99 @@ export interface GeneratedImage {
   brandIssues?: string[]
   usedInCampaigns: string[]
   createdAt: string
+}
+
+export interface ReactivationRadarClient {
+  id: string
+  name: string
+  company?: string
+  phone?: string
+  whatsapp?: string
+  waNumber?: string
+  city?: string
+  category?: string
+  totalSpent: number
+  orderCount: number
+  daysInactive: number
+  lastOrderDate: string | null
+  lastProducts: string[]
+  primaryProduct: string
+  urgency: 'CRITICO' | 'DORMIDO' | 'ENFRIANDOSE' | 'SEGUIMIENTO' | 'ACTIVO'
+  suggestedPitch: string
+}
+
+export interface ReactivationRadarData {
+  summary: {
+    totalOpportunities: number
+    criticalCount: number
+    dormantCount: number
+    coolingCount: number
+    followUpCount: number
+    potentialRevenueCOP: number
+  }
+  clients: ReactivationRadarClient[]
+}
+
+export interface CompetitorComparisonItem {
+  id: string
+  category: 'ANTENAS_BASE' | 'ANTENAS_MOVILES' | 'DIPOLOS' | 'CABLES' | 'CONECTORES' | 'FUENTES'
+  maralName: string
+  maralRef: string
+  maralPriceCOP: number
+  syscomRef: string
+  syscomPriceUSD: number
+  syscomPriceCOP: number
+  syscomAvailability: 'STOCK_LIMITADO' | 'SIN_STOCK' | 'IMPORTACION_15D' | 'DISPONIBLE'
+  maralStock: number
+  maralAdvantageDays: number
+  priceDiffCOP: number
+  savingsPercentage: number
+  isMaralCheaper: boolean
+  killerPitch: string
+}
+
+export interface CompetitorComparisonData {
+  summary: {
+    totalProductsTracked: number
+    averageSavingsPercentage: number
+    totalPriceAdvantageCOP: number
+    syscomOutOrSlowCount: number
+    lastScrapedAt: string
+    trmApplied: number
+  }
+  items: CompetitorComparisonItem[]
+}
+
+export interface B2BProspect {
+  id: string
+  name: string
+  companyName: string
+  nit: string
+  sector: 'SEGURIDAD_PRIVADA' | 'TRANSPORTE_CARGA' | 'INSTALADOR_TELECOM' | 'MINERIA_INDUSTRIA' | 'AGROINDUSTRIA'
+  city: string
+  department: string
+  estimatedRadiosCount: number
+  contactName: string
+  contactRole: string
+  phone: string
+  whatsapp: string
+  email: string
+  currentSupplier: string
+  monthlyPotentialCOP: number
+  primaryNeed: string
+  suggestedAction: string
+  customPitch: string
+  isConverted: boolean
+}
+
+export interface B2BProspectingData {
+  summary: {
+    totalLeads: number
+    totalPipelineValueCOP: number
+    securityLeadsCount: number
+    transportLeadsCount: number
+    installerLeadsCount: number
+    industryLeadsCount: number
+  }
+  leads: B2BProspect[]
 }

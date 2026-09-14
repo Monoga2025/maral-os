@@ -1,23 +1,55 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Factory, Plus, X } from 'lucide-react'
+import {
+  Factory,
+  Plus,
+  X,
+  Wrench,
+  Package,
+  CheckCircle2,
+  Clock,
+  ArrowRight,
+  ShieldCheck,
+  Search,
+  Filter,
+  Layers,
+  Sparkles,
+  Truck,
+} from 'lucide-react'
 import { productionApi, productsApi, usersApi } from '../lib/api'
-import { formatDate, getStatusColor } from '../lib/utils'
-import type { ProductionOrder } from '../types'
+import { formatDate, formatCOP } from '../lib/utils'
+import type { ProductionOrder, Product } from '../types'
 import { toast } from 'sonner'
 import { TourButton } from '../components/tour/TourButton'
-import { Hint } from '../components/ui/Hint'
 
 const PHASES = [
-  { key: 'BASICO', label: 'Procesos Básicos', desc: 'Cortes, dobleces, perforaciones, etiquetas' },
-  { key: 'PREENSAMBLE', label: 'Preensamble', desc: 'Bobinas, racores, sub-ensambles' },
-  { key: 'ENSAMBLE_FINAL', label: 'Ensamble Final', desc: 'Ensamble completo, revisión, empaque' },
+  {
+    key: 'BASICO',
+    title: '1. Corte & Mecanizado',
+    icon: <Wrench className="h-4 w-4 text-blue-600" />,
+    desc: 'Corte de tubos de aluminio, dobleces y perforación',
+    badgeBg: 'bg-blue-50 text-blue-700 border-blue-200',
+  },
+  {
+    key: 'PREENSAMBLE',
+    title: '2. Pre-ensamble & Bobinas',
+    icon: <Layers className="h-4 w-4 text-amber-600" />,
+    desc: 'Bobinas de antena, soldadura en plata y cables',
+    badgeBg: 'bg-amber-50 text-amber-700 border-amber-200',
+  },
+  {
+    key: 'ENSAMBLE_FINAL',
+    title: '3. Ensamble, Calibración & Empaque',
+    icon: <ShieldCheck className="h-4 w-4 text-emerald-600" />,
+    desc: 'Prueba en analizador (SWR < 1.2:1) y empaque final',
+    badgeBg: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+  },
 ]
 
 export default function Production() {
   const qc = useQueryClient()
-  const [phaseFilter, setPhaseFilter] = useState('')
-  const [statusFilter, setStatusFilter] = useState('')
+  const [search, setSearch] = useState('')
+  const [phaseTab, setPhaseTab] = useState<string>('ALL')
   const [showForm, setShowForm] = useState(false)
   const [newProductId, setNewProductId] = useState('')
   const [newQty, setNewQty] = useState(1)
@@ -25,18 +57,15 @@ export default function Production() {
   const [newAssignee, setNewAssignee] = useState('')
   const [newRequired, setNewRequired] = useState('')
 
-  const { data, isLoading } = useQuery({
-    queryKey: ['production', phaseFilter, statusFilter],
-    queryFn: () => productionApi.getAll({
-      phase: phaseFilter || undefined,
-      status: statusFilter || undefined,
-      pageSize: 100,
-    }),
+  const { data: responseData, isLoading } = useQuery({
+    queryKey: ['production'],
+    queryFn: () => productionApi.getAll({ pageSize: 150 }).then((r) => r.data),
+    refetchInterval: 30_000,
   })
 
-  const { data: productsData } = useQuery({
+  const { data: productsResponse } = useQuery({
     queryKey: ['products-all'],
-    queryFn: () => productsApi.getAll({ pageSize: 200 }),
+    queryFn: () => productsApi.getAll({ pageSize: 200 }).then((r) => r.data),
   })
 
   const { data: usersData } = useQuery({
@@ -45,261 +74,347 @@ export default function Production() {
   })
 
   const updateStatus = useMutation({
-    mutationFn: ({ id, status }: { id: string; status: string }) =>
-      productionApi.updateStatus(id, status),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['production'] }); toast.success('Estado actualizado') },
-    onError: () => toast.error('Error al actualizar'),
+    mutationFn: ({ id, status, phase }: { id: string; status?: string; phase?: string }) =>
+      productionApi.update(id, { status, phase } as never),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['production'] })
+      toast.success('Estado de fabricación actualizado')
+    },
+    onError: () => toast.error('Error al actualizar orden de taller'),
   })
 
   const createOrder = useMutation({
-    mutationFn: () => productionApi.create({
-      productId: newProductId,
-      qty: newQty,
-      phase: newPhase as never,
-      assignedTo: newAssignee || undefined,
-      requiredDate: newRequired ? new Date(newRequired + 'T12:00:00').toISOString() : undefined,
-    } as never),
+    mutationFn: () =>
+      productionApi.create({
+        productId: newProductId,
+        qty: newQty,
+        phase: newPhase as never,
+        assignedTo: newAssignee || undefined,
+        requiredDate: newRequired ? new Date(newRequired + 'T12:00:00').toISOString() : undefined,
+      } as never),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['production'] })
-      toast.success('Orden de producción creada')
+      toast.success('Nueva orden de taller enviada a fabricación')
       setShowForm(false)
+      setNewProductId('')
+      setNewQty(1)
     },
-    onError: () => toast.error('Error al crear orden'),
+    onError: () => toast.error('Error al crear orden de taller'),
   })
 
-  const orders: ProductionOrder[] = data?.data.data ?? []
-  const products = productsData?.data.data ?? []
+  // Safe data array
+  const rawOrders = responseData?.data ?? (Array.isArray(responseData) ? responseData : [])
+  const orders: ProductionOrder[] = Array.isArray(rawOrders) ? rawOrders : []
+
+  const rawProducts = productsResponse?.data ?? (Array.isArray(productsResponse) ? productsResponse : [])
+  const products: Product[] = Array.isArray(rawProducts) ? rawProducts : []
+
   const assignees = (usersData ?? []).filter((u) => u.role === 'LOGISTICA' || u.role === 'GERENTE')
 
-  const STATUS_FLOW: Record<string, string> = {
-    PENDIENTE: 'EN_PROCESO',
-    EN_PROCESO: 'TERMINADO',
-    TERMINADO: 'EMPACADO',
-  }
+  // Filtered orders
+  const filteredOrders = orders.filter((o) => {
+    const matchSearch =
+      !search ||
+      o.product?.name?.toLowerCase().includes(search.toLowerCase()) ||
+      o.product?.reference?.toLowerCase().includes(search.toLowerCase()) ||
+      o.order?.client?.name?.toLowerCase().includes(search.toLowerCase()) ||
+      String(o.number).includes(search)
 
-  const STATUS_LABELS: Record<string, string> = {
-    PENDIENTE: 'Pendiente', EN_PROCESO: 'En Proceso', TERMINADO: 'Terminado', EMPACADO: 'Empacado',
-  }
+    const matchPhase = phaseTab === 'ALL' || o.phase === phaseTab
+    return matchSearch && matchPhase
+  })
 
-  if (isLoading && !data) {
-    return <div className="animate-pulse"><div className="h-64 bg-gray-200 rounded-xl" /></div>
+  const getNextPhase = (currentPhase: string) => {
+    if (currentPhase === 'BASICO') return { phase: 'PREENSAMBLE', label: 'Pasar a Pre-ensamble' }
+    if (currentPhase === 'PREENSAMBLE') return { phase: 'ENSAMBLE_FINAL', label: 'Pasar a Calibración & Empaque' }
+    return { phase: 'ENSAMBLE_FINAL', status: 'EMPACADO', label: 'Listo para Despacho ✅' }
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
+    <div className="space-y-6 max-w-7xl mx-auto pb-12">
+      {/* 🏭 Header Principal */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Producción</h1>
-          <p className="text-sm text-gray-500 mt-0.5">{orders.length} órdenes activas</p>
+          <div className="flex items-center gap-2">
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
+              <Factory className="h-3.5 w-3.5 text-amber-600" />
+              Taller de Fabricación Nacional
+            </span>
+            <span className="text-xs text-slate-400">|</span>
+            <span className="text-xs font-semibold text-slate-600">{orders.length} órdenes en taller</span>
+          </div>
+          <h1 className="text-2xl font-black text-slate-900 tracking-tight mt-1">
+            Órdenes de Fabricación y Armado
+          </h1>
+          <p className="text-xs text-slate-500 mt-0.5">
+            Control de corte de aluminio, ensamble de bobinas, cables coaxiales y calibración de frecuencia.
+          </p>
         </div>
+
         <div className="flex items-center gap-2">
-          <TourButton tourId="produccion" />
           <button
-            data-tour="new-production-btn"
             onClick={() => setShowForm(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium text-sm"
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white shadow-xs transition-all active:scale-[0.98]"
           >
-            <Plus size={16} />
-            Nueva Orden
+            <Plus className="h-4 w-4" />
+            <span>Nueva Orden de Taller</span>
           </button>
+          <TourButton tourId="produccion" />
         </div>
       </div>
 
-      {/* Flow guide */}
-      <div className="bg-blue-50 border border-blue-100 rounded-xl p-4">
-        <p className="text-xs font-semibold text-blue-700 uppercase tracking-wide mb-3">Flujo de una orden de producción</p>
-        <div className="flex items-center gap-1 flex-wrap">
-          {[
-            { step: '1', label: 'Se crea la orden', desc: 'Con producto, cantidad y quién la hace', color: 'bg-gray-100 text-gray-700' },
-            { step: '→', label: '', desc: '', color: '' },
-            { step: '2', label: 'Pendiente', desc: 'Esperando que Angelo o Iván la inicien', color: 'bg-yellow-100 text-yellow-700' },
-            { step: '→', label: '', desc: '', color: '' },
-            { step: '3', label: 'En Proceso', desc: 'El técnico está fabricando', color: 'bg-blue-100 text-blue-700' },
-            { step: '→', label: '', desc: '', color: '' },
-            { step: '4', label: 'Terminado', desc: 'Fabricación lista, va al área de empaque', color: 'bg-purple-100 text-purple-700' },
-            { step: '→', label: '', desc: '', color: '' },
-            { step: '5', label: 'Empacado ✓', desc: 'Listo para despachar el pedido', color: 'bg-green-100 text-green-700' },
-          ].map((item, i) =>
-            item.label === '' ? (
-              <span key={i} className="text-gray-400 text-lg font-light">→</span>
-            ) : (
-              <div key={i} className={`flex-1 min-w-[120px] rounded-lg px-3 py-2 ${item.color}`}>
-                <p className="text-xs font-bold">{item.label}</p>
-                <p className="text-xs opacity-70 mt-0.5">{item.desc}</p>
-              </div>
-            )
-          )}
-        </div>
-        <p className="text-xs text-blue-600 mt-3">
-          <strong>¿Qué hago yo?</strong> Busca la orden en la tabla → haz clic en el botón de la columna "Acción" para avanzarla al siguiente paso. Cuando llegue a "Empacado", el pedido puede despacharse.
-        </p>
-      </div>
-
-      {/* Phase info cards */}
-      <div data-tour="production-phases" className="grid grid-cols-3 gap-4">
-        {PHASES.map((phase) => {
-          const count = orders.filter((o) => o.phase === phase.key).length
+      {/* 📊 Métricas Rápidas del Taller */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        {PHASES.map((p) => {
+          const count = orders.filter((o) => o.phase === p.key && o.status !== 'EMPACADO').length
           return (
-            <div key={phase.key} className="bg-white rounded-xl border border-gray-200 p-4">
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="font-semibold text-gray-900 text-sm">{phase.label}</p>
-                  <p className="text-xs text-gray-500 mt-0.5">{phase.desc}</p>
+            <div
+              key={p.key}
+              onClick={() => setPhaseTab(phaseTab === p.key ? 'ALL' : p.key)}
+              className={`cursor-pointer rounded-2xl p-4 border transition-all ${
+                phaseTab === p.key
+                  ? 'bg-white border-blue-500 ring-2 ring-blue-500/20 shadow-xs'
+                  : 'bg-white border-slate-200 hover:border-slate-300 shadow-2xs'
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="p-2 rounded-xl bg-slate-100">{p.icon}</div>
+                  <div>
+                    <h3 className="text-xs font-bold text-slate-900">{p.title}</h3>
+                    <p className="text-[11px] text-slate-500">{p.desc}</p>
+                  </div>
                 </div>
-                <span className="text-2xl font-bold text-blue-600">{count}</span>
+                <span className="text-2xl font-black text-slate-900">{count}</span>
               </div>
             </div>
           )
         })}
       </div>
 
-      {/* Filters */}
-      <div className="flex items-center gap-3">
-        <select value={phaseFilter} onChange={(e) => setPhaseFilter(e.target.value)}
-          className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-          <option value="">Todas las fases</option>
-          {PHASES.map((p) => <option key={p.key} value={p.key}>{p.label}</option>)}
-        </select>
-        <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}
-          className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-          <option value="">Todos los estados</option>
-          <option value="PENDIENTE">Pendiente</option>
-          <option value="EN_PROCESO">En Proceso</option>
-          <option value="TERMINADO">Terminado</option>
-          <option value="EMPACADO">Empacado</option>
-        </select>
+      {/* 🔍 Barra de Búsqueda y Filtros de Fase */}
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-white p-3 rounded-2xl border border-slate-200">
+        <div className="relative w-full sm:w-80">
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+          <input
+            type="text"
+            placeholder="Buscar por producto, referencia o cliente..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full pl-9 pr-4 py-2 text-xs font-medium bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all"
+          />
+        </div>
+
+        <div className="flex items-center gap-1.5 w-full sm:w-auto overflow-x-auto pb-1 sm:pb-0">
+          <button
+            onClick={() => setPhaseTab('ALL')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+              phaseTab === 'ALL'
+                ? 'bg-slate-900 text-white shadow-2xs'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+            }`}
+          >
+            Todas ({orders.length})
+          </button>
+          {PHASES.map((p) => {
+            const count = orders.filter((o) => o.phase === p.key).length
+            return (
+              <button
+                key={p.key}
+                onClick={() => setPhaseTab(p.key)}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
+                  phaseTab === p.key
+                    ? 'bg-blue-600 text-white shadow-2xs'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                }`}
+              >
+                {p.title.split('.')[1]} ({count})
+              </button>
+            )
+          })}
+        </div>
       </div>
 
-      {/* Table */}
-      <div data-tour="production-table" className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-        <table className="w-full text-sm">
-          <thead className="bg-gray-50 border-b border-gray-200">
-            <tr>
-              {['#', 'Producto', 'Pedido / Cliente', 'Cantidad', 'Fase', 'Asignado', 'Fecha Req.', 'Estado', 'Acción'].map((h) => (
-                <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-100">
-            {orders.map((order) => (
-              <tr key={order.id} className="hover:bg-gray-50 transition-colors">
-                <td className="px-4 py-3 font-bold text-blue-600 text-xs">#{order.number}</td>
-                <td className="px-4 py-3">
-                  <p className="font-medium text-gray-900">{order.product?.name ?? '—'}</p>
-                  <p className="text-xs text-gray-400">{order.product?.reference}</p>
-                </td>
-                <td className="px-4 py-3">
-                  {order.order ? (
-                    <div>
-                      <p className="text-xs font-bold text-blue-600">Pedido #{order.order.number}</p>
-                      <p className="text-xs text-gray-500">{(order.order as any).client?.name ?? '—'}</p>
+      {/* 📋 Tarjetas de Órdenes de Fabricación (Legible, Limpio, Profesional) */}
+      {isLoading ? (
+        <div className="space-y-3">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="h-28 bg-white border border-slate-200 rounded-2xl animate-pulse" />
+          ))}
+        </div>
+      ) : filteredOrders.length > 0 ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {filteredOrders.map((order) => {
+            const phaseInfo = PHASES.find((p) => p.key === order.phase) || PHASES[0]
+            const nextAction = getNextPhase(order.phase)
+
+            return (
+              <div
+                key={order.id}
+                className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs hover:border-slate-300 transition-all flex flex-col justify-between gap-4"
+              >
+                <div>
+                  <div className="flex items-start justify-between gap-2 pb-3 border-b border-slate-100">
+                    <div className="flex items-center gap-2">
+                      <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-blue-100 text-blue-700 font-black text-xs">
+                        #{order.number}
+                      </span>
+                      <div>
+                        <span className={`text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-md border ${phaseInfo.badgeBg}`}>
+                          {phaseInfo.title}
+                        </span>
+                      </div>
                     </div>
-                  ) : (
-                    <span className="text-xs text-gray-400">—</span>
-                  )}
-                </td>
-                <td className="px-4 py-3 font-semibold text-gray-900">{order.qty}</td>
-                <td className="px-4 py-3">
-                  <span className="px-2 py-1 bg-gray-100 text-gray-700 rounded text-xs font-medium">
-                    {PHASES.find((p) => p.key === order.phase)?.label ?? order.phase}
-                  </span>
-                </td>
-                <td className="px-4 py-3 text-gray-600">{order.assignedUser?.name ?? '—'}</td>
-                <td className="px-4 py-3 text-gray-500 text-xs">
-                  {order.requiredDate ? formatDate(order.requiredDate) : '—'}
-                </td>
-                <td className="px-4 py-3">
-                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(order.status)}`}>
-                    {STATUS_LABELS[order.status] ?? order.status}
-                  </span>
-                </td>
-                <td className="px-4 py-3">
-                  {STATUS_FLOW[order.status] && (
-                    <button
-                      onClick={() => updateStatus.mutate({ id: order.id, status: STATUS_FLOW[order.status] })}
-                      className="text-xs text-blue-600 hover:text-blue-800 border border-blue-200 rounded px-2 py-1 hover:bg-blue-50 transition-colors"
-                    >
-                      → {STATUS_LABELS[STATUS_FLOW[order.status]]}
-                    </button>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        {orders.length === 0 && (
-          <div className="py-16 text-center text-gray-400">
-            <Factory size={40} className="mx-auto mb-2 opacity-40" />
-            <p className="font-medium">Sin órdenes de producción</p>
-            <p className="text-xs mt-1">Crea una nueva orden cuando haya productos para fabricar</p>
-          </div>
-        )}
-      </div>
 
-      {/* New Order Modal */}
+                    {order.order && (
+                      <span className="text-[11px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md">
+                        Pedido #{order.order.number}
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="mt-3">
+                    <h3 className="text-sm font-black text-slate-900 leading-snug">
+                      {order.product?.name ?? 'Producto de Taller'}
+                    </h3>
+                    <p className="text-xs text-slate-500 font-mono mt-0.5">
+                      Ref: {order.product?.reference ?? 'N/A'} • Cantidad:{' '}
+                      <strong className="text-slate-900">{order.qty} {order.product?.unit || 'und'}</strong>
+                    </p>
+
+                    {order.order?.client?.name && (
+                      <p className="text-xs text-blue-700 font-semibold mt-2 flex items-center gap-1">
+                        <span>Cliente:</span>
+                        <span>{order.order.client.name}</span>
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
+                  <div className="text-[11px] text-slate-400">
+                    {order.requiredDate ? (
+                      <span className="flex items-center gap-1 text-slate-600 font-medium">
+                        <Clock className="h-3 w-3 text-amber-500" />
+                        Req: {formatDate(order.requiredDate)}
+                      </span>
+                    ) : (
+                      <span>Despacho Normal</span>
+                    )}
+                  </div>
+
+                  <button
+                    onClick={() =>
+                      updateStatus.mutate({
+                        id: order.id,
+                        phase: nextAction.phase,
+                        status: nextAction.status,
+                      })
+                    }
+                    className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-slate-900 hover:bg-slate-800 text-white shadow-2xs transition-all active:scale-[0.98]"
+                  >
+                    <span>{nextAction.label}</span>
+                    <ArrowRight className="h-3.5 w-3.5 text-blue-400" />
+                  </button>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      ) : (
+        <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center text-slate-400">
+          <Factory className="h-10 w-10 mx-auto text-slate-300 mb-2" />
+          <p className="font-bold text-slate-700 text-sm">No hay órdenes en esta fase</p>
+          <p className="text-xs text-slate-400 mt-1">Crea una nueva orden de taller para enviar materiales a producción.</p>
+        </div>
+      )}
+
+      {/* 🛠️ Modal Nueva Orden de Taller */}
       {showForm && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md mx-4">
-            <div className="flex items-center justify-between p-5 border-b border-gray-100">
-              <h3 className="text-lg font-semibold">Nueva Orden de Producción</h3>
-              <button onClick={() => setShowForm(false)} className="text-gray-400 hover:text-gray-600"><X size={20} /></button>
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-slate-200">
+            <div className="flex items-center justify-between p-5 border-b border-slate-100 bg-slate-50">
+              <div className="flex items-center gap-2">
+                <Factory className="h-5 w-5 text-blue-600" />
+                <h3 className="text-sm font-bold text-slate-900">Nueva Orden de Fabricación</h3>
+              </div>
+              <button
+                onClick={() => setShowForm(false)}
+                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-200 transition-colors"
+              >
+                <X className="h-4 w-4" />
+              </button>
             </div>
+
             <div className="p-5 space-y-4">
               <div>
-                <label className="text-xs text-gray-500 font-medium">Producto a fabricar</label>
-                <select value={newProductId} onChange={(e) => setNewProductId(e.target.value)}
-                  className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-                  <option value="">Seleccionar...</option>
-                  {products.map((p) => <option key={p.id} value={p.id}>{p.reference} — {p.name}</option>)}
+                <label className="text-xs font-bold text-slate-700 block mb-1">Producto a fabricar</label>
+                <select
+                  value={newProductId}
+                  onChange={(e) => setNewProductId(e.target.value)}
+                  className="w-full text-xs border border-slate-200 rounded-xl p-2.5 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">Seleccione un producto del catálogo...</option>
+                  {products.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name} ({p.reference})
+                    </option>
+                  ))}
                 </select>
               </div>
+
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-xs text-gray-500 font-medium">Cantidad</label>
-                  <input type="number" min={1} value={newQty} onChange={(e) => setNewQty(Number(e.target.value))}
-                    className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                  <label className="text-xs font-bold text-slate-700 block mb-1">Cantidad</label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={newQty}
+                    onChange={(e) => setNewQty(Number(e.target.value) || 1)}
+                    className="w-full text-xs border border-slate-200 rounded-xl p-2.5 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
                 </div>
                 <div>
-                  <div className="flex items-center gap-1">
-                    <label className="text-xs text-gray-500 font-medium">Fase inicial</label>
-                    <Hint text="Básico: cortes y perforaciones. Preensamble: bobinas y sub-ensambles. Ensamble Final: producto completo listo para empacar." side="top" />
-                  </div>
-                  <select value={newPhase} onChange={(e) => setNewPhase(e.target.value)}
-                    className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    {PHASES.map((p) => <option key={p.key} value={p.key}>{p.label}</option>)}
+                  <label className="text-xs font-bold text-slate-700 block mb-1">Fase Inicial</label>
+                  <select
+                    value={newPhase}
+                    onChange={(e) => setNewPhase(e.target.value)}
+                    className="w-full text-xs border border-slate-200 rounded-xl p-2.5 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="BASICO">1. Corte de Tubo</option>
+                    <option value="PREENSAMBLE">2. Pre-ensamble</option>
+                    <option value="ENSAMBLE_FINAL">3. Calibración & Empaque</option>
                   </select>
-                </div>
-                <div>
-                  <div className="flex items-center gap-1">
-                    <label className="text-xs text-gray-500 font-medium">Asignar a</label>
-                    <Hint text="Angelo y Iván son los técnicos de producción. 'Sin asignar' cuando aún no se ha definido quién lo hará." side="top" />
-                  </div>
-                  <select value={newAssignee} onChange={(e) => setNewAssignee(e.target.value)}
-                    className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    <option value="">Sin asignar</option>
-                    {assignees.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <div className="flex items-center gap-1">
-                    <label className="text-xs text-gray-500 font-medium">Fecha requerida</label>
-                    <Hint text="Fecha en que el pedido necesita este producto terminado. Ayuda a priorizar el trabajo en planta." side="top" />
-                  </div>
-                  <input type="date" value={newRequired} onChange={(e) => setNewRequired(e.target.value)}
-                    className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
                 </div>
               </div>
-            </div>
-            <div className="flex justify-end gap-3 p-5 border-t border-gray-100">
-              <button onClick={() => setShowForm(false)} className="px-4 py-2 border border-gray-200 rounded-lg text-sm hover:bg-gray-50">Cancelar</button>
-              <button
-                onClick={() => createOrder.mutate()}
-                disabled={!newProductId || createOrder.isPending}
-                className="px-5 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
-              >
-                {createOrder.isPending ? 'Creando...' : 'Crear Orden'}
-              </button>
+
+              <div>
+                <label className="text-xs font-bold text-slate-700 block mb-1">Fecha límite de entrega</label>
+                <input
+                  type="date"
+                  value={newRequired}
+                  onChange={(e) => setNewRequired(e.target.value)}
+                  className="w-full text-xs border border-slate-200 rounded-xl p-2.5 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowForm(false)}
+                  className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  disabled={!newProductId || createOrder.isPending}
+                  onClick={() => createOrder.mutate()}
+                  className="px-5 py-2 rounded-xl text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50 shadow-xs"
+                >
+                  {createOrder.isPending ? 'Creando...' : 'Crear Orden'}
+                </button>
+              </div>
             </div>
           </div>
         </div>

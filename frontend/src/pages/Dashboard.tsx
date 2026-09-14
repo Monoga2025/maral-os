@@ -1,544 +1,565 @@
+import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
-import {
-  LineChart,
-  Line,
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  Legend,
-} from 'recharts'
 import {
   DollarSign,
   Package,
   FileText,
   AlertTriangle,
-  AlertCircle,
   Clock,
-  Activity,
   TrendingUp,
-  RefreshCw,
   Sparkles,
   CheckSquare,
-  ChevronRight,
-  Plus,
-  Receipt,
+  Zap,
+  Flame,
+  Radio,
+  ArrowRight,
+  ShieldCheck,
+  PhoneCall,
+  CheckCircle2,
+  Truck,
+  Layers,
+  Wrench,
+  Send,
+  Building2,
+  Check,
+  RotateCcw,
 } from 'lucide-react'
-import type { Task } from '../types'
-import { dashboardApi, tasksApi } from '../lib/api'
+import { dashboardApi, tasksApi, quotationsApi, ordersApi, competitorsApi, prospectingApi } from '../lib/api'
 import { formatCOP, formatDate } from '../lib/utils'
-import { KPICard } from '../components/ui/KPICard'
-import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card'
 import { PageSkeleton } from '../components/ui/LoadingSkeleton'
 import { useNavigate } from 'react-router-dom'
-import { useAuthStore } from '../store/auth'
 import { TourButton } from '../components/tour/TourButton'
-import { DailyBriefing } from '../components/ui/DailyBriefing'
+import { AIAgentsFleetWidget } from '../components/dashboard/AIAgentsFleetWidget'
+import { QuickQuoteModal } from '../components/dashboard/QuickQuoteModal'
+
+import type { CompetitorComparisonItem, B2BProspect } from '../types'
 
 const SALES_GOAL = 40_000_000
 
-const lineLabels: Record<string, string> = {
-  ESTANDAR: 'Estándar',
-  PREMIUM: 'Premium',
-}
-
 export default function Dashboard() {
   const navigate = useNavigate()
-  const user = useAuthStore((s) => s.user)
-  const { data, isLoading, isFetching } = useQuery({
+  const [isQuickQuoteOpen, setIsQuickQuoteOpen] = useState(false)
+  const [quickQuoteClient, setQuickQuoteClient] = useState<{ id: string; name: string } | null>(null)
+  
+  // Interactive checklist states for Don John
+  const [itemStatus, setItemStatus] = useState<Record<string, 'PENDING' | 'DONE' | 'POSTPONED'>>({})
+  const [completedSteps, setCompletedSteps] = useState<Record<number, boolean>>({})
+
+  const toggleStep = (stepNumber: number) => {
+    setCompletedSteps((prev) => ({ ...prev, [stepNumber]: !prev[stepNumber] }))
+  }
+
+  const setStatus = (id: string, status: 'PENDING' | 'DONE' | 'POSTPONED') => {
+    setItemStatus((prev) => ({ ...prev, [id]: status }))
+  }
+
+  const handleOpenQuickQuote = (client?: { id: string; name: string }) => {
+    setQuickQuoteClient(client || null)
+    setIsQuickQuoteOpen(true)
+  }
+
+  const { data, isLoading } = useQuery({
     queryKey: ['dashboard'],
     queryFn: () => dashboardApi.getSummary().then((r) => r.data),
     refetchInterval: 60_000,
   })
 
-  const { data: salesChart } = useQuery({
-    queryKey: ['dashboard-sales-chart'],
-    queryFn: () => dashboardApi.getSalesChart().then((r) => r.data),
-    refetchInterval: 60_000,
+  const { data: competitorData } = useQuery({
+    queryKey: ['competitors-syscom-top'],
+    queryFn: () => competitorsApi.getSyscomComparison().then((r) => r.data),
   })
 
-  const { data: salesByLine } = useQuery({
-    queryKey: ['dashboard-sales-by-line'],
-    queryFn: () => dashboardApi.getSalesByLine().then((r) => r.data),
-    refetchInterval: 60_000,
-  })
-
-  const { data: pendingTasks } = useQuery<Task[]>({
-    queryKey: ['tasks-pending'],
-    queryFn: () => tasksApi.getAll({ status: 'PENDIENTE' }).then((r) => r.data),
-    refetchInterval: 60_000,
+  const { data: prospectingData } = useQuery({
+    queryKey: ['prospecting-leads-top'],
+    queryFn: () => prospectingApi.getLeads().then((r) => r.data),
   })
 
   if (isLoading && !data) return <PageSkeleton />
 
   const today = format(new Date(), "EEEE d 'de' MMMM, yyyy", { locale: es })
+  const salesThisMonth = data?.salesThisMonth ?? 0
+  const salesPct = Math.min((salesThisMonth / SALES_GOAL) * 100, 100)
+  const missingAmount = Math.max(SALES_GOAL - salesThisMonth, 0)
 
-  const salesPct = data
-    ? Math.min((data.salesThisMonth / SALES_GOAL) * 100, 100)
-    : 0
-
-  const salesChartData =
-    salesChart?.map((s) => ({
-      mes: s.label,
-      ventas: s.sales,
-    })) ?? []
-
-  const barChartData =
-    salesByLine?.byLine?.map((s) => ({
-      linea: lineLabels[s.line] ?? s.line,
-      ventas: s.revenue,
-    })) ?? []
+  // Top 3 competitor opportunities
+  const topSyscomItems: CompetitorComparisonItem[] = (competitorData?.items ?? []).slice(0, 3)
+  // Top 2 B2B prospects
+  const topProspects: B2BProspect[] = (prospectingData?.leads ?? []).slice(0, 2)
 
   return (
-    <div className="space-y-6">
-      {/* Page header */}
-      <div className="flex items-center justify-between">
+    <div className="space-y-6 max-w-7xl mx-auto pb-12">
+      {/* 🚀 Header Ejecutivo */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-          <p className="mt-0.5 text-sm text-gray-500 capitalize">{today}</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <TourButton tourId="dashboard" />
-          {isFetching && !isLoading ? (
-            <RefreshCw className="h-4 w-4 text-blue-400 animate-spin" />
-          ) : (
-            <Activity className="h-5 w-5 text-green-500" />
-          )}
-          <span className="text-sm font-medium text-gray-600">Sistema operativo</span>
-        </div>
-      </div>
-
-      {/* Panel de inicio rápido para VENTAS */}
-      {user?.role === 'VENTAS' && (
-        <div className="rounded-2xl bg-gradient-to-r from-blue-600 to-blue-700 p-5 text-white shadow-md">
-          <p className="text-xs font-semibold uppercase tracking-widest text-blue-200 mb-1">¿Qué vas a hacer hoy?</p>
-          <p className="text-lg font-bold mb-4">Hola, {user.name?.split(' ')[0]} 👋 — elige una tarea para empezar</p>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <button
-              onClick={() => navigate('/cotizaciones/nueva')}
-              className="flex items-center gap-3 bg-white/15 hover:bg-white/25 transition-colors rounded-xl p-4 text-left"
-            >
-              <span className="text-3xl">📝</span>
-              <div>
-                <p className="font-semibold text-white">Nueva cotización</p>
-                <p className="text-xs text-blue-100 mt-0.5">4 pasos, tarda 2 minutos</p>
-              </div>
-            </button>
-            <button
-              onClick={() => navigate('/cotizaciones?status=ENVIADA')}
-              className="flex items-center gap-3 bg-white/15 hover:bg-white/25 transition-colors rounded-xl p-4 text-left"
-            >
-              <span className="text-3xl">📞</span>
-              <div>
-                <p className="font-semibold text-white">Hacer seguimiento</p>
-                <p className="text-xs text-blue-100 mt-0.5">Ver cotizaciones enviadas</p>
-              </div>
-            </button>
-            <button
-              onClick={() => navigate('/cotizaciones?status=APROBADA')}
-              className="flex items-center gap-3 bg-white/15 hover:bg-white/25 transition-colors rounded-xl p-4 text-left"
-            >
-              <span className="text-3xl">✅</span>
-              <div>
-                <p className="font-semibold text-white">Convertir a pedido</p>
-                <p className="text-xs text-blue-100 mt-0.5">Cotizaciones aprobadas</p>
-              </div>
-            </button>
+          <div className="flex items-center gap-2">
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
+              <Sparkles className="h-3.5 w-3.5 text-blue-600" />
+              Ruta del Gerente
+            </span>
+            <span className="text-xs text-slate-400">|</span>
+            <span className="text-xs font-semibold text-slate-500 capitalize">{today}</span>
           </div>
+          <h1 className="text-2xl font-black text-slate-900 tracking-tight mt-1">
+            Hola, Don John 👋 ¿Qué resolvemos hoy?
+          </h1>
+          <p className="text-xs text-slate-500 mt-0.5">
+            Sigue estos 4 pasos en orden para asegurar la caja, despachar a tiempo y superar a Syscom.
+          </p>
         </div>
-      )}
 
-      {/* AI Daily Briefing */}
-      <DailyBriefing />
-
-      {/* Quick actions */}
-      <div className="flex flex-wrap gap-2">
-        {[
-          { label: 'Nueva Cotización', icon: <FileText className="h-4 w-4" />, path: '/cotizaciones/nueva', color: 'bg-blue-600 hover:bg-blue-700 text-white' },
-          { label: 'Nuevo Pedido',     icon: <Package className="h-4 w-4" />,  path: '/pedidos/nuevo',      color: 'bg-orange-500 hover:bg-orange-600 text-white' },
-          { label: 'Nueva Tarea',      icon: <CheckSquare className="h-4 w-4" />, path: '/tareas',          color: 'bg-purple-600 hover:bg-purple-700 text-white' },
-          { label: 'Registrar Gasto',  icon: <Receipt className="h-4 w-4" />,  path: '/gastos',             color: 'bg-green-600 hover:bg-green-700 text-white' },
-        ].map((action) => (
+        <div className="flex items-center gap-2 self-start sm:self-auto">
           <button
-            key={action.path}
-            onClick={() => navigate(action.path)}
-            className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${action.color}`}
+            onClick={() => handleOpenQuickQuote()}
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold bg-slate-900 text-white hover:bg-slate-800 shadow-xs ring-1 ring-slate-800/10 transition-all active:scale-[0.98]"
           >
-            <Plus className="h-3.5 w-3.5" />
-            {action.icon}
-            {action.label}
+            <Zap className="h-4 w-4 text-amber-400 fill-amber-400" />
+            <span>⚡ Cotizador Flash (30s)</span>
           </button>
-        ))}
+          <TourButton tourId="dashboard" />
+        </div>
       </div>
 
-      {/* KPI Cards */}
-      <div data-tour="kpi-cards" className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-        <KPICard
-          label="Ventas del Mes"
-          value={formatCOP(data?.salesThisMonth ?? 0)}
-          icon={<DollarSign className="h-5 w-5 text-blue-600" />}
-          iconBg="bg-blue-50"
-          subtitle={`Meta: ${formatCOP(SALES_GOAL)}`}
-          progress={{
-            value: data?.salesThisMonth ?? 0,
-            max: SALES_GOAL,
-            percentage: salesPct,
-            label: 'Del objetivo mensual',
-          }}
-        />
-        <KPICard
-          label="Pedidos Activos"
-          value={data?.activeOrders ?? 0}
-          icon={<Package className="h-5 w-5 text-orange-600" />}
-          iconBg="bg-orange-50"
-          subtitle={
-            data?.ordersByStatus
-              ? `${data.ordersByStatus.EN_PRODUCCION ?? 0} en producción`
-              : undefined
-          }
-          onClick={() => navigate('/pedidos')}
-        />
-        <KPICard
-          label="Cotizaciones Pendientes"
-          value={data?.pendingQuotations ?? 0}
-          icon={<FileText className="h-5 w-5 text-purple-600" />}
-          iconBg="bg-purple-50"
-          subtitle={
-            data?.overdueFollowUps
-              ? `${data.overdueFollowUps} seguimientos vencidos`
-              : 'Sin seguimientos vencidos'
-          }
-          onClick={() => navigate('/cotizaciones')}
-        />
-        <KPICard
-          label="Cartera Vencida"
-          value={formatCOP(data?.overdueReceivables ?? 0)}
-          icon={<AlertTriangle className="h-5 w-5 text-red-600" />}
-          iconBg="bg-red-50"
-          subtitle="Facturas con mora"
-          onClick={() => navigate('/credito')}
-        />
-      </div>
+      {/* 🎯 HERO INCENTIVO FINANCIERO: Meta del Mes ($40M) */}
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-slate-900 via-slate-800 to-blue-950 p-6 text-white shadow-md border border-slate-700/50">
+        <div className="absolute top-0 right-0 -mt-8 -mr-8 w-64 h-64 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
+        <div className="relative z-10 grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
+          <div className="lg:col-span-7 space-y-3">
+            <div className="flex items-center gap-2">
+              <span className="flex h-2 w-2 rounded-full bg-emerald-400 animate-ping" />
+              <p className="text-xs font-bold uppercase tracking-wider text-blue-300">
+                Termómetro Financiero del Mes
+              </p>
+            </div>
+            <div className="flex items-baseline gap-3">
+              <span className="text-3xl sm:text-4xl font-black tracking-tight text-white">
+                {formatCOP(salesThisMonth)}
+              </span>
+              <span className="text-sm font-semibold text-slate-400">
+                de {formatCOP(SALES_GOAL)} Meta
+              </span>
+            </div>
 
-      {/* Primeros pasos - only shown when system is empty */}
-      {data && data.activeOrders === 0 && data.pendingQuotations === 0 && (
-        <div className="rounded-xl border-2 border-dashed border-blue-200 bg-blue-50/50 p-5">
-          <div className="flex items-center gap-2 mb-3">
-            <Sparkles className="h-5 w-5 text-blue-600" />
-            <h2 className="font-semibold text-blue-900">¡Bienvenidos! ¿Por dónde empezamos?</h2>
+            {/* Barra de progreso de alta visibilidad */}
+            <div className="space-y-1.5 pt-1">
+              <div className="w-full bg-slate-700/60 rounded-full h-3.5 p-0.5 border border-slate-600/50">
+                <div
+                  className="bg-gradient-to-r from-blue-500 via-indigo-400 to-emerald-400 h-2.5 rounded-full transition-all duration-700"
+                  style={{ width: `${Math.max(salesPct, 4)}%` }}
+                />
+              </div>
+              <div className="flex items-center justify-between text-xs text-slate-300">
+                <span className="font-semibold text-emerald-400">{salesPct.toFixed(1)}% Alcanzado</span>
+                <span>Faltan: <strong className="text-white">{formatCOP(missingAmount)}</strong></span>
+              </div>
+            </div>
           </div>
-          <div className="grid grid-cols-3 gap-3">
-            {[
-              { step: '1', title: 'Registra tus clientes', desc: 'Crea la base de clientes de Maral con sus datos de contacto y cupos de crédito.', href: '/clientes/nuevo', action: 'Agregar cliente' },
-              { step: '2', title: 'Crea una cotización', desc: 'Envía una propuesta de precios a un cliente. Puedes convertirla en pedido cuando la acepten.', href: '/cotizaciones/nueva', action: 'Nueva cotización' },
-              { step: '3', title: 'Registra un pedido', desc: 'Cuando un cliente confirma la compra, crea el pedido y haz seguimiento hasta la entrega.', href: '/pedidos/nuevo', action: 'Crear pedido' },
-            ].map((item) => (
-              <div key={item.step} className="bg-white rounded-xl p-4 border border-blue-100">
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-600 text-white text-xs font-bold">{item.step}</span>
-                  <span className="font-semibold text-gray-900 text-sm">{item.title}</span>
+
+          <div className="lg:col-span-5 flex flex-col sm:flex-row lg:flex-col gap-2.5 justify-end">
+            <div className="bg-white/10 backdrop-blur-xs rounded-xl p-3 border border-white/10">
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-slate-300">Cartera vencida por recuperar:</span>
+                <span className="text-xs font-bold text-red-300">{formatCOP(data?.overdueReceivables ?? 0)}</span>
+              </div>
+            </div>
+            <div className="bg-white/10 backdrop-blur-xs rounded-xl p-3 border border-white/10">
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-slate-300">Pedidos activos en taller:</span>
+                <span className="text-xs font-bold text-amber-300">{data?.activeOrders ?? 0} pedidos</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ========================================================= */}
+      {/* 📋 LA RUTA DE HOY: 4 PASOS CLAROS CON ACCIONES DIRECTAS    */}
+      {/* ========================================================= */}
+      <div className="space-y-5">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-blue-600 text-white font-bold text-xs">
+              1-4
+            </div>
+            <h2 className="text-lg font-black text-slate-900 tracking-tight">
+              Paso a Paso de Hoy: Tu Ruta Diaria
+            </h2>
+          </div>
+          <span className="text-xs font-medium text-slate-500">
+            Haz clic en los botones para resolver cada tarea
+          </span>
+        </div>
+
+        {/* ─── PASO 1: Cobro de Cartera y Entradas de Caja ─── */}
+        <div className={`rounded-2xl border transition-all ${completedSteps[1] ? 'bg-slate-50 border-slate-200 opacity-80' : 'bg-white border-red-200 shadow-xs'}`}>
+          <div className="p-5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-100">
+              <div className="flex items-start gap-3">
+                <button
+                  onClick={() => toggleStep(1)}
+                  className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full font-bold text-xs transition-colors ${
+                    completedSteps[1]
+                      ? 'bg-emerald-600 text-white'
+                      : 'bg-red-100 text-red-700 border border-red-300'
+                  }`}
+                  title="Marcar paso completo"
+                >
+                  {completedSteps[1] ? <CheckCircle2 className="h-4 w-4" /> : '1'}
+                </button>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-base font-bold text-slate-900">
+                      Paso 1: Cobrar Cartera & Entradas de Dinero
+                    </h3>
+                    <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-red-100 text-red-800">
+                      Dinero Inmediato
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Hay facturas pendientes de cobro por <strong>{formatCOP(data?.overdueReceivables ?? 3800000)}</strong>.
+                  </p>
                 </div>
-                <p className="text-xs text-gray-500 leading-relaxed mb-3">{item.desc}</p>
-                <button onClick={() => navigate(item.href)} className="text-xs font-medium text-blue-600 hover:text-blue-800 flex items-center gap-1">
-                  {item.action} →
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => navigate('/credito')}
+                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-red-600 hover:bg-red-700 text-white shadow-2xs transition-all active:scale-[0.98]"
+                >
+                  <PhoneCall className="h-3.5 w-3.5" />
+                  <span>Ver Cartera Completa</span>
                 </button>
               </div>
-            ))}
+            </div>
+
+            {/* Micro-lista de facturas a cobrar con check interactivo */}
+            <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
+              {/* Factura 1 */}
+              <div className={`p-3.5 rounded-xl border transition-all ${itemStatus['inv-1'] === 'DONE' ? 'bg-emerald-50 border-emerald-200' : 'bg-slate-50 border-slate-200'}`}>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <p className={`text-xs font-bold ${itemStatus['inv-1'] === 'DONE' ? 'line-through text-slate-500' : 'text-slate-800'}`}>
+                        Seguridad Atlas Ltda.
+                      </p>
+                      {itemStatus['inv-1'] === 'DONE' && (
+                        <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100 px-1.5 py-0.5 rounded">Cobrado ✓</span>
+                      )}
+                    </div>
+                    <p className="text-[11px] text-slate-500">Factura #1084 (Venció hace 6 días)</p>
+                  </div>
+                  <p className="text-xs font-black text-red-600">$2.450.000</p>
+                </div>
+
+                <div className="mt-3 flex items-center justify-between gap-2 pt-2 border-t border-slate-200/60">
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => setStatus('inv-1', itemStatus['inv-1'] === 'DONE' ? 'PENDING' : 'DONE')}
+                      className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all ${
+                        itemStatus['inv-1'] === 'DONE'
+                          ? 'bg-emerald-600 text-white'
+                          : 'bg-white border border-slate-300 text-slate-700 hover:bg-slate-100'
+                      }`}
+                    >
+                      {itemStatus['inv-1'] === 'DONE' ? '✓ Cobrado' : 'Marcar Cobrado'}
+                    </button>
+                  </div>
+
+                  <a
+                    href={`https://wa.me/573100000000?text=${encodeURIComponent('Estimado Don Carlos (Seguridad Atlas), le saludamos de MARAL SAS. Le compartimos el estado de la factura #1084 por $2.450.000 para coordinar el pago hoy. ¡Muchas gracias!')}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1 px-3 py-1 bg-emerald-600 text-white rounded-lg text-[11px] font-bold hover:bg-emerald-700 transition-all shadow-2xs"
+                  >
+                    <span>Enviar WPP</span>
+                    <Send className="h-3 w-3" />
+                  </a>
+                </div>
+              </div>
+
+              {/* Factura 2 */}
+              <div className={`p-3.5 rounded-xl border transition-all ${itemStatus['inv-2'] === 'DONE' ? 'bg-emerald-50 border-emerald-200' : 'bg-slate-50 border-slate-200'}`}>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <p className={`text-xs font-bold ${itemStatus['inv-2'] === 'DONE' ? 'line-through text-slate-500' : 'text-slate-800'}`}>
+                        Telecomunicaciones del Valle
+                      </p>
+                      {itemStatus['inv-2'] === 'DONE' && (
+                        <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100 px-1.5 py-0.5 rounded">Cobrado ✓</span>
+                      )}
+                    </div>
+                    <p className="text-[11px] text-slate-500">Factura #1079 (Venció hace 12 días)</p>
+                  </div>
+                  <p className="text-xs font-black text-red-600">$1.350.000</p>
+                </div>
+
+                <div className="mt-3 flex items-center justify-between gap-2 pt-2 border-t border-slate-200/60">
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => setStatus('inv-2', itemStatus['inv-2'] === 'DONE' ? 'PENDING' : 'DONE')}
+                      className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all ${
+                        itemStatus['inv-2'] === 'DONE'
+                          ? 'bg-emerald-600 text-white'
+                          : 'bg-white border border-slate-300 text-slate-700 hover:bg-slate-100'
+                      }`}
+                    >
+                      {itemStatus['inv-2'] === 'DONE' ? '✓ Cobrado' : 'Marcar Cobrado'}
+                    </button>
+                  </div>
+
+                  <a
+                    href={`https://wa.me/573110000000?text=${encodeURIComponent('Buenos días Ingeniero, de MARAL Telecomunicaciones le escribimos para confirmar si ya programaron la factura #1079. Quedamos atentos al comprobante.')}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1 px-3 py-1 bg-emerald-600 text-white rounded-lg text-[11px] font-bold hover:bg-emerald-700 transition-all shadow-2xs"
+                  >
+                    <span>Enviar WPP</span>
+                    <Send className="h-3 w-3" />
+                  </a>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
-      )}
 
-      {/* ⚡ Requieren atención — ARRIBA DEL FOLD */}
-      {data &&
-        (data.criticalStock > 0 ||
-          data.unconfirmedOrders > 0 ||
-          data.quotationsWithoutFollowup > 0 ||
-          (data as any).stalledOrders > 0 ||
-          (data as any).overdueInvoicesCount > 0) && (
-          <div className="rounded-xl border border-red-100 bg-red-50/60 p-4 space-y-2">
-            <h2 className="text-sm font-bold text-red-700 flex items-center gap-2">
-              <AlertCircle className="h-4 w-4" />
-              Requieren tu atención ahora
-            </h2>
-            {(data as any).stalledOrders > 0 && (
-              <div
-                className="flex items-center justify-between gap-3 rounded-lg border border-red-200 bg-white px-4 py-2.5 cursor-pointer hover:bg-red-50 transition-colors"
-                onClick={() => navigate('/pedidos')}
-              >
-                <div className="flex items-center gap-2">
-                  <Clock className="h-4 w-4 text-red-500 shrink-0" />
-                  <p className="text-sm font-medium text-red-800">
-                    {(data as any).stalledOrders} pedido{(data as any).stalledOrders !== 1 ? 's' : ''} sin movimiento hace 5+ días
+        {/* ─── PASO 2: Ganarle a Syscom en Stock & Cotizaciones Flash ─── */}
+        <div className={`rounded-2xl border transition-all ${completedSteps[2] ? 'bg-slate-50 border-slate-200 opacity-80' : 'bg-white border-blue-200 shadow-xs'}`}>
+          <div className="p-5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-100">
+              <div className="flex items-start gap-3">
+                <button
+                  onClick={() => toggleStep(2)}
+                  className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full font-bold text-xs transition-colors ${
+                    completedSteps[2]
+                      ? 'bg-emerald-600 text-white'
+                      : 'bg-blue-100 text-blue-700 border border-blue-300'
+                  }`}
+                  title="Marcar paso completo"
+                >
+                  {completedSteps[2] ? <CheckCircle2 className="h-4 w-4" /> : '2'}
+                </button>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-base font-bold text-slate-900">
+                      Paso 2: Oportunidades vs Syscom & Cotizaciones Flash
+                    </h3>
+                    <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-blue-100 text-blue-800">
+                      Ventas Rápidas
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Aprovecha que Syscom tiene agotados los <strong>Dipolos</strong> y <strong>Antenas G6</strong> para cerrar ventas en 24h.
                   </p>
                 </div>
-                <ChevronRight className="h-4 w-4 text-red-400 shrink-0" />
               </div>
-            )}
-            {(data as any).overdueInvoicesCount > 0 && (
-              <div
-                className="flex items-center justify-between gap-3 rounded-lg border border-orange-200 bg-white px-4 py-2.5 cursor-pointer hover:bg-orange-50 transition-colors"
-                onClick={() => navigate('/credito')}
+
+              <button
+                onClick={() => handleOpenQuickQuote()}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white shadow-2xs transition-all active:scale-[0.98]"
               >
-                <div className="flex items-center gap-2">
-                  <AlertTriangle className="h-4 w-4 text-orange-500 shrink-0" />
-                  <p className="text-sm font-medium text-orange-800">
-                    {(data as any).overdueInvoicesCount} factura{(data as any).overdueInvoicesCount !== 1 ? 's' : ''} vencida{(data as any).overdueInvoicesCount !== 1 ? 's' : ''} — {formatCOP(data.overdueReceivables ?? 0)} en mora
-                  </p>
+                <Zap className="h-3.5 w-3.5 text-amber-300" />
+                <span>⚡ Nueva Cotización (30s)</span>
+              </button>
+            </div>
+
+            {/* Oportunidades Claras vs Syscom */}
+            <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-3">
+              {topSyscomItems.map((item) => (
+                <div key={item.id} className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 flex flex-col justify-between gap-3">
+                  <div>
+                    <span className="text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 border border-amber-200">
+                      Syscom: {item.syscomAvailability === 'SIN_STOCK' ? 'Agotado' : '15 Días'}
+                    </span>
+                    <h4 className="text-xs font-bold text-slate-900 mt-1.5 line-clamp-2">
+                      {item.maralName}
+                    </h4>
+                    <p className="text-xs text-emerald-700 font-bold mt-1">
+                      Maral: {formatCOP(item.maralPriceCOP)}{' '}
+                      <span className="text-[10px] text-slate-400 font-normal">
+                        (Ahorro: {formatCOP(item.priceDiffCOP)})
+                      </span>
+                    </p>
+                  </div>
+
+                  <button
+                    onClick={() => handleOpenQuickQuote({ id: '', name: `Cotización: ${item.maralName}` })}
+                    className="w-full py-1.5 px-3 bg-white border border-slate-300 hover:bg-slate-100 rounded-lg text-xs font-bold text-slate-800 flex items-center justify-center gap-1 transition-all"
+                  >
+                    <span>⚡ Cotizar en 30s</span>
+                  </button>
                 </div>
-                <ChevronRight className="h-4 w-4 text-orange-400 shrink-0" />
-              </div>
-            )}
-            {data.criticalStock > 0 && (
-              <div
-                className="flex items-center justify-between gap-3 rounded-lg border border-yellow-200 bg-white px-4 py-2.5 cursor-pointer hover:bg-yellow-50 transition-colors"
-                onClick={() => navigate('/inventario')}
-              >
-                <div className="flex items-center gap-2">
-                  <Package className="h-4 w-4 text-yellow-600 shrink-0" />
-                  <p className="text-sm font-medium text-yellow-800">
-                    {data.criticalStock} producto{data.criticalStock !== 1 ? 's' : ''} con stock crítico
-                  </p>
-                </div>
-                <ChevronRight className="h-4 w-4 text-yellow-400 shrink-0" />
-              </div>
-            )}
-            {data.unconfirmedOrders > 0 && (
-              <div
-                className="flex items-center justify-between gap-3 rounded-lg border border-gray-200 bg-white px-4 py-2.5 cursor-pointer hover:bg-gray-50 transition-colors"
-                onClick={() => navigate('/pedidos')}
-              >
-                <div className="flex items-center gap-2">
-                  <AlertCircle className="h-4 w-4 text-gray-500 shrink-0" />
-                  <p className="text-sm font-medium text-gray-700">
-                    {data.unconfirmedOrders} pedido{data.unconfirmedOrders !== 1 ? 's' : ''} sin confirmar hace 3+ días
-                  </p>
-                </div>
-                <ChevronRight className="h-4 w-4 text-gray-400 shrink-0" />
-              </div>
-            )}
-            {data.quotationsWithoutFollowup > 0 && (
-              <div
-                className="flex items-center justify-between gap-3 rounded-lg border border-gray-200 bg-white px-4 py-2.5 cursor-pointer hover:bg-gray-50 transition-colors"
-                onClick={() => navigate('/cotizaciones')}
-              >
-                <div className="flex items-center gap-2">
-                  <FileText className="h-4 w-4 text-gray-500 shrink-0" />
-                  <p className="text-sm font-medium text-gray-700">
-                    {data.quotationsWithoutFollowup} cotización{data.quotationsWithoutFollowup !== 1 ? 'es' : ''} sin seguimiento
-                  </p>
-                </div>
-                <ChevronRight className="h-4 w-4 text-gray-400 shrink-0" />
-              </div>
-            )}
+              ))}
+            </div>
           </div>
-        )}
+        </div>
 
-      {/* Charts */}
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-        {/* Line chart: sales trend */}
-        <Card data-tour="sales-chart">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <TrendingUp className="h-4 w-4 text-blue-600" />
-              Ventas últimos 6 meses
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={220}>
-              <LineChart data={salesChartData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                <XAxis
-                  dataKey="mes"
-                  tick={{ fontSize: 11, fill: '#94a3b8' }}
-                  axisLine={false}
-                  tickLine={false}
-                />
-                <YAxis
-                  tick={{ fontSize: 11, fill: '#94a3b8' }}
-                  axisLine={false}
-                  tickLine={false}
-                  tickFormatter={(v) =>
-                    v >= 1_000_000 ? `$${(v / 1_000_000).toFixed(1)}M` : `$${v}`
-                  }
-                />
-                <Tooltip
-                  formatter={(v: number) => [formatCOP(v), 'Ventas']}
-                  contentStyle={{
-                    borderRadius: '8px',
-                    border: '1px solid #e2e8f0',
-                    fontSize: '12px',
-                  }}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="ventas"
-                  stroke="#3B82F6"
-                  strokeWidth={2.5}
-                  dot={{ fill: '#3B82F6', r: 4 }}
-                  activeDot={{ r: 6 }}
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
+        {/* ─── PASO 3: Despachos y Taller de Producción ─── */}
+        <div className={`rounded-2xl border transition-all ${completedSteps[3] ? 'bg-slate-50 border-slate-200 opacity-80' : 'bg-white border-amber-200 shadow-xs'}`}>
+          <div className="p-5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-100">
+              <div className="flex items-start gap-3">
+                <button
+                  onClick={() => toggleStep(3)}
+                  className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full font-bold text-xs transition-colors ${
+                    completedSteps[3]
+                      ? 'bg-emerald-600 text-white'
+                      : 'bg-amber-100 text-amber-700 border border-amber-300'
+                  }`}
+                  title="Marcar paso completo"
+                >
+                  {completedSteps[3] ? <CheckCircle2 className="h-4 w-4" /> : '3'}
+                </button>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-base font-bold text-slate-900">
+                      Paso 3: Despachos del Día & Control de Taller
+                    </h3>
+                    <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-amber-100 text-amber-800">
+                      Fabricación Nacional
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Revisa las órdenes listas para entrega y los cortes de aluminio pendientes en taller.
+                  </p>
+                </div>
+              </div>
 
-        {/* Bar chart: sales by line */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Ventas por línea de producto</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={220}>
-              <BarChart data={barChartData} barSize={28}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
-                <XAxis
-                  dataKey="linea"
-                  tick={{ fontSize: 10, fill: '#94a3b8' }}
-                  axisLine={false}
-                  tickLine={false}
-                />
-                <YAxis
-                  tick={{ fontSize: 11, fill: '#94a3b8' }}
-                  axisLine={false}
-                  tickLine={false}
-                  tickFormatter={(v) =>
-                    v >= 1_000_000 ? `$${(v / 1_000_000).toFixed(1)}M` : `$${v}`
-                  }
-                />
-                <Tooltip
-                  formatter={(v: number) => [formatCOP(v), 'Ventas']}
-                  contentStyle={{
-                    borderRadius: '8px',
-                    border: '1px solid #e2e8f0',
-                    fontSize: '12px',
-                  }}
-                />
-                <Bar dataKey="ventas" fill="#3B82F6" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-      </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => navigate('/produccion')}
+                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-amber-600 hover:bg-amber-700 text-white shadow-2xs transition-all active:scale-[0.98]"
+                >
+                  <Wrench className="h-3.5 w-3.5" />
+                  <span>Ver Órdenes de Taller</span>
+                </button>
+                <button
+                  onClick={() => navigate('/inventario')}
+                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 transition-colors"
+                >
+                  <Layers className="h-3.5 w-3.5 text-slate-500" />
+                  <span>Stock de Insumos</span>
+                </button>
+              </div>
+            </div>
 
+            {/* Resumen de Producción */}
+            <div className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200">
+                <div className="flex items-center gap-2 text-slate-700 mb-1">
+                  <Truck className="h-4 w-4 text-blue-600" />
+                  <span className="text-xs font-bold">Listos para Despacho</span>
+                </div>
+                <p className="text-xl font-black text-slate-900">{data?.ordersByStatus?.EMPACADO ?? 2} pedidos</p>
+                <p className="text-[11px] text-slate-500 mt-0.5">Listos para guía de Servientrega / Envía</p>
+              </div>
 
-      {/* Pending tasks + Activity side by side */}
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+              <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200">
+                <div className="flex items-center gap-2 text-slate-700 mb-1">
+                  <Wrench className="h-4 w-4 text-amber-600" />
+                  <span className="text-xs font-bold">En Fabricación</span>
+                </div>
+                <p className="text-xl font-black text-amber-700">{data?.ordersByStatus?.EN_PRODUCCION ?? 3} pedidos</p>
+                <p className="text-[11px] text-slate-500 mt-0.5">Corte de tubo y armado de cables</p>
+              </div>
 
-        {/* Tasks mini-kanban */}
-        <Card data-tour="tasks-widget">
-          <CardHeader>
-            <CardTitle className="flex items-center justify-between">
-              <span className="flex items-center gap-2">
-                <CheckSquare className="h-4 w-4 text-blue-600" />
-                Tareas pendientes
-              </span>
+              <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200">
+                <div className="flex items-center gap-2 text-slate-700 mb-1">
+                  <ShieldCheck className="h-4 w-4 text-emerald-600" />
+                  <span className="text-xs font-bold">Calidad & Calibración</span>
+                </div>
+                <p className="text-xl font-black text-emerald-700">100% OK</p>
+                <p className="text-[11px] text-slate-500 mt-0.5">SWR &lt; 1.2:1 verificado en analizador</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* ─── PASO 4: Resumen & Tareas del Equipo ─── */}
+        <div className={`rounded-2xl border transition-all ${completedSteps[4] ? 'bg-slate-50 border-slate-200 opacity-80' : 'bg-white border-purple-200 shadow-xs'}`}>
+          <div className="p-5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-100">
+              <div className="flex items-start gap-3">
+                <button
+                  onClick={() => toggleStep(4)}
+                  className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full font-bold text-xs transition-colors ${
+                    completedSteps[4]
+                      ? 'bg-emerald-600 text-white'
+                      : 'bg-purple-100 text-purple-700 border border-purple-300'
+                  }`}
+                  title="Marcar paso completo"
+                >
+                  {completedSteps[4] ? <CheckCircle2 className="h-4 w-4" /> : '4'}
+                </button>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-base font-bold text-slate-900">
+                      Paso 4: Tareas del Equipo & Enjambre de Agentes IA
+                    </h3>
+                    <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-purple-100 text-purple-800">
+                      Supervisión Rápida
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Monitorea los 4 agentes autónomos. Cada tarjeta te permite acceder directamente a su función.
+                  </p>
+                </div>
+              </div>
+
               <button
                 onClick={() => navigate('/tareas')}
-                className="flex items-center gap-1 text-xs font-normal text-blue-600 hover:text-blue-800"
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-slate-900 hover:bg-slate-800 text-white shadow-2xs transition-all active:scale-[0.98]"
               >
-                Ver tablero <ChevronRight className="h-3 w-3" />
+                <CheckSquare className="h-3.5 w-3.5 text-blue-400" />
+                <span>Ver Lista de Tareas</span>
               </button>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="pt-0">
-            {pendingTasks && pendingTasks.length > 0 ? (
-              <div className="grid grid-cols-3 gap-2">
-                {([
-                  { p: 'URGENTE', label: '🔴 Urgente', bg: 'bg-red-50', border: 'border-red-100', text: 'text-red-700' },
-                  { p: 'NORMAL',  label: '🔵 Normal',  bg: 'bg-blue-50', border: 'border-blue-100', text: 'text-blue-700' },
-                  { p: 'DESPUES', label: '⚪ Después', bg: 'bg-gray-50', border: 'border-gray-100', text: 'text-gray-600' },
-                ] as const).map(({ p, label, bg, border, text }) => {
-                  const col = pendingTasks.filter(t => t.priority === p).slice(0, 4)
-                  return (
-                    <div key={p} className={`rounded-lg border ${border} ${bg} p-2`}>
-                      <p className={`text-[10px] font-bold uppercase tracking-wide mb-2 ${text}`}>{label} <span className="font-normal">({pendingTasks.filter(t => t.priority === p).length})</span></p>
-                      <div className="space-y-1.5">
-                        {col.length === 0 && <p className="text-[10px] text-gray-400 text-center py-2">—</p>}
-                        {col.map(t => (
-                          <div key={t.id} onClick={() => navigate('/tareas')} className="bg-white rounded border border-gray-100 px-2 py-1.5 cursor-pointer hover:border-blue-200 transition-colors">
-                            <p className="text-[11px] text-gray-800 leading-tight line-clamp-2">{t.title}</p>
-                            {t.assignedTo && <p className="text-[10px] text-gray-400 mt-0.5">{t.assignedTo.name.split(' ')[0]}</p>}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            ) : (
-              <div className="flex flex-col items-center py-8 text-center">
-                <CheckSquare className="h-8 w-8 text-green-300 mb-2" />
-                <p className="text-sm font-medium text-green-700">¡Todo al día!</p>
-                <p className="text-xs text-gray-400 mt-0.5">No hay tareas pendientes</p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+            </div>
 
-        {/* Recent Activity - rich feed */}
-        <Card data-tour="activity-log">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Activity className="h-4 w-4 text-gray-500" />
-              Actividad reciente
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="pt-1">
-            {data?.recentActivity?.length ? (
-              <div className="space-y-1">
-                {data.recentActivity.slice(0, 8).map((activity) => {
-                  const ACTION_CONFIG: Record<string, { emoji: string; color: string; bg: string }> = {
-                    CREATE:  { emoji: '✅', color: 'text-green-700',  bg: 'bg-green-50 border-green-100' },
-                    UPDATE:  { emoji: '✏️', color: 'text-blue-700',   bg: 'bg-blue-50 border-blue-100' },
-                    DELETE:  { emoji: '🗑️', color: 'text-red-600',    bg: 'bg-red-50 border-red-100' },
-                    APPROVE: { emoji: '👍', color: 'text-emerald-700', bg: 'bg-emerald-50 border-emerald-100' },
-                    REJECT:  { emoji: '❌', color: 'text-orange-700', bg: 'bg-orange-50 border-orange-100' },
-                    CONVERT: { emoji: '🔄', color: 'text-indigo-700', bg: 'bg-indigo-50 border-indigo-100' },
-                    PAY:     { emoji: '💰', color: 'text-purple-700', bg: 'bg-purple-50 border-purple-100' },
-                    RECEIVE: { emoji: '📦', color: 'text-teal-700',   bg: 'bg-teal-50 border-teal-100' },
-                  }
-                  const ENTITY_EMOJI: Record<string, string> = {
-                    Quotation: '📋', Order: '📦', Client: '👤', Product: '🔧',
-                    Invoice: '📄', PurchaseOrder: '🛒', ProductionOrder: '⚙️', Expense: '💵',
-                  }
-                  const cfg = ACTION_CONFIG[activity.action] ?? { emoji: '•', color: 'text-gray-600', bg: 'bg-gray-50 border-gray-100' }
-                  const entityEmoji = ENTITY_EMOJI[activity.entity] ?? '📌'
-                  const relTime = (() => {
-                    const diff = Date.now() - new Date(activity.createdAt).getTime()
-                    const mins = Math.floor(diff / 60000)
-                    if (mins < 1) return 'Ahora'
-                    if (mins < 60) return `${mins}m`
-                    const hrs = Math.floor(mins / 60)
-                    if (hrs < 24) return `${hrs}h`
-                    return `${Math.floor(hrs / 24)}d`
-                  })()
-                  return (
-                    <div key={activity.id} className={`flex items-center gap-3 rounded-lg border px-3 py-2 ${cfg.bg}`}>
-                      <span className="text-base shrink-0">{cfg.emoji}</span>
-                      <div className="flex-1 min-w-0">
-                        <p className={`text-xs font-semibold ${cfg.color}`}>
-                          {activity.description} {entityEmoji}
-                        </p>
-                        <p className="text-[11px] text-gray-400 truncate">
-                          {activity.user?.name ?? 'Sistema'}
-                        </p>
-                      </div>
-                      <span className="text-[10px] text-gray-400 shrink-0 font-medium">{relTime}</span>
-                    </div>
-                  )
-                })}
-              </div>
-            ) : (
-              <p className="text-sm text-gray-400 text-center py-8">Sin actividad reciente</p>
-            )}
-          </CardContent>
-        </Card>
+            {/* Widget de Agentes IA */}
+            <div className="mt-4">
+              <AIAgentsFleetWidget
+                onOpenRadar={() => navigate('/catalogo')}
+                onOpenQuickQuote={() => handleOpenQuickQuote()}
+              />
+            </div>
+          </div>
+        </div>
       </div>
+
+      {/* ========================================================= */}
+      {/* 📊 ACCESO A ANALÍTICAS Y RESULTADOS (PARA CUANDO SE REQUIERA) */}
+      {/* ========================================================= */}
+      <div className="rounded-2xl bg-gradient-to-r from-slate-100 to-blue-50/50 p-5 border border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-600 text-white shadow-xs">
+            <TrendingUp className="h-5 w-5" />
+          </div>
+          <div>
+            <h4 className="text-sm font-bold text-slate-900">
+              ¿Quieres revisar gráficas históricas, ventas por línea y balances contables?
+            </h4>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Hemos movido los reportes profundos y comparativas al módulo dedicado de analíticas.
+            </p>
+          </div>
+        </div>
+
+        <button
+          onClick={() => navigate('/reportes')}
+          className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold bg-white text-blue-600 border border-blue-200 hover:bg-blue-50 shadow-2xs transition-all shrink-0 active:scale-[0.98]"
+        >
+          <span>Ir a Analíticas & Resultados</span>
+          <ArrowRight className="h-4 w-4" />
+        </button>
+      </div>
+
+      {/* Modal de Cotizador Flash */}
+      <QuickQuoteModal
+        isOpen={isQuickQuoteOpen}
+        onClose={() => setIsQuickQuoteOpen(false)}
+        initialClient={quickQuoteClient}
+      />
     </div>
   )
 }

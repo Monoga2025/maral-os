@@ -29,11 +29,14 @@ import notificationRoutes from './routes/notifications';
 import tagRoutes from './routes/tags';
 import segmentRoutes from './routes/segments';
 import categoryRoutes from './routes/categories';
+import competitorRoutes from './routes/competitors';
+import prospectingRoutes from './routes/prospecting';
 import { startSender } from './lib/campaign-sender';
 import { startDripWorker, seedDripSequences } from './lib/drip-scheduler';
 import { startBestTimeJob } from './lib/best-time';
 import { startPatternJob } from './lib/forbidden-patterns';
 import { startWeeklyReportJob } from './jobs/weekly-report';
+import { ensureSeedData } from './lib/autoSeed';
 
 const app = express();
 const PORT = parseInt(process.env.PORT || '3001', 10);
@@ -108,6 +111,8 @@ app.use('/api/notifications', notificationRoutes);
 app.use('/api/tags', tagRoutes);
 app.use('/api/segments', segmentRoutes);
 app.use('/api/categories', categoryRoutes);
+app.use('/api/competitors', competitorRoutes);
+app.use('/api/prospecting', prospectingRoutes);
 
 // ── Serve frontend in production ────────────────────────────
 if (process.env.NODE_ENV === 'production') {
@@ -136,6 +141,7 @@ app.use(
 );
 
 // ── Start server ────────────────────────────────────────────
+ensureSeedData().catch(console.error);
 startSender();
 seedDripSequences().catch(console.error);
 startDripWorker();

@@ -5,14 +5,47 @@ import { authenticate, AuthRequest } from '../middleware/auth';
 const router = Router();
 router.use(authenticate);
 
-const OR_BASE  = 'https://openrouter.ai/api/v1/chat/completions';
-const OR_MODEL = 'google/gemini-2.0-flash-001';
+const OR_BASE  = process.env.OPENROUTER_BASE_URL || 'https://openrouter.ai/api/v1/chat/completions';
+const OR_MODEL = process.env.OPENROUTER_MODEL || 'google/gemini-2.0-flash-001';
+const LOCAL_AI_URL = process.env.LOCAL_AI_URL || 'http://127.0.0.1:11434/v1/chat/completions';
 
-// ─── OpenRouter helper ────────────────────────────────────────────
+// ─── Hybrid Local / Cloud AI helper ───────────────────────────────
 
-async function callAI(prompt: string): Promise<string> {
+async function callAI(prompt: string, systemPrompt = 'Eres el asistente comercial inteligente de MARAL Tecnología y Comunicaciones SAS en Colombia.'): Promise<string> {
+  // 1. Try Local AI Engine (Antigravity/Codex/Ollama local endpoint if available)
+  try {
+    const localController = new AbortController();
+    const timeoutId = setTimeout(() => localController.abort(), 1200);
+    const localRes = await fetch(LOCAL_AI_URL, {
+      method: 'POST',
+      signal: localController.signal,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'codex-local',
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: prompt }
+        ],
+        temperature: 0.3,
+        max_tokens: 1024,
+      }),
+    });
+    clearTimeout(timeoutId);
+    if (localRes.ok) {
+      const data = (await localRes.json()) as { choices?: { message?: { content?: string } }[] };
+      if (data.choices?.[0]?.message?.content) {
+        return data.choices[0].message.content;
+      }
+    }
+  } catch {
+    // Local AI not responding, fallback to Cloud API
+  }
+
+  // 2. Cloud Fallback (OpenRouter / Gemini / OpenAI compatible)
   const key = process.env.OPENROUTER_API_KEY;
-  if (!key) throw new Error('OPENROUTER_API_KEY no configurada');
+  if (!key) {
+    throw new Error('Sin clave de IA configurada');
+  }
 
   const res = await fetch(OR_BASE, {
     method: 'POST',
@@ -24,7 +57,10 @@ async function callAI(prompt: string): Promise<string> {
     },
     body: JSON.stringify({
       model: OR_MODEL,
-      messages: [{ role: 'user', content: prompt }],
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: prompt }
+      ],
       temperature: 0.4,
       max_tokens: 2048,
     }),
@@ -32,10 +68,10 @@ async function callAI(prompt: string): Promise<string> {
 
   if (!res.ok) {
     const err = await res.text();
-    throw new Error(`OpenRouter error ${res.status}: ${err}`);
+    throw new Error(`Cloud AI error ${res.status}: ${err}`);
   }
 
-  const data = await res.json() as {
+  const data = (await res.json()) as {
     choices?: { message?: { content?: string } }[];
   };
   return data.choices?.[0]?.message?.content ?? '';

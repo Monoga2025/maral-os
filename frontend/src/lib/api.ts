@@ -90,6 +90,7 @@ export const dashboardApi = {
   getSummary: () => api.get<DashboardData>('/dashboard/kpis'),
   getSalesChart: () => api.get<{ month: string; label: string; sales: number; orders: number }[]>('/dashboard/sales-chart'),
   getSalesByLine: () => api.get<{ byLine: { line: string; revenue: number; units: number; percentage: number }[] }>('/dashboard/sales-by-line'),
+  getReactivationRadar: () => api.get<import('../types').ReactivationRadarData>('/dashboard/reactivation-radar'),
 }
 
 // Clients
@@ -500,7 +501,7 @@ export const campaignsApi = {
     targetSegment: string[]
     productPhotoUrls?: string[]
     additionalContext?: string
-    vendorName?: 'John' | 'Lady'
+    vendorName?: 'John' | 'Wilson'
   }) => api.post<MarcoResult>(`/campaigns/${id}/marco`, payload),
 
   applyMarco: (id: string, payload: { steps: MarcoStep[]; generateImages?: boolean }) =>
@@ -647,4 +648,23 @@ export const notificationsApi = {
     api.get(`/notifications/campaign-report/${campaignId}`),
   globalReport: () =>
     api.get('/notifications/global-report'),
+}
+
+// 🛰️ Syscom Competitor Intelligence API
+export const competitorsApi = {
+  getSyscomComparison: (params?: { category?: string; search?: string }) =>
+    api.get<import('../types').CompetitorComparisonData>('/competitors/syscom-comparison', { params }),
+  triggerSyscomScrape: () =>
+    api.post<{ success: boolean; message: string; updatedAt: string }>('/competitors/scrape-syscom', {}),
+}
+
+// 🎯 B2B Prospecting & Lead Generation API
+export const prospectingApi = {
+  getLeads: (params?: { sector?: string; department?: string; search?: string }) =>
+    api.get<import('../types').B2BProspectingData>('/prospecting/leads', { params }),
+  convertToClient: (prospectId: string) =>
+    api.post<{ success: boolean; alreadyExisted: boolean; client: import('../types').Client; message: string }>(
+      '/prospecting/convert-to-client',
+      { prospectId }
+    ),
 }

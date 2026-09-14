@@ -1,0 +1,53 @@
+{
+  "name": "MARAL OS - Gestión Empresarial",
+  "short_name": "MARAL OS",
+  "description": "Sistema operativo y control de tareas, operaciones, taller y ventas de MARAL Antenas",
+  "start_url": "/tareas",
+  "display": "standalone",
+  "background_color": "#0F172A",
+  "theme_color": "#0F172A",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/icon-192.svg",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/favicon.svg",
+      "sizes": "64x64",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Módulo de Tareas",
+      "short_name": "Tareas",
+      "description": "Seguimiento y control de tareas del equipo",
+      "url": "/tareas",
+      "icons": [{ "src": "/icon-192.svg", "sizes": "192x192" }]
+    },
+    {
+      "name": "Pedidos & Despachos",
+      "short_name": "Pedidos",
+      "description": "Estado de pedidos en taller y despacho",
+      "url": "/pedidos",
+      "icons": [{ "src": "/icon-192.svg", "sizes": "192x192" }]
+    },
+    {
+      "name": "Cotizaciones",
+      "short_name": "Cotizaciones",
+      "description": "Crear y consultar cotizaciones flash",
+      "url": "/cotizaciones",
+      "icons": [{ "src": "/icon-192.svg", "sizes": "192x192" }]
+    }
+  ]
+}

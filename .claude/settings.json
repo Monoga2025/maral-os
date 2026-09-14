@@ -1,5 +1,8 @@
 {
   "model": "claude-sonnet-4-6",
   "autoCompact": true,
-  "autoCompactThreshold": 0.75
+  "autoCompactThreshold": 0.75,
+  "enabledPlugins": {
+    "superpowers@claude-plugins-official": true
+  }
 }

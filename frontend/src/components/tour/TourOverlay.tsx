@@ -221,17 +221,18 @@ function WelcomeModal({ onClose, onStartTour }: { onClose: () => void; onStartTo
 
         <div className="p-6">
           {/* Users */}
-          <div className="grid grid-cols-3 gap-3 mb-6">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
             {[
-              { name: 'John', emoji: '👔', role: 'Gerente', desc: 'Dashboard y reportes' },
-              { name: 'Lady', emoji: '💼', role: 'Ventas', desc: 'Clientes y cotizaciones' },
-              { name: 'Anyelo', emoji: '⚙️', role: 'Logística', desc: 'Pedidos y producción' },
+              { name: 'John', emoji: '👔', role: 'Gerente', desc: 'Control general & estrategia' },
+              { name: 'Wilson', emoji: '🎯', role: 'Ventas', desc: 'Clientes & cotizaciones' },
+              { name: 'Iván', emoji: '⚙️', role: 'Producción', desc: 'Taller & logística' },
+              { name: 'Janet', emoji: '📊', role: 'Contabilidad', desc: 'Cartera & finanzas' },
             ].map((u) => (
-              <div key={u.name} className="text-center p-3 bg-gray-50 rounded-xl">
+              <div key={u.name} className="text-center p-3 bg-gray-50 rounded-xl border border-gray-100 shadow-xs">
                 <div className="text-2xl mb-1">{u.emoji}</div>
                 <p className="font-bold text-gray-900 text-sm">{u.name}</p>
-                <p className="text-xs text-blue-600 font-medium">{u.role}</p>
-                <p className="text-xs text-gray-400 mt-0.5">{u.desc}</p>
+                <p className="text-xs text-blue-600 font-semibold">{u.role}</p>
+                <p className="text-[11px] text-gray-500 mt-0.5">{u.desc}</p>
               </div>
             ))}
           </div>

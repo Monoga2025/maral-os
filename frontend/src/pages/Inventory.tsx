@@ -74,12 +74,14 @@ export default function Inventory() {
     onError: () => toast.error('Error al actualizar stock mínimo'),
   })
 
-  const products: Product[] = data?.data.data ?? []
-  const allProds: Product[] = allProducts?.data.data ?? []
+  const rawProducts = data?.data?.data ?? (Array.isArray(data?.data) ? data.data : (Array.isArray(data) ? data : []))
+  const products: Product[] = Array.isArray(rawProducts) ? rawProducts : []
+  const rawAll = allProducts?.data?.data ?? (Array.isArray(allProducts?.data) ? allProducts.data : (Array.isArray(allProducts) ? allProducts : []))
+  const allProds: Product[] = Array.isArray(rawAll) ? rawAll : []
 
   const critical = products.filter((p) => p.minStock > 0 && p.stock <= p.minStock).length
   const sinStock = products.filter((p) => p.minStock > 0 && p.stock === 0).length
-  const totalValue = products.reduce((a, p) => a + p.stock * p.cost, 0)
+  const totalValue = products.reduce((a, p) => a + (p.stock || 0) * (p.cost || 0), 0)
 
   const rowColor = (p: Product) => {
     if (p.minStock > 0 && p.stock < p.minStock) return 'bg-red-50 border-l-4 border-red-400'

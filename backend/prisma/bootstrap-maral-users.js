@@ -16,8 +16,8 @@ async function upsertUser({ name, email, password, cedula, role }) {
 
 async function main() {
   await upsertUser({
-    name: 'Janneth',
-    email: 'janneth@industriasmaral.com',
+    name: 'Janet',
+    email: 'janet@industriasmaral.com',
     password: '63328625',
     cedula: '63328625',
     role: 'CONTADORA',
@@ -32,26 +32,26 @@ async function main() {
   });
 
   await upsertUser({
-    name: 'Lady',
-    email: 'lady@maral.com',
-    password: '63541610',
-    cedula: '63541610',
+    name: 'Wilson',
+    email: 'wilson@industriasmaral.com',
+    password: '1098670002',
+    cedula: '1098670002',
     role: 'VENTAS',
   });
 
   await upsertUser({
-    name: 'Produccion',
-    email: 'produccion@industriasmaral.com',
-    password: crypto.randomBytes(48).toString('hex'),
-    cedula: crypto.randomBytes(32).toString('hex'),
+    name: 'Iván',
+    email: 'ivan@industriasmaral.com',
+    password: '1098670001',
+    cedula: '1098670001',
     role: 'LOGISTICA',
   });
 
   await prisma.user.updateMany({
-    where: { email: 'produccion@maral.com' },
-    data: { active: false, cedula: crypto.randomBytes(32).toString('hex') },
+    where: { email: { in: ['lady@maral.com', 'angelo@maral.com', 'produccion@maral.com', 'produccion@industriasmaral.com', 'janneth@industriasmaral.com'] } },
+    data: { active: false },
   });
-  console.log('old produccion@maral.com disabled');
+  console.log('Old users disabled');
 }
 
 main()

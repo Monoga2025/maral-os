@@ -1,9 +1,10 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, X, Check, AlertCircle, Clock, ArrowDown } from 'lucide-react'
+import { Plus, X, Check, AlertCircle, Clock, ArrowDown, Smartphone, Users, Zap } from 'lucide-react'
 import { tasksApi } from '../../lib/api'
 import api from '../../lib/api'
 import { useAuthStore } from '../../store/auth'
+import { InstallAppModal } from '../../components/pwa/InstallAppModal'
 import { toast } from 'sonner'
 import type { Task, TaskPriority, User } from '../../types'
 
@@ -45,21 +46,25 @@ export default function MobileTareas() {
   const { user } = useAuthStore()
   const qc = useQueryClient()
   const [showModal, setShowModal] = useState(false)
+  const [showAppModal, setShowAppModal] = useState(false)
+  const [selectedUserFilter, setSelectedUserFilter] = useState<string>('all')
   const [title, setTitle] = useState('')
   const [priority, setPriority] = useState<TaskPriority>('NORMAL')
   const [assignedToId, setAssignedToId] = useState('')
   const [dueDate, setDueDate] = useState('')
 
   const { data: tasks, isLoading } = useQuery<Task[]>({
-    queryKey: ['tasks-mobile'],
-    queryFn: () => tasksApi.getAll({ status: 'PENDIENTE' }).then((r) => r.data),
+    queryKey: ['tasks-mobile', selectedUserFilter],
+    queryFn: () => tasksApi.getAll({
+      status: 'PENDIENTE',
+      assignedToId: selectedUserFilter === 'all' ? undefined : selectedUserFilter === 'me' ? user?.id : selectedUserFilter,
+    }).then((r) => r.data),
   })
 
   const { data: users } = useQuery<User[]>({
-    queryKey: ['users'],
-    queryFn: () => api.get<User[]>('/users').then((r) => r.data),
+    queryKey: ['users-assignable'],
+    queryFn: () => api.get<User[]>('/users/assignable').then((r) => r.data),
     staleTime: 60_000,
-    enabled: showModal,
   })
 
   const completeMutation = useMutation({
@@ -67,7 +72,7 @@ export default function MobileTareas() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['tasks-mobile'] })
       qc.invalidateQueries({ queryKey: ['tasks'] })
-      toast.success('Tarea completada')
+      toast.success('Tarea completada 🎉')
     },
   })
 
@@ -94,11 +99,66 @@ export default function MobileTareas() {
   const pending = tasks ?? []
   const byPriority = (p: TaskPriority) => pending.filter(t => t.priority === p)
 
+  const handleWhatsApp = (task: Task) => {
+    const phone = task.assignedTo?.whatsapp || task.assignedTo?.phone
+    const clean = phone ? phone.replace(/\D/g, '') : ''
+    const targetPhone = clean.startsWith('57') ? clean : clean ? `57${clean}` : ''
+    const msg = encodeURIComponent(`Hola ${task.assignedTo?.name || ''}, te recuerdo tu tarea en MARAL OS: "${task.title}". ¡Gracias!`)
+    window.open(targetPhone ? `https://wa.me/${targetPhone}?text=${msg}` : `https://wa.me/?text=${msg}`, '_blank')
+  }
+
   return (
-    <div className="space-y-4 pb-2">
+    <div className="space-y-4 pb-20">
+      {/* Header & Install CTA */}
       <div className="flex items-center justify-between">
-        <h1 className="text-[#F1F5F9] text-lg font-bold">Tareas</h1>
-        <span className="text-[#475569] text-xs">{pending.length} pendientes</span>
+        <div>
+          <h1 className="text-[#F1F5F9] text-lg font-bold">Tareas & Operaciones</h1>
+          <span className="text-[#94A3B8] text-xs">{pending.length} activas</span>
+        </div>
+        <button
+          onClick={() => setShowAppModal(true)}
+          className="flex items-center gap-1.5 rounded-full bg-emerald-600/20 border border-emerald-500/40 px-3 py-1 text-xs font-bold text-emerald-400 active:scale-95 transition-all"
+        >
+          <Smartphone size={13} />
+          Descargar App
+        </button>
+      </div>
+
+      {/* User filter pills */}
+      <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar text-xs">
+        <button
+          onClick={() => setSelectedUserFilter('all')}
+          className={`shrink-0 px-3 py-1.5 rounded-full font-bold transition-all ${
+            selectedUserFilter === 'all'
+              ? 'bg-blue-600 text-white shadow-xs'
+              : 'bg-[#141C26] text-[#94A3B8] border border-[#1E2D3D]'
+          }`}
+        >
+          Todos
+        </button>
+        <button
+          onClick={() => setSelectedUserFilter('me')}
+          className={`shrink-0 px-3 py-1.5 rounded-full font-bold transition-all ${
+            selectedUserFilter === 'me'
+              ? 'bg-blue-600 text-white shadow-xs'
+              : 'bg-[#141C26] text-[#94A3B8] border border-[#1E2D3D]'
+          }`}
+        >
+          Mis Tareas
+        </button>
+        {users?.map((u) => (
+          <button
+            key={u.id}
+            onClick={() => setSelectedUserFilter(u.id)}
+            className={`shrink-0 px-3 py-1.5 rounded-full font-bold transition-all ${
+              selectedUserFilter === u.id
+                ? 'bg-blue-600 text-white shadow-xs'
+                : 'bg-[#141C26] text-[#94A3B8] border border-[#1E2D3D]'
+            }`}
+          >
+            {u.name.split(' ')[0]}
+          </button>
+        ))}
       </div>
 
       {isLoading ? (
@@ -148,15 +208,25 @@ export default function MobileTareas() {
                       </button>
                       <div className="flex-1 min-w-0">
                         <p className="text-[#F1F5F9] text-sm font-medium leading-snug">{task.title}</p>
-                        <div className="flex items-center gap-3 mt-1.5 flex-wrap">
-                          {task.assignedTo && (
-                            <span className="text-[#475569] text-[11px]">→ {task.assignedTo.name}</span>
-                          )}
-                          {due && (
-                            <span className={`text-[11px] font-medium ${due.overdue ? 'text-red-400' : 'text-[#94A3B8]'}`}>
-                              {due.text}
-                            </span>
-                          )}
+                        <div className="flex items-center justify-between gap-2 mt-2 flex-wrap">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            {task.assignedTo && (
+                              <span className="text-[#94A3B8] text-[11px] bg-white/5 border border-white/10 px-2 py-0.5 rounded-full">
+                                {task.assignedTo.name}
+                              </span>
+                            )}
+                            {due && (
+                              <span className={`text-[11px] font-medium ${due.overdue ? 'text-red-400 font-bold' : 'text-[#94A3B8]'}`}>
+                                {due.text}
+                              </span>
+                            )}
+                          </div>
+                          <button
+                            onClick={() => handleWhatsApp(task)}
+                            className="text-[10px] text-emerald-400 hover:text-emerald-300 bg-emerald-950/40 border border-emerald-800/60 rounded-lg px-2 py-0.5 flex items-center gap-1"
+                          >
+                            <Zap size={10} /> WhatsApp
+                          </button>
                         </div>
                       </div>
                     </div>
@@ -171,17 +241,17 @@ export default function MobileTareas() {
       {/* FAB */}
       <button
         onClick={() => setShowModal(true)}
-        className="fixed bottom-24 right-4 w-14 h-14 bg-[#22C55E] rounded-full flex items-center justify-center shadow-lg shadow-green-900/40 z-40"
+        className="fixed bottom-24 right-4 w-14 h-14 bg-[#22C55E] rounded-full flex items-center justify-center shadow-lg shadow-green-900/40 z-40 active:scale-95"
       >
         <Plus size={24} className="text-white" />
       </button>
 
       {/* Create sheet */}
       {showModal && (
-        <div className="fixed inset-0 bg-black/70 flex items-end z-50">
-          <div className="bg-[#141C26] border border-[#1E2D3D] rounded-t-3xl w-full p-5 space-y-4">
+        <div className="fixed inset-0 bg-black/70 flex items-end z-50 animate-fade-in">
+          <div className="bg-[#141C26] border border-[#1E2D3D] rounded-t-3xl w-full p-5 space-y-4 max-h-[85vh] overflow-y-auto">
             <div className="flex items-center justify-between">
-              <h3 className="text-[#F1F5F9] text-base font-bold">Nueva tarea</h3>
+              <h3 className="text-[#F1F5F9] text-base font-bold">Nueva Tarea</h3>
               <button onClick={() => setShowModal(false)}><X size={20} className="text-[#475569]" /></button>
             </div>
 
@@ -191,7 +261,7 @@ export default function MobileTareas() {
               placeholder="¿Qué hay que hacer?"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              className="w-full bg-[#1E2D3D] border border-[#2D3F50] rounded-xl px-4 py-3 text-[#F1F5F9] text-sm placeholder-[#334155] focus:outline-none focus:border-[#22C55E]"
+              className="w-full bg-[#1E2D3D] border border-[#2D3F50] rounded-xl px-4 py-3 text-[#F1F5F9] text-sm placeholder-[#475569] focus:outline-none focus:border-[#22C55E]"
             />
 
             {/* Priority selector */}
@@ -219,7 +289,7 @@ export default function MobileTareas() {
             </div>
 
             {/* Assignee */}
-            {users && users.length > 1 && (
+            {users && users.length > 0 && (
               <div>
                 <label className="text-[#94A3B8] text-xs font-medium">Asignar a</label>
                 <select
@@ -229,7 +299,7 @@ export default function MobileTareas() {
                 >
                   <option value="">Yo mismo</option>
                   {users.map(u => (
-                    <option key={u.id} value={u.id}>{u.name}</option>
+                    <option key={u.id} value={u.id}>{u.name} ({u.role})</option>
                   ))}
                 </select>
               </div>
@@ -248,14 +318,17 @@ export default function MobileTareas() {
 
             <button
               onClick={() => createMutation.mutate()}
-              disabled={!title.trim() || createMutation.isPending}
-              className="w-full py-3.5 bg-[#22C55E] text-white rounded-2xl font-semibold text-sm disabled:opacity-50"
+              disabled={createMutation.isPending || !title.trim()}
+              className="w-full bg-[#22C55E] text-white py-3.5 rounded-xl font-bold text-sm shadow-md disabled:opacity-50"
             >
-              {createMutation.isPending ? 'Creando...' : 'Crear tarea'}
+              {createMutation.isPending ? 'Guardando...' : 'Crear Tarea'}
             </button>
           </div>
         </div>
       )}
+
+      {/* App Install Modal */}
+      <InstallAppModal isOpen={showAppModal} onClose={() => setShowAppModal(false)} />
     </div>
   )
 }

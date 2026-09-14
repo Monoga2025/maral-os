@@ -26,7 +26,7 @@ export default function MarcoPanel({ campaignId, onApply, onClose }: Props) {
   const [productDescription, setProductDescription] = useState('')
   const [objective, setObjective] = useState('top_of_mind')
   const [segments, setSegments] = useState<string[]>(['IM', 'DS'])
-  const [vendorName, setVendorName] = useState<'John' | 'Lady'>('John')
+  const [vendorName, setVendorName] = useState<'John' | 'Wilson'>('John')
   const [photoUrls, setPhotoUrls] = useState<string[]>([''])
   const [additionalContext, setAdditionalContext] = useState('')
   const [result, setResult] = useState<MarcoResult | null>(null)
@@ -169,7 +169,7 @@ export default function MarcoPanel({ campaignId, onApply, onClose }: Props) {
             <div>
               <label className="block text-xs font-semibold text-gray-700 mb-1.5">Firma del vendedor</label>
               <div className="flex gap-2">
-                {(['John', 'Lady'] as const).map((v) => (
+                {(['John', 'Wilson'] as const).map((v) => (
                   <button
                     key={v}
                     onClick={() => setVendorName(v)}
@@ -179,7 +179,7 @@ export default function MarcoPanel({ campaignId, onApply, onClose }: Props) {
                         : 'bg-white text-gray-500 border-gray-200 hover:border-gray-400'
                     }`}
                   >
-                    {v === 'John' ? '👔 John Mónoga' : '👩‍💼 Lady'}
+                    {v === 'John' ? '👔 John Mónoga' : '🎯 Wilson (Ventas)'}
                   </button>
                 ))}
               </div>

@@ -82,9 +82,9 @@ const modules = [
         ],
       },
       {
-        heading: 'Ejemplo de uso — Lady (Ventas)',
+        heading: 'Ejemplo de uso — Wilson (Ventas)',
         type: 'example',
-        content: 'Lady recibe una llamada de Meltec pidiendo precios. Busca "Meltec" en Clientes, ve que tiene $8M de cupo disponible, que su factoring está ACTIVO y que su último pedido fue hace 45 días. Con esa información crea la cotización directamente desde la ficha del cliente.',
+        content: 'Wilson recibe una llamada de Meltec pidiendo precios. Busca "Meltec" en Clientes, ve que tiene $8M de cupo disponible, que su factoring está ACTIVO y que su último pedido fue hace 45 días. Con esa información crea la cotización directamente desde la ficha del cliente.',
       },
     ],
   },
@@ -133,9 +133,9 @@ const modules = [
         ],
       },
       {
-        heading: 'Ejemplo de uso — Lady (Ventas)',
+        heading: 'Ejemplo de uso — Wilson (Ventas)',
         type: 'example',
-        content: 'Lady llama a ISEC para hacer seguimiento de la cotización C-2024-0032 enviada hace 5 días. ISEC dice que la acepta. Lady abre la cotización, cambia el estado a ACEPTADA y hace clic en "Convertir a Pedido". En 30 segundos el pedido P-2024-0087 está creado y aparece en el kanban de Pedidos para que Anyelo lo procese.',
+        content: 'Wilson llama a ISEC para hacer seguimiento de la cotización C-2024-0032 enviada hace 5 días. ISEC dice que la acepta. Wilson abre la cotización, cambia el estado a ACEPTADA y hace clic en "Convertir a Pedido". En 30 segundos el pedido P-2024-0087 está creado y aparece en el kanban de Pedidos para que Iván lo procese.',
       },
     ],
   },
@@ -338,9 +338,9 @@ const modules = [
         ],
       },
       {
-        heading: 'Ejemplo de uso — John (Gerente)',
+        heading: 'Ejemplo de uso — Janet (Contabilidad)',
         type: 'example',
-        content: 'A fin de mes John revisa Crédito y ve que ISEC tiene una factura de $12M vencida hace 15 días. Llama a su contacto, acuerdan el pago para el viernes. El viernes Lady registra el pago de $12M y la cartera se actualiza. El cupo de ISEC vuelve a quedar disponible para nuevos pedidos.',
+        content: 'A fin de mes John y Janet revisan Crédito y ven que ISEC tiene una factura de $12M vencida hace 15 días. Wilson llama a su contacto y acuerdan el pago para el viernes. El viernes Janet registra el pago de $12M y la cartera se actualiza automáticamente. El cupo de ISEC vuelve a quedar disponible para nuevos pedidos.',
       },
     ],
   },
@@ -380,9 +380,9 @@ const modules = [
         ],
       },
       {
-        heading: 'Ejemplo de uso — John (Gerente)',
+        heading: 'Ejemplo de uso — Wilson (Ventas)',
         type: 'example',
-        content: 'Lady necesita cotizar una antena G6 pero no recuerda el precio. Abre el Catálogo, busca "G6", ve que el precio de lista es $485.000 con un margen del 52%. Con esa información crea la cotización sin necesitar llamar a John.',
+        content: 'Wilson necesita cotizar una antena G6 pero no recuerda el precio. Abre el Catálogo, busca "G6", ve que el precio de lista es $485.000 con un margen del 52%. Con esa información crea la cotización sin necesitar llamar a John.',
       },
     ],
   },
@@ -494,7 +494,7 @@ export default function Manual() {
             Manual de Uso — MARAL OS
           </h1>
           <p className="text-sm text-gray-500 mt-0.5">
-            Guía paso a paso para John, Lady y Anyelo
+            Guía paso a paso para John, Wilson, Iván y Janet
           </p>
         </div>
         <button
@@ -536,20 +536,20 @@ export default function Manual() {
       <div className="bg-blue-600 text-white rounded-xl p-6">
         <h2 className="text-lg font-bold mb-2">Bienvenidos a MARAL OS</h2>
         <p className="text-blue-100 text-sm leading-relaxed">
-          MARAL OS es la plataforma digital de Maral Tecnología y Comunicaciones S.A.S. Esta herramienta reemplaza los
-          Excel, las planillas de Drive, los grupos de WhatsApp y la memoria para gestionar clientes, cotizaciones,
-          pedidos, inventario, producción, compras y cartera — todo en un solo lugar, en tiempo real.
+          MARAL OS es la plataforma digital de Maral Tecnología y Comunicaciones S.A.S. Esta herramienta gestiona
+          clientes, cotizaciones, pedidos, inventario, producción, compras, cartera y tareas — todo en un solo lugar, en tiempo real.
         </p>
-        <div className="mt-4 grid grid-cols-3 gap-3">
+        <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-3">
           {[
-            { name: 'John Mónoga', role: 'Gerente', desc: 'Dashboard, reportes, crédito, aprobaciones' },
-            { name: 'Lady', role: 'Ventas', desc: 'Clientes, cotizaciones, pedidos, cartera' },
-            { name: 'Anyelo', role: 'Logística/Producción', desc: 'Pedidos, inventario, producción, compras' },
+            { name: 'John Mónoga', role: 'Gerente General', desc: 'Dashboard, dirección general, analíticas y tareas' },
+            { name: 'Wilson', role: 'Ventas & Mercadeo', desc: 'Clientes, cotizaciones, pedidos, campañas y WhatsApp' },
+            { name: 'Iván', role: 'Producción & Logística', desc: 'Órdenes de taller, inventario, producción y compras' },
+            { name: 'Janet', role: 'Contabilidad', desc: 'Facturación, crédito, cartera, gastos y balances' },
           ].map((p) => (
             <div key={p.name} className="bg-white/10 rounded-lg p-3">
               <p className="font-bold text-sm">{p.name}</p>
-              <p className="text-blue-200 text-xs">{p.role}</p>
-              <p className="text-blue-100 text-xs mt-1">{p.desc}</p>
+              <p className="text-blue-200 text-xs font-semibold">{p.role}</p>
+              <p className="text-blue-100 text-[11px] mt-1">{p.desc}</p>
             </div>
           ))}
         </div>

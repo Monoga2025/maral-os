@@ -49,34 +49,52 @@ async function main() {
       email: 'john@maral.com',
       password: passwordHash,
       role: 'GERENTE',
-      title: 'Gerente de Proyectos',
+      title: 'Gerente General',
       phone: '3177606126',
       whatsapp: '573177606126',
+      cedula: '80163914',
     },
   });
   const vendedora = await prisma.user.create({
     data: {
-      name: 'Lady García',
-      email: 'lady@maral.com',
+      name: 'Wilson',
+      email: 'wilson@industriasmaral.com',
       password: passwordHash,
       role: 'VENTAS',
-      title: 'Asesora Comercial',
+      title: 'Encargado de Ventas & Mercadeo',
       phone: '3167760692',
       whatsapp: '573167760692',
+      cedula: '1098670002',
     },
   });
   const logistica = await prisma.user.create({
     data: {
-      name: 'Angelo Pérez',
-      email: 'angelo@maral.com',
+      name: 'Iván',
+      email: 'ivan@industriasmaral.com',
       password: passwordHash,
       role: 'LOGISTICA',
-      title: 'Coordinador Logística',
+      title: 'Encargado de Producción & Logística',
+      phone: '3177606126',
+      whatsapp: '573177606126',
+      cedula: '1098670001',
+    },
+  });
+  const contabilidad = await prisma.user.create({
+    data: {
+      name: 'Janet',
+      email: 'janet@industriasmaral.com',
+      password: passwordHash,
+      role: 'CONTADORA',
+      title: 'Encargada de Contabilidad',
+      phone: '3164526523',
+      whatsapp: '573164526523',
+      cedula: '63328625',
     },
   });
   console.log(`  ✓ ${gerente.name} (GERENTE)`);
   console.log(`  ✓ ${vendedora.name} (VENTAS)`);
-  console.log(`  ✓ ${logistica.name} (LOGISTICA)\n`);
+  console.log(`  ✓ ${logistica.name} (LOGISTICA)`);
+  console.log(`  ✓ ${contabilidad.name} (CONTADORA)\n`);
 
   // ── Restart quotation sequence at 4585 ──────────────────
   console.log('Resetting quotation number sequence to 4585...');

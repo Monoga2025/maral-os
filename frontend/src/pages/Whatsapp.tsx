@@ -233,7 +233,7 @@ function GhostSuggestion({
           <div className="flex h-4 w-4 items-center justify-center rounded-full bg-gradient-to-br from-emerald-500 to-teal-600">
             <Sparkles className="h-2.5 w-2.5 text-white" />
           </div>
-          <span className="text-[9px] font-bold text-emerald-700 uppercase tracking-wider">Lady sugiere</span>
+          <span className="text-[9px] font-bold text-emerald-700 uppercase tracking-wider">MARAL IA sugiere</span>
           {isRegenerating && <RefreshCw className="h-2.5 w-2.5 text-emerald-500 animate-spin" />}
         </div>
         <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap italic">
@@ -280,7 +280,7 @@ function GhostSuggestion({
   )
 }
 
-// ─── Quick ask Lady bar ───────────────────────────────────────
+// ─── Quick ask IA bar ─────────────────────────────────────────
 
 function QuickAskLadyBar({ isLoading, onRequest }: { isLoading: boolean; onRequest: () => void }) {
   if (isLoading) {
@@ -293,7 +293,7 @@ function QuickAskLadyBar({ isLoading, onRequest }: { isLoading: boolean; onReque
           </div>
         </div>
         <div className="flex-1">
-          <p className="text-xs font-semibold text-emerald-800">Lady está pensando…</p>
+          <p className="text-xs font-semibold text-emerald-800">MARAL IA redactando respuesta…</p>
           <div className="flex gap-1 mt-1.5">
             {[0, 150, 300].map(d => (
               <div key={d} className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-bounce" style={{ animationDelay: `${d}ms` }} />
@@ -312,8 +312,8 @@ function QuickAskLadyBar({ isLoading, onRequest }: { isLoading: boolean; onReque
         <Sparkles className="h-4 w-4 text-white" />
       </div>
       <div className="flex-1 min-w-0">
-        <p className="text-xs font-bold text-emerald-800">✨ Pedir sugerencia a Lady IA</p>
-        <p className="text-[11px] text-emerald-600/80">Responde al cliente con el tono perfecto en 1 clic</p>
+        <p className="text-xs font-bold text-emerald-800">✨ Pedir sugerencia a MARAL IA</p>
+        <p className="text-[11px] text-emerald-600/80">Responde al cliente con el tono de ventas perfecto en 1 clic</p>
       </div>
       <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-100 px-2 py-1 rounded-md group-hover:bg-emerald-200 transition-colors">
         Generar
@@ -477,7 +477,7 @@ function SuggestionConfirmBar({ suggestion, chat, onSent, onCancel }: { suggesti
     <div className="border-t border-emerald-300 bg-emerald-50">
       <div className="flex items-center gap-2 px-4 pt-2 pb-1">
         <Sparkles className="h-3.5 w-3.5 text-emerald-600" />
-        <span className="text-[10px] font-semibold text-emerald-700 uppercase tracking-wide flex-1">Edita y envía como Lady</span>
+        <span className="text-[10px] font-semibold text-emerald-700 uppercase tracking-wide flex-1">Edita y envía respuesta recomendada</span>
         <button onClick={onCancel} className="text-gray-400 hover:text-gray-600"><X className="h-3.5 w-3.5" /></button>
       </div>
       <div className="flex items-end gap-2 px-3 pb-2.5">
@@ -1025,7 +1025,7 @@ function ChatView({ chat, token }: { chat: WaChat; token: string }) {
         setManualSuggestion(res.data.suggestion)
         localStorage.setItem(STORAGE_KEY, res.data.suggestion)
       } else {
-        toast.error('Lady no generó respuesta, intenta de nuevo')
+        toast.error('No se pudo generar la respuesta, intenta de nuevo')
       }
     } catch (err) {
       const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error
@@ -1259,8 +1259,8 @@ function EmptyState() {
           <Sparkles className="h-3.5 w-3.5 text-white" />
         </div>
       </div>
-      <h3 className="text-2xl font-semibold text-[#41525d] mb-2">WhatsApp + Lady IA</h3>
-      <p className="text-sm text-[#667781] max-w-sm mb-6">Selecciona una conversación. Lady sugiere respuestas comerciales con el tono de MARAL — listas para enviar en un clic.</p>
+      <h3 className="text-2xl font-semibold text-[#41525d] mb-2">WhatsApp + MARAL IA</h3>
+      <p className="text-sm text-[#667781] max-w-sm mb-6">Selecciona una conversación. MARAL IA sugiere respuestas comerciales y técnicas con el tono oficial de la empresa — listas para enviar en un clic.</p>
       <div className="grid grid-cols-3 gap-4 max-w-md text-center">
         <div><p className="text-2xl font-bold text-emerald-600">3×</p><p className="text-[10px] text-gray-500 uppercase tracking-wide">Más rápido</p></div>
         <div><p className="text-2xl font-bold text-emerald-600">24/7</p><p className="text-[10px] text-gray-500 uppercase tracking-wide">Disponible</p></div>

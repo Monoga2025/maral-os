@@ -45,7 +45,8 @@ export default function Credit() {
   })
 
   const summary = summaryData?.data
-  const invoices = invoicesData?.data.data ?? []
+  const rawInvoices = invoicesData?.data?.data ?? (Array.isArray(invoicesData?.data) ? invoicesData.data : (Array.isArray(invoicesData) ? invoicesData : []))
+  const invoices = Array.isArray(rawInvoices) ? rawInvoices : []
 
   const nearDue = invoices.filter((inv) => {
     if (inv.status !== 'VIGENTE') return false

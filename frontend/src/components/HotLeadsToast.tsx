@@ -18,8 +18,13 @@ export default function HotLeadsToast({ onHotCount }: Props) {
   useEffect(() => {
     const poll = async () => {
       try {
-        const { data } = await notificationsApi.getUnread().then((r) => r.data)
-        const hot = data.filter((n) => n.type === 'HOT_LEAD')
+        const res = await notificationsApi.getUnread().then((r) => r.data)
+        const list: AppNotification[] = Array.isArray(res?.data)
+          ? res.data
+          : Array.isArray(res)
+          ? res
+          : []
+        const hot = list.filter((n) => n.type === 'HOT_LEAD')
         onHotCount(hot.length)
 
         // Show toast for truly new ones

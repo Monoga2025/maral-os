@@ -361,21 +361,115 @@ router.get('/alerts', async (req: AuthRequest, res: Response) => {
   }
 });
 
-// GET /api/dashboard/activity
-router.get('/activity', async (req: AuthRequest, res: Response) => {
+// GET /api/dashboard/reactivation-radar
+router.get('/reactivation-radar', async (req: AuthRequest, res: Response) => {
   try {
-    const activity = await prisma.activityLog.findMany({
-      take: 10,
-      orderBy: { createdAt: 'desc' },
+    const now = new Date();
+
+    const clients = await prisma.client.findMany({
+      where: { active: true, isProvider: false },
       include: {
-        user: { select: { id: true, name: true, role: true } },
+        orders: {
+          orderBy: { createdAt: 'desc' },
+          take: 3,
+          include: {
+            items: {
+              include: {
+                product: { select: { name: true, reference: true } },
+              },
+            },
+          },
+        },
+        quotations: {
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+        },
       },
     });
 
-    res.json(activity);
+    const analyzedClients = clients.map((c) => {
+      const deliveredOrders = c.orders.filter((o) =>
+        ['DESPACHADO', 'ENTREGADO', 'CONFIRMADO'].includes(o.status)
+      );
+      const totalSpent = deliveredOrders.reduce((sum, o) => sum + o.total, 0);
+      const lastOrder = c.orders[0] || null;
+      const lastOrderDate = lastOrder ? lastOrder.createdAt : null;
+
+      let daysInactive = 999;
+      if (lastOrderDate) {
+        daysInactive = Math.floor((now.getTime() - new Date(lastOrderDate).getTime()) / (1000 * 60 * 60 * 24));
+      } else {
+        const clientCreatedDays = Math.floor((now.getTime() - new Date(c.createdAt).getTime()) / (1000 * 60 * 60 * 24));
+        daysInactive = clientCreatedDays;
+      }
+
+      let urgency: 'CRITICO' | 'DORMIDO' | 'ENFRIANDOSE' | 'SEGUIMIENTO' | 'ACTIVO' = 'SEGUIMIENTO';
+      if (lastOrderDate) {
+        if (daysInactive >= 90) urgency = 'CRITICO';
+        else if (daysInactive >= 60) urgency = 'DORMIDO';
+        else if (daysInactive >= 30) urgency = 'ENFRIANDOSE';
+        else if (daysInactive >= 7) urgency = 'SEGUIMIENTO';
+        else urgency = 'ACTIVO';
+      } else {
+        urgency = daysInactive >= 30 ? 'ENFRIANDOSE' : 'SEGUIMIENTO';
+      }
+
+      const lastProducts = lastOrder?.items.map((i) => i.product.name).filter(Boolean) || [];
+      const primaryProduct = lastProducts[0] || 'equipos y accesorios electrónicos';
+
+      const contactPerson = c.purchaseContactName || c.ownerName || c.name.split(' ')[0] || 'estimado cliente';
+      const cleanPhone = (c.whatsapp || c.phone || '').replace(/\D/g, '');
+      const waNumber = cleanPhone.length === 10 ? `57${cleanPhone}` : cleanPhone;
+
+      const pitchText = `Hola ${contactPerson}, un cordial saludo de MARAL Tecnología y Comunicaciones ⚡. Estaba revisando tu historial y vi que tu última adquisición con nosotros fue de ${primaryProduct}. Queremos contarte que tenemos lotes disponibles y condiciones comerciales preferenciales para ti esta semana. ¿Te gustaría que te preparemos una propuesta actualizada?`;
+
+      return {
+        id: c.id,
+        name: c.name,
+        company: c.company,
+        phone: c.phone,
+        whatsapp: c.whatsapp,
+        waNumber,
+        city: c.city,
+        category: c.category,
+        totalSpent,
+        orderCount: c.orders.length,
+        daysInactive,
+        lastOrderDate: lastOrderDate ? lastOrderDate.toISOString() : null,
+        lastProducts,
+        primaryProduct,
+        urgency,
+        suggestedPitch: pitchText,
+      };
+    });
+
+    const urgencyWeight: Record<string, number> = {
+      CRITICO: 5,
+      DORMIDO: 4,
+      ENFRIANDOSE: 3,
+      SEGUIMIENTO: 2,
+      ACTIVO: 1,
+    };
+
+    const sortedClients = [...analyzedClients].sort((a, b) => {
+      const weightDiff = (urgencyWeight[b.urgency] || 0) - (urgencyWeight[a.urgency] || 0);
+      if (weightDiff !== 0) return weightDiff;
+      return b.totalSpent - a.totalSpent;
+    });
+
+    const summary = {
+      totalOpportunities: sortedClients.length,
+      criticalCount: sortedClients.filter((c) => c.urgency === 'CRITICO').length,
+      dormantCount: sortedClients.filter((c) => c.urgency === 'DORMIDO').length,
+      coolingCount: sortedClients.filter((c) => c.urgency === 'ENFRIANDOSE').length,
+      followUpCount: sortedClients.filter((c) => c.urgency === 'SEGUIMIENTO').length,
+      potentialRevenueCOP: sortedClients.reduce((acc, c) => acc + (c.totalSpent > 0 ? c.totalSpent * 0.35 : 1200000), 0),
+    };
+
+    res.json({ summary, clients: sortedClients.slice(0, 15) });
   } catch (error) {
-    console.error('Dashboard activity error:', error);
-    res.status(500).json({ error: 'Error al obtener actividad reciente' });
+    console.error('Reactivation radar error:', error);
+    res.status(500).json({ error: 'Error al calcular radar de reactivación' });
   }
 });
 

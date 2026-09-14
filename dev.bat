@@ -1,4 +1,7 @@
 @echo off
+echo Iniciando base de datos PostgreSQL...
+wsl -d Ubuntu -u root service postgresql start >nul 2>&1
+
 echo Iniciando MARAL OS en modo desarrollo...
 
 start "MARAL Backend" cmd /k "cd /d "%~dp0backend" && npm run dev"

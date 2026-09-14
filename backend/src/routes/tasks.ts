@@ -55,8 +55,8 @@ router.get('/', async (req: AuthRequest, res: Response) => {
         { createdAt: 'desc' },
       ],
       include: {
-        createdBy: { select: { id: true, name: true } },
-        assignedTo: { select: { id: true, name: true, whatsapp: true } },
+        createdBy: { select: { id: true, name: true, role: true, phone: true, whatsapp: true } },
+        assignedTo: { select: { id: true, name: true, role: true, phone: true, whatsapp: true } },
         client: { select: { id: true, name: true, company: true } },
         order: { select: { id: true, number: true } },
         comments: {

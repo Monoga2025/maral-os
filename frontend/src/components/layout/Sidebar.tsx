@@ -46,54 +46,54 @@ const navGroups: NavGroup[] = [
   {
     label: '',
     items: [
-      { to: '/', icon: <LayoutDashboard className="h-5 w-5" />, label: 'Dashboard' },
+      { to: '/', icon: <LayoutDashboard className="h-5 w-5" />, label: '🚀 Mi Ruta de Hoy' },
     ],
   },
   {
-    label: 'Comercial',
+    label: 'Comercial & Clientes',
     items: [
-      { to: '/clientes',     icon: <Users className="h-5 w-5" />,         label: 'Clientes',        roles: ['GERENTE', 'VENTAS'] },
-      { to: '/cotizaciones', icon: <FileText className="h-5 w-5" />,       label: 'Cotizaciones',    roles: ['GERENTE', 'VENTAS'] },
-      { to: '/pedidos',      icon: <Package className="h-5 w-5" />,        label: 'Pedidos',         roles: ['GERENTE', 'VENTAS', 'LOGISTICA', 'CONTADORA'] },
-      { to: '/whatsapp',     icon: <MessageCircle className="h-5 w-5" />,  label: 'WhatsApp Assist', roles: ['GERENTE', 'VENTAS'] },
-      { to: '/campanas',     icon: <Megaphone className="h-5 w-5" />,       label: 'Campañas',        roles: ['GERENTE', 'VENTAS'] },
-      { to: '/etiquetas',    icon: <Tag className="h-5 w-5" />,            label: 'Etiquetas',       roles: ['GERENTE', 'VENTAS'] },
+      { to: '/cotizaciones', icon: <FileText className="h-5 w-5" />,       label: 'Cotizaciones Flash', roles: ['GERENTE', 'VENTAS'] },
+      { to: '/pedidos',      icon: <Package className="h-5 w-5" />,        label: 'Pedidos & Despachos', roles: ['GERENTE', 'VENTAS', 'LOGISTICA', 'CONTADORA'] },
+      { to: '/clientes',     icon: <Users className="h-5 w-5" />,         label: 'Clientes & Radar',   roles: ['GERENTE', 'VENTAS'] },
+      { to: '/whatsapp',     icon: <MessageCircle className="h-5 w-5" />,  label: 'WhatsApp Assist',   roles: ['GERENTE', 'VENTAS'] },
+      { to: '/campanas',     icon: <Megaphone className="h-5 w-5" />,       label: 'Campañas B2B',      roles: ['GERENTE', 'VENTAS'] },
     ],
   },
   {
-    label: 'Operaciones',
+    label: 'Taller & Producción',
     items: [
-      { to: '/produccion', icon: <Factory className="h-5 w-5" />,    label: 'Producción', roles: ['GERENTE', 'LOGISTICA'] },
-      { to: '/inventario', icon: <BarChart3 className="h-5 w-5" />,  label: 'Inventario', roles: ['GERENTE', 'LOGISTICA'] },
-      { to: '/compras',    icon: <ShoppingCart className="h-5 w-5" />, label: 'Compras',  roles: ['GERENTE', 'LOGISTICA'] },
+      { to: '/produccion', icon: <Factory className="h-5 w-5" />,    label: 'Órdenes de Taller', roles: ['GERENTE', 'LOGISTICA'] },
+      { to: '/inventario', icon: <BarChart3 className="h-5 w-5" />,  label: 'Insumos & Stock',   roles: ['GERENTE', 'LOGISTICA'] },
+      { to: '/compras',    icon: <ShoppingCart className="h-5 w-5" />, label: 'Compras de Material', roles: ['GERENTE', 'LOGISTICA'] },
     ],
   },
   {
-    label: 'Finanzas',
+    label: 'Finanzas & Cartera',
     items: [
-      { to: '/credito', icon: <CreditCard className="h-5 w-5" />, label: 'Crédito', roles: ['GERENTE', 'VENTAS', 'CONTADORA'] },
-      { to: '/gastos',  icon: <Receipt className="h-5 w-5" />,    label: 'Gastos' },
+      { to: '/credito', icon: <CreditCard className="h-5 w-5" />, label: 'Cobro de Cartera', roles: ['GERENTE', 'VENTAS', 'CONTADORA'] },
+      { to: '/gastos',  icon: <Receipt className="h-5 w-5" />,    label: 'Gastos de Caja' },
     ],
   },
   {
-    label: 'Equipo',
+    label: 'Métricas & Balance',
     items: [
-      { to: '/tareas', icon: <CheckSquare className="h-5 w-5" />, label: 'Tareas' },
+      { to: '/reportes', icon: <TrendingUp className="h-5 w-5" />, label: '📊 Analíticas & Resultados', roles: ['GERENTE', 'CONTADORA'] },
     ],
   },
 ]
 
 const settingsItems: NavItem[] = [
-  { to: '/catalogo',      icon: <Grid3X3 className="h-5 w-5" />,   label: 'Catálogo de productos', roles: ['GERENTE', 'VENTAS'] },
-  { to: '/reportes',      icon: <TrendingUp className="h-5 w-5" />, label: 'Reportes',              roles: ['GERENTE', 'CONTADORA'] },
+  { to: '/tareas',        icon: <CheckSquare className="h-5 w-5" />, label: 'Lista de Tareas' },
+  { to: '/catalogo',      icon: <Grid3X3 className="h-5 w-5" />,   label: 'Catálogo de Productos', roles: ['GERENTE', 'VENTAS'] },
   { to: '/configuracion', icon: <Settings className="h-5 w-5" />,   label: 'Configuración',         roles: ['GERENTE'] },
   { to: '/manual',        icon: <BookOpen className="h-5 w-5" />,   label: 'Manual de Uso' },
 ]
 
 const roleLabels: Record<string, string> = {
-  GERENTE: 'Gerente',
-  VENTAS: 'Ventas',
-  LOGISTICA: 'Logística',
+  GERENTE: 'Gerente General',
+  VENTAS: 'Ventas & Mercadeo',
+  LOGISTICA: 'Producción & Logística',
+  CONTADORA: 'Contabilidad',
 }
 
 export function Sidebar({ hotLeadCount = 0 }: { hotLeadCount?: number }) {
@@ -101,6 +101,19 @@ export function Sidebar({ hotLeadCount = 0 }: { hotLeadCount?: number }) {
   const { sidebarCollapsed } = useUIStore()
   const navigate = useNavigate()
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [opsOpen, setOpsOpen] = useState(false)
+  const [isSalesMode, setIsSalesMode] = useState<boolean>(() => {
+    const saved = localStorage.getItem('maral-sales-focus-mode')
+    return saved !== null ? saved === 'true' : true
+  })
+
+  const toggleSalesMode = () => {
+    setIsSalesMode((prev) => {
+      const next = !prev
+      localStorage.setItem('maral-sales-focus-mode', String(next))
+      return next
+    })
+  }
 
   const { data: pendingTasks } = useQuery<number>({
     queryKey: ['tasks-count'],
@@ -184,29 +197,91 @@ export function Sidebar({ hotLeadCount = 0 }: { hotLeadCount?: number }) {
         </div>
       </div>
 
+      {/* Mode Switcher */}
+      {!sidebarCollapsed && (
+        <div className="px-3 pt-3 pb-1">
+          <button
+            onClick={toggleSalesMode}
+            className={cn(
+              'w-full flex items-center justify-between rounded-xl px-2.5 py-1.5 text-xs font-bold transition-all',
+              isSalesMode
+                ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-xs'
+                : 'bg-white/5 text-slate-400 border border-white/10 hover:text-white'
+            )}
+            title="Alternar entre vista simplificada de ventas o vista completa"
+          >
+            <span>{isSalesMode ? '🚀 Modo Ventas' : '⚙️ Modo Completo'}</span>
+            <span className="text-[10px] opacity-70 font-normal">{isSalesMode ? 'Simple' : 'Todos'}</span>
+          </button>
+        </div>
+      )}
+
       {/* Navigation */}
-      <nav className="flex-1 overflow-y-auto py-3 px-2">
-        {navGroups.map((group) => {
-          const visible = group.items.filter(
-            (item) => !item.roles || !user || item.roles.includes(user.role)
-          )
-          if (visible.length === 0) return null
-          return (
-            <div key={group.label} className="mb-3">
-              {group.label && !sidebarCollapsed && (
-                <p className="px-2.5 pb-1 text-[10px] font-semibold uppercase tracking-widest text-slate-600">
-                  {group.label}
-                </p>
-              )}
-              {group.label && sidebarCollapsed && (
-                <div className="my-1 mx-3 h-px bg-white/10" />
-              )}
+      <nav className="flex-1 overflow-y-auto py-2 px-2">
+        {isSalesMode ? (
+          /* Simplified Sales View */
+          <div className="space-y-3">
+            <div>
+              <p className="px-2.5 pb-1 text-[10px] font-semibold uppercase tracking-widest text-slate-500">
+                Ventas Rápidas
+              </p>
               <div className="space-y-0.5">
-                {visible.map(renderItem)}
+                {renderItem({ to: '/', icon: <LayoutDashboard className="h-5 w-5" />, label: 'Dashboard Cockpit' })}
+                {renderItem({ to: '/cotizaciones', icon: <FileText className="h-5 w-5" />, label: 'Cotizaciones' })}
+                {renderItem({ to: '/pedidos', icon: <Package className="h-5 w-5" />, label: 'Pedidos' })}
+                {renderItem({ to: '/clientes', icon: <Users className="h-5 w-5" />, label: 'Clientes & Radar' })}
+                {renderItem({ to: '/whatsapp', icon: <MessageCircle className="h-5 w-5" />, label: 'WhatsApp Assist' })}
               </div>
             </div>
-          )
-        })}
+
+            {/* Collapsible Operations & Admin in Sales Mode */}
+            <div className="pt-2 border-t border-white/10">
+              <button
+                onClick={() => setOpsOpen((v) => !v)}
+                className="w-full flex items-center justify-between px-2.5 py-2 text-xs font-medium text-slate-400 hover:text-white rounded-lg hover:bg-white/5 transition-colors"
+              >
+                <span>📦 Operaciones & Finanzas</span>
+                <ChevronDown className={cn('h-3.5 w-3.5 transition-transform', opsOpen && 'rotate-180')} />
+              </button>
+
+              {opsOpen && (
+                <div className="mt-1 space-y-0.5 pl-2 border-l border-white/10 ml-3">
+                  {renderItem({ to: '/produccion', icon: <Factory className="h-4 w-4" />, label: 'Producción' })}
+                  {renderItem({ to: '/inventario', icon: <BarChart3 className="h-4 w-4" />, label: 'Inventario' })}
+                  {renderItem({ to: '/compras', icon: <ShoppingCart className="h-4 w-4" />, label: 'Compras' })}
+                  {renderItem({ to: '/credito', icon: <CreditCard className="h-4 w-4" />, label: 'Crédito' })}
+                  {renderItem({ to: '/gastos', icon: <Receipt className="h-4 w-4" />, label: 'Gastos' })}
+                  {renderItem({ to: '/tareas', icon: <CheckSquare className="h-4 w-4" />, label: 'Tareas' })}
+                  {renderItem({ to: '/campanas', icon: <Megaphone className="h-4 w-4" />, label: 'Campañas' })}
+                  {renderItem({ to: '/etiquetas', icon: <Tag className="h-4 w-4" />, label: 'Etiquetas' })}
+                </div>
+              )}
+            </div>
+          </div>
+        ) : (
+          /* Full Mode */
+          navGroups.map((group) => {
+            const visible = group.items.filter(
+              (item) => !item.roles || !user || item.roles.includes(user.role)
+            )
+            if (visible.length === 0) return null
+            return (
+              <div key={group.label} className="mb-3">
+                {group.label && !sidebarCollapsed && (
+                  <p className="px-2.5 pb-1 text-[10px] font-semibold uppercase tracking-widest text-slate-600">
+                    {group.label}
+                  </p>
+                )}
+                {group.label && sidebarCollapsed && (
+                  <div className="my-1 mx-3 h-px bg-white/10" />
+                )}
+                <div className="space-y-0.5">
+                  {visible.map(renderItem)}
+                </div>
+              </div>
+            )
+          })
+        )}
       </nav>
 
       {/* Ajustes accordion */}

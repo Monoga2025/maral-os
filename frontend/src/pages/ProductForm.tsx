@@ -421,7 +421,7 @@ export default function ProductForm() {
           <div className="rounded-xl border border-blue-100 bg-blue-50 p-4 space-y-3">
             <p className="text-sm font-semibold text-blue-900">Receta del kit (componentes)</p>
             <p className="text-xs text-gray-500">
-              Al cotizar este kit, Lady podrá ver y ajustar estas cantidades sin cambiar la referencia.
+              Al cotizar este kit, el asesor comercial podrá ver y ajustar estas cantidades sin cambiar la referencia.
             </p>
 
             {/* Component search */}

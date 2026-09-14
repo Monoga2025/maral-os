@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <title>Guía Rápida - MARAL OS para Don John</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+
+    @page {
+      size: letter portrait;
+      margin: 1.2cm;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+
+    body {
+      background-color: #ffffff;
+      color: #0f172a;
+      line-height: 1.45;
+      font-size: 13px;
+    }
+
+    .page {
+      page-break-after: always;
+      min-height: 25cm;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .page:last-child {
+      page-break-after: auto;
+    }
+
+    /* Header */
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-bottom: 14px;
+      border-bottom: 2px solid #e2e8f0;
+      margin-bottom: 18px;
+    }
+
+    .logo-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .logo-box {
+      background: #2563eb;
+      color: white;
+      font-weight: 900;
+      font-size: 14px;
+      padding: 6px 10px;
+      border-radius: 8px;
+      letter-spacing: 0.5px;
+    }
+
+    .logo-text {
+      font-size: 18px;
+      font-weight: 800;
+      color: #0f172a;
+      letter-spacing: -0.5px;
+    }
+
+    .subtitle-badge {
+      background: #f1f5f9;
+      color: #475569;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 4px 10px;
+      border-radius: 20px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    /* Hero Box */
+    .hero {
+      background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+      color: white;
+      padding: 20px;
+      border-radius: 14px;
+      margin-bottom: 20px;
+    }
+
+    .hero h1 {
+      font-size: 20px;
+      font-weight: 900;
+      margin-bottom: 4px;
+      color: #ffffff;
+    }
+
+    .hero p {
+      font-size: 12px;
+      color: #94a3b8;
+      max-width: 90%;
+    }
+
+    .meta-target {
+      display: flex;
+      align-items: center;
+      gap: 15px;
+      margin-top: 14px;
+      background: rgba(255, 255, 255, 0.08);
+      padding: 10px 14px;
+      border-radius: 10px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+    }
+
+    .meta-target .amount {
+      font-size: 18px;
+      font-weight: 900;
+      color: #4ade80;
+    }
+
+    .meta-target .label {
+      font-size: 11px;
+      color: #cbd5e1;
+    }
+
+    /* Steps Grid */
+    .section-title {
+      font-size: 14px;
+      font-weight: 800;
+      color: #0f172a;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .step-card {
+      background: #ffffff;
+      border: 1.5px solid #e2e8f0;
+      border-radius: 12px;
+      padding: 14px;
+      margin-bottom: 12px;
+      display: flex;
+      gap: 14px;
+      align-items: flex-start;
+    }
+
+    .step-num {
+      width: 28px;
+      height: 28px;
+      background: #2563eb;
+      color: white;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      font-size: 13px;
+      flex-shrink: 0;
+    }
+
+    .step-num.red { background: #dc2626; }
+    .step-num.amber { background: #d97706; }
+    .step-num.purple { background: #7c3aed; }
+
+    .step-content {
+      flex: 1;
+    }
+
+    .step-title {
+      font-size: 13px;
+      font-weight: 800;
+      color: #0f172a;
+      margin-bottom: 2px;
+    }
+
+    .step-desc {
+      font-size: 11.5px;
+      color: #475569;
+      line-height: 1.4;
+    }
+
+    .step-action-tag {
+      display: inline-block;
+      margin-top: 6px;
+      font-size: 10.5px;
+      font-weight: 700;
+      color: #2563eb;
+      background: #eff6ff;
+      padding: 3px 8px;
+      border-radius: 6px;
+    }
+
+    /* Strategy Cards */
+    .strategy-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+
+    .strategy-card {
+      border: 1.5px solid #e2e8f0;
+      border-radius: 12px;
+      padding: 14px;
+      background: #f8fafc;
+    }
+
+    .strategy-card.highlight {
+      border-color: #3b82f6;
+      background: #f0f7ff;
+    }
+
+    .strategy-card h3 {
+      font-size: 13px;
+      font-weight: 800;
+      color: #0f172a;
+      margin-bottom: 6px;
+    }
+
+    .strategy-card p {
+      font-size: 11px;
+      color: #334155;
+      line-height: 1.45;
+    }
+
+    .highlight-badge {
+      background: #10b981;
+      color: white;
+      font-size: 9.5px;
+      font-weight: 800;
+      padding: 2px 6px;
+      border-radius: 4px;
+      text-transform: uppercase;
+      margin-bottom: 6px;
+      display: inline-block;
+    }
+
+    /* Speech box */
+    .speech-box {
+      background: #ecfdf5;
+      border: 1.5px dashed #10b981;
+      border-radius: 12px;
+      padding: 14px;
+      margin-top: 10px;
+    }
+
+    .speech-box h4 {
+      font-size: 11.5px;
+      font-weight: 800;
+      color: #065f46;
+      text-transform: uppercase;
+      margin-bottom: 4px;
+    }
+
+    .speech-box p {
+      font-size: 11.5px;
+      color: #047857;
+      font-style: italic;
+      line-height: 1.4;
+    }
+
+    /* Footer */
+    .footer {
+      border-top: 1px solid #e2e8f0;
+      padding-top: 10px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 10px;
+      color: #94a3b8;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ==================== PÁGINA 1 ==================== -->
+  <div class="page">
+    <div>
+      <div class="header">
+        <div class="logo-badge">
+          <div class="logo-box">MARAL</div>
+          <div class="logo-text">OS</div>
+        </div>
+        <div class="subtitle-badge">Guía Rápida para Don John Mónoga</div>
+      </div>
+
+      <div class="hero">
+        <h1>¡Bienvenido a su Nuevo Segundo Cerebro!</h1>
+        <p>Esta plataforma fue diseñada para que usted no tenga que desgastarse con reportes confusos. Siga estos 4 pasos cada mañana para mantener la caja llena y la fábrica produciendo.</p>
+        <div class="meta-target">
+          <div>
+            <div class="label">OBJETIVO DEL MES:</div>
+            <div class="amount">$40.000.000 COP</div>
+          </div>
+          <div style="border-left: 1px solid rgba(255,255,255,0.2); padding-left: 14px;">
+            <div class="label">TIEMPO REQUERIDO:</div>
+            <div style="font-size: 13px; font-weight: 700; color: white;">15 Minutos al Día</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="section-title">📋 Los 4 Pasos de su Día a Día (En Orden)</div>
+
+      <!-- Paso 1 -->
+      <div class="step-card">
+        <div class="step-num red">1</div>
+        <div class="step-content">
+          <div class="step-title">Cobrar Cartera & Entradas de Caja</div>
+          <div class="step-desc">El sistema le muestra las facturas vencidas. Con solo un clic en el botón <strong>"Enviar WPP"</strong>, se abre WhatsApp con el cobro diplomático listo para la tesorería del cliente.</div>
+          <div class="step-action-tag">👉 Meta: Recuperar entre $2M y $4M semanales</div>
+        </div>
+      </div>
+
+      <!-- Paso 2 -->
+      <div class="step-card">
+        <div class="step-num">2</div>
+        <div class="step-content">
+          <div class="step-title">Ganarle a Syscom & Cotizar Flash (30s)</div>
+          <div class="step-desc">Vea qué productos tiene Syscom agotados o caros. Use el botón negro <strong>"⚡ Cotizador Flash"</strong> para emitir cotizaciones formales con IVA (19%) y enviarlas por PDF en segundos.</div>
+          <div class="step-action-tag">👉 Ventaja: Despacho en 24h vs 15 días de Syscom</div>
+        </div>
+      </div>
+
+      <!-- Paso 3 -->
+      <div class="step-card">
+        <div class="step-num amber">3</div>
+        <div class="step-content">
+          <div class="step-title">Despachos del Día y Taller de Producción</div>
+          <div class="step-desc">Revise cuántos pedidos están listos para guía de Servientrega/Envía y qué órdenes de corte de aluminio y cables coaxiales están en ensamble en el taller.</div>
+          <div class="step-action-tag">👉 Cero errores de calibración (SWR &lt; 1.2:1)</div>
+        </div>
+      </div>
+
+      <!-- Paso 4 -->
+      <div class="step-card">
+        <div class="step-num purple">4</div>
+        <div class="step-content">
+          <div class="step-title">Supervisar Agentes IA & Prospección B2B</div>
+          <div class="step-desc">La IA busca nuevas empresas de seguridad privada y transporte de carga en Colombia. Solo elija un prospecto y dele a <strong>"Enviar WhatsApp"</strong> para abrir nuevos clientes.</div>
+          <div class="step-action-tag">👉 10 a 15 prospectos nuevos cada semana</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="footer">
+      <span>MARAL Tecnología y Comunicaciones S.A.S. — Sistema Confidencial</span>
+      <span>Página 1 de 2</span>
+    </div>
+  </div>
+
+  <!-- ==================== PÁGINA 2 ==================== -->
+  <div class="page">
+    <div>
+      <div class="header">
+        <div class="logo-badge">
+          <div class="logo-box">MARAL</div>
+          <div class="logo-text">OS</div>
+        </div>
+        <div class="subtitle-badge">Estrategia Comercial vs Syscom</div>
+      </div>
+
+      <div class="section-title">⚔️ Dónde Ganamos y Cómo Venderle a los Clientes</div>
+
+      <div class="strategy-grid">
+        <div class="strategy-card highlight">
+          <div class="highlight-badge">NUESTRA MINA DE ORO</div>
+          <h3>1. Antenas DIPOLOS (VHF y UHF)</h3>
+          <p>En Dipolos plegados y arneses de fase para repetidoras en cerro, <strong>MARAL TIENE MEJOR PRECIO QUE SYSCOM</strong>. El cliente ahorra hasta <strong>$344.000 COP</strong> por arreglo de 4 bahías y recibe en 24-48h con aluminio resistente nacional.</p>
+        </div>
+
+        <div class="strategy-card">
+          <div class="highlight-badge" style="background: #3b82f6;">ALTO VALOR AGREGADO</div>
+          <h3>2. Kits Móviles Conectorizados</h3>
+          <p>Syscom vende la varilla suelta barata en dólares. Nosotros vendemos el <strong>"Kit Completo"</strong> (Antena 5/8 + Base + Cable coaxial RG-58 soldado y sellado). Al técnico instalador le ahorramos 45 minutos de soldadura por carro.</p>
+        </div>
+      </div>
+
+      <div class="strategy-grid">
+        <div class="strategy-card">
+          <h3>3. Pronto Pago vs Crédito Syscom</h3>
+          <p>Syscom da 60 a 90 días pero con precios inflados. Nosotros ofrecemos <strong>5% de descuento por pago anticipado/contado</strong> para meter dinero fresco a la cuenta de Maral hoy mismo.</p>
+        </div>
+
+        <div class="strategy-card">
+          <h3>4. ¿Dónde están las Gráficas?</h3>
+          <p>Para no saturar su vista diaria, las curvas de ventas y estadísticas históricas están guardadas en el menú <strong>"📊 Analíticas & Resultados"</strong> para cuando quiera hacer balance de fin de mes.</p>
+        </div>
+      </div>
+
+      <div class="speech-box">
+        <h4>💬 Argumento de Venta Recomendado (Para enviar por WhatsApp):</h4>
+        <p>"Ingeniero, en <strong>Antenas Dipolo para Repetidora y Estación Base</strong>, en MARAL le mantenemos mejor precio que Syscom, con aluminio estructural de alta resistencia y entrega inmediata en 24h sin esperar importaciones. ¿Le preparo la cotización formal con calibración de frecuencia en 1 minuto?"</p>
+      </div>
+
+      <div style="margin-top: 18px; background: #f8fafc; border: 1.5px solid #cbd5e1; border-radius: 12px; padding: 14px;">
+        <h4 style="font-size: 12px; font-weight: 800; color: #0f172a; margin-bottom: 4px;">🚀 ¿Cómo abrir la aplicación en el computador?</h4>
+        <p style="font-size: 11px; color: #475569;">
+          1. En su pantalla tiene el archivo <strong>MaralOS.exe</strong>.<br />
+          2. Dele doble clic y el sistema se abrirá automáticamente en pantalla completa.<br />
+          3. No necesita instalar nada más. ¡Todo está conectado y listo!
+        </p>
+      </div>
+    </div>
+
+    <div class="footer">
+      <span>MARAL Tecnología y Comunicaciones S.A.S. — Sistema Confidencial</span>
+      <span>Página 2 de 2</span>
+    </div>
+  </div>
+
+</body>
+</html>

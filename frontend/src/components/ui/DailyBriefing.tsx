@@ -21,42 +21,42 @@ interface Briefing {
 
 const PRIORITY_CONFIG = {
   URGENTE: {
-    pill: 'bg-red-100 text-red-700 border border-red-200',
-    card: 'border-red-100 bg-red-50/40',
-    dot:  'bg-red-500',
+    pill: 'bg-rose-100 text-rose-800 border border-rose-200',
+    card: 'border-rose-100 bg-rose-50/60',
+    dot:  'bg-rose-500',
     label: 'Urgente',
   },
   NORMAL: {
-    pill: 'bg-blue-100 text-blue-700 border border-blue-200',
-    card: 'border-blue-100 bg-blue-50/40',
-    dot:  'bg-blue-400',
+    pill: 'bg-blue-100 text-blue-800 border border-blue-200',
+    card: 'border-blue-100 bg-blue-50/60',
+    dot:  'bg-blue-500',
     label: 'Pendiente',
   },
   INFO: {
-    pill: 'bg-gray-100 text-gray-600 border border-gray-200',
-    card: 'border-gray-100 bg-gray-50/40',
-    dot:  'bg-gray-300',
+    pill: 'bg-slate-100 text-slate-700 border border-slate-200',
+    card: 'border-slate-100 bg-slate-50/60',
+    dot:  'bg-slate-400',
     label: 'Info',
   },
 } as const
 
 const MOOD_BAR = {
-  BIEN:     { bg: 'bg-green-500',  label: '✅ Negocio al día' },
+  BIEN:     { bg: 'bg-emerald-500', label: '✅ Negocio al día' },
   ATENCION: { bg: 'bg-amber-400',  label: '⚠️ Requiere atención' },
-  CRITICO:  { bg: 'bg-red-500',    label: '🚨 Acción urgente' },
+  CRITICO:  { bg: 'bg-rose-500',    label: '🚨 Acción urgente' },
 } as const
 
 function PulseDot() {
   return (
-    <span className="relative flex h-2.5 w-2.5 shrink-0">
+    <span className="relative flex h-2 w-2 shrink-0">
       <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75" />
-      <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-blue-500" />
+      <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500" />
     </span>
   )
 }
 
 function SkeletonRow({ w }: { w: string }) {
-  return <div className={`h-14 rounded-xl bg-gray-100 animate-pulse ${w}`} />
+  return <div className={`h-12 rounded-xl bg-slate-100 animate-pulse ${w}`} />
 }
 
 export function DailyBriefing() {
@@ -66,8 +66,8 @@ export function DailyBriefing() {
   const query = useQuery<Briefing | null>({
     queryKey: ['ai-briefing'],
     queryFn: () => api.post<Briefing | null>('/ai/briefing', {}).then((r) => r.data),
-    staleTime: 15 * 60 * 1000,   // no re-fetch por 15 min aunque navegues
-    gcTime:    30 * 60 * 1000,   // mantiene en caché 30 min
+    staleTime: 15 * 60 * 1000,
+    gcTime:    30 * 60 * 1000,
     retry: 2,
     refetchOnWindowFocus: false,
   })
@@ -78,22 +78,22 @@ export function DailyBriefing() {
   const normales = briefing?.actions.filter(a => a.priority !== 'URGENTE') ?? []
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+    <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
       {/* Header strip */}
-      <div className="flex items-center justify-between px-4 py-3 bg-gradient-to-r from-slate-800 to-slate-700">
+      <div className="flex items-center justify-between px-4 py-3 bg-slate-900 text-white">
         <div className="flex items-center gap-2.5">
-          <div className="w-7 h-7 rounded-lg bg-white/15 flex items-center justify-center shrink-0">
-            <Sparkles className="h-3.5 w-3.5 text-white" />
+          <div className="w-7 h-7 rounded-lg bg-white/10 flex items-center justify-center shrink-0">
+            <Sparkles className="h-3.5 w-3.5 text-indigo-300" />
           </div>
           <div className="leading-tight">
-            <p className="text-white text-sm font-semibold">Asistente MARAL</p>
+            <p className="text-white text-xs font-bold uppercase tracking-wide">Asistente Ejecutivo</p>
             {briefing && moodCfg && (
-              <p className="text-slate-300 text-[11px]">{moodCfg.label}</p>
+              <p className="text-slate-300 text-[11px] font-medium">{moodCfg.label}</p>
             )}
             {query.isFetching && (
               <div className="flex items-center gap-1.5 mt-0.5">
                 <PulseDot />
-                <p className="text-slate-400 text-[11px]">Analizando el negocio...</p>
+                <p className="text-slate-400 text-[11px]">Analizando indicadores...</p>
               </div>
             )}
           </div>
@@ -103,30 +103,28 @@ export function DailyBriefing() {
             onClick={() => qc.invalidateQueries({ queryKey: ['ai-briefing'] })}
             disabled={query.isFetching}
             title="Actualizar análisis"
-            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white text-xs font-medium transition-colors disabled:opacity-40"
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-white text-xs font-medium transition-colors disabled:opacity-40"
           >
-            <RefreshCw className={`h-3.5 w-3.5 ${query.isFetching ? 'animate-spin' : ''}`} />
-            {!query.isFetching && 'Actualizar'}
+            <RefreshCw className={`h-3 w-3 ${query.isFetching ? 'animate-spin' : ''}`} />
+            <span className="text-[11px]">{query.isFetching ? '' : 'Actualizar'}</span>
           </button>
         )}
       </div>
 
       {/* Mood progress bar */}
       {moodCfg && !query.isFetching && (
-        <div className="h-0.5 w-full bg-gray-100">
+        <div className="h-0.5 w-full bg-slate-100">
           <div className={`h-full w-full ${moodCfg.bg} transition-all`} />
         </div>
       )}
 
       {/* Body */}
       <div className="p-4 space-y-3">
-
         {/* Loading skeletons */}
         {query.isFetching && (
-          <div className="space-y-2.5">
+          <div className="space-y-2">
             <SkeletonRow w="w-full" />
             <SkeletonRow w="w-5/6" />
-            <SkeletonRow w="w-4/5" />
           </div>
         )}
 
@@ -143,16 +141,16 @@ export function DailyBriefing() {
                   ? <Zap className="h-4 w-4 text-purple-500 shrink-0" />
                   : <AlertTriangle className="h-4 w-4 text-amber-500 shrink-0" />}
                 <div>
-                  <p className={`text-sm font-medium ${isQuota ? 'text-purple-800' : 'text-amber-800'}`}>
-                    {isQuota ? 'Cuota de IA agotada por hoy' : 'No se pudo conectar con el asistente'}
+                  <p className={`text-xs font-semibold ${isQuota ? 'text-purple-800' : 'text-amber-800'}`}>
+                    {isQuota ? 'Cuota de IA en pausa' : 'Asistente no disponible'}
                   </p>
-                  {isQuota && <p className="text-xs text-purple-600 mt-0.5">Se restablece mañana — o actualiza la clave en Google AI Studio</p>}
+                  {isQuota && <p className="text-[11px] text-purple-600 mt-0.5">Se restablece pronto</p>}
                 </div>
               </div>
               {!isQuota && (
                 <button
                   onClick={() => qc.invalidateQueries({ queryKey: ['ai-briefing'] })}
-                  className="shrink-0 text-xs font-semibold text-amber-700 hover:text-amber-900 bg-amber-100 hover:bg-amber-200 px-3 py-1.5 rounded-lg transition-colors"
+                  className="shrink-0 text-xs font-semibold text-amber-800 hover:text-amber-950 bg-amber-100 hover:bg-amber-200 px-2.5 py-1 rounded-lg transition-colors"
                 >
                   Reintentar
                 </button>
@@ -163,16 +161,16 @@ export function DailyBriefing() {
 
         {/* Greeting */}
         {briefing && !query.isFetching && (
-          <p className="text-sm font-medium text-gray-700 px-0.5">{briefing.greeting}</p>
+          <p className="text-xs font-semibold text-slate-800 px-0.5">{briefing.greeting}</p>
         )}
 
         {/* All good state */}
         {briefing && briefing.actions.length === 0 && !query.isFetching && (
-          <div className="flex items-center gap-3 p-4 bg-green-50 border border-green-100 rounded-xl">
-            <CheckCircle2 className="h-6 w-6 text-green-500 shrink-0" />
+          <div className="flex items-center gap-2.5 p-3 bg-emerald-50 border border-emerald-100 rounded-xl">
+            <CheckCircle2 className="h-5 w-5 text-emerald-600 shrink-0" />
             <div>
-              <p className="text-sm font-semibold text-green-800">¡Todo al día!</p>
-              <p className="text-xs text-green-600 mt-0.5">No hay acciones urgentes hoy. Buen trabajo.</p>
+              <p className="text-xs font-bold text-emerald-900">¡Todo al día!</p>
+              <p className="text-[11px] text-emerald-700 mt-0.5">No hay acciones urgentes pendientes.</p>
             </div>
           </div>
         )}
@@ -183,17 +181,14 @@ export function DailyBriefing() {
             {urgentes.map((action, i) => {
               const cfg = PRIORITY_CONFIG[action.priority]
               return (
-                <div key={i} className={`flex items-center gap-3 rounded-xl border px-3 py-3 ${cfg.card}`}>
-                  <span className="text-xl shrink-0 leading-none">{action.emoji}</span>
+                <div key={i} className={`flex items-center gap-2.5 rounded-xl border px-3 py-2.5 ${cfg.card}`}>
+                  <span className="text-base shrink-0 leading-none">{action.emoji}</span>
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-1.5 mb-0.5">
-                      <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${cfg.pill}`}>{cfg.label}</span>
-                    </div>
-                    <p className="text-sm text-gray-800 font-medium leading-snug">{action.text}</p>
+                    <p className="text-xs text-slate-800 font-semibold leading-snug">{action.text}</p>
                   </div>
                   <button
                     onClick={() => navigate(action.link)}
-                    className="shrink-0 flex items-center gap-1 bg-red-600 hover:bg-red-700 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors"
+                    className="shrink-0 flex items-center gap-1 bg-rose-600 hover:bg-rose-700 text-white text-[11px] font-bold px-2.5 py-1 rounded-lg transition-colors shadow-2xs"
                   >
                     {action.cta} <ArrowRight className="h-3 w-3" />
                   </button>
@@ -203,32 +198,29 @@ export function DailyBriefing() {
           </div>
         )}
 
-        {/* NORMAL / INFO actions */}
+        {/* NORMAL actions */}
         {normales.length > 0 && !query.isFetching && (
           <div className="space-y-1.5">
-            {normales.map((action, i) => {
-              const cfg = PRIORITY_CONFIG[action.priority]
-              return (
-                <div key={i} className="flex items-center gap-3 rounded-xl border border-gray-100 bg-gray-50/60 px-3 py-2.5">
-                  <span className="text-base shrink-0 leading-none">{action.emoji}</span>
-                  <p className="flex-1 text-sm text-gray-700 leading-snug">{action.text}</p>
-                  <button
-                    onClick={() => navigate(action.link)}
-                    className="shrink-0 flex items-center gap-1 text-blue-600 hover:text-blue-800 text-xs font-semibold hover:bg-blue-50 px-2.5 py-1.5 rounded-lg transition-colors"
-                  >
-                    {action.cta} <ArrowRight className="h-3 w-3" />
-                  </button>
-                </div>
-              )
-            })}
+            {normales.map((action, i) => (
+              <div key={i} className="flex items-center gap-2.5 rounded-xl border border-slate-100 bg-slate-50/70 px-3 py-2">
+                <span className="text-sm shrink-0 leading-none">{action.emoji}</span>
+                <p className="flex-1 text-xs text-slate-700 font-medium leading-snug">{action.text}</p>
+                <button
+                  onClick={() => navigate(action.link)}
+                  className="shrink-0 flex items-center gap-0.5 text-indigo-600 hover:text-indigo-800 text-[11px] font-bold hover:underline"
+                >
+                  {action.cta} <ArrowRight className="h-3 w-3" />
+                </button>
+              </div>
+            ))}
           </div>
         )}
 
         {/* Insight */}
         {briefing?.insight && !query.isFetching && (
-          <div className="flex items-start gap-2 px-3 py-2.5 bg-indigo-50/70 border border-indigo-100 rounded-xl">
-            <Sparkles className="h-3.5 w-3.5 text-indigo-400 shrink-0 mt-0.5" />
-            <p className="text-xs text-indigo-700 leading-relaxed">{briefing.insight}</p>
+          <div className="flex items-start gap-2 px-3 py-2 bg-indigo-50/70 border border-indigo-100/80 rounded-xl">
+            <Sparkles className="h-3.5 w-3.5 text-indigo-600 shrink-0 mt-0.5" />
+            <p className="text-[11px] text-indigo-900 font-medium leading-relaxed">{briefing.insight}</p>
           </div>
         )}
       </div>
