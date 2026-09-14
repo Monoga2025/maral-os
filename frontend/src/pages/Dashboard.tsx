@@ -30,6 +30,7 @@ import { dashboardApi, tasksApi, quotationsApi, ordersApi, competitorsApi, prosp
 import { formatCOP, formatDate } from '../lib/utils'
 import { PageSkeleton } from '../components/ui/LoadingSkeleton'
 import { useNavigate } from 'react-router-dom'
+import { useAuthStore } from '../store/auth'
 import { TourButton } from '../components/tour/TourButton'
 import { AIAgentsFleetWidget } from '../components/dashboard/AIAgentsFleetWidget'
 import { QuickQuoteModal } from '../components/dashboard/QuickQuoteModal'
@@ -40,10 +41,11 @@ const SALES_GOAL = 40_000_000
 
 export default function Dashboard() {
   const navigate = useNavigate()
+  const { user } = useAuthStore()
   const [isQuickQuoteOpen, setIsQuickQuoteOpen] = useState(false)
   const [quickQuoteClient, setQuickQuoteClient] = useState<{ id: string; name: string } | null>(null)
   
-  // Interactive checklist states for Don John
+  // Interactive checklist states
   const [itemStatus, setItemStatus] = useState<Record<string, 'PENDING' | 'DONE' | 'POSTPONED'>>({})
   const [completedSteps, setCompletedSteps] = useState<Record<number, boolean>>({})
 
@@ -88,6 +90,33 @@ export default function Dashboard() {
   // Top 2 B2B prospects
   const topProspects: B2BProspect[] = (prospectingData?.leads ?? []).slice(0, 2)
 
+  const roleInfo = {
+    GERENTE: {
+      badge: 'Ruta del Gerente General',
+      greeting: 'Hola, Don John 👔 ¿Qué resolvemos hoy?',
+      desc: 'Sigue estos pasos en orden para asegurar la caja, despachar a tiempo y superar a Syscom.',
+    },
+    VENTAS: {
+      badge: 'Ruta Comercial & Ventas',
+      greeting: `Hola, ${user?.name || 'Wilson'} 🎯`,
+      desc: 'Atiende prospectos B2B, genera cotizaciones flash en 30s y acelera pedidos de clientes.',
+    },
+    LOGISTICA: {
+      badge: 'Ruta de Taller & Logística',
+      greeting: `Hola, ${user?.name || 'Iván'} ⚙️`,
+      desc: 'Supervisa las órdenes de corte, el ensamblaje de antenas y los despachos del día.',
+    },
+    CONTADORA: {
+      badge: 'Ruta de Contabilidad & Cartera',
+      greeting: `Hola, ${user?.name || 'Janet'} 📊`,
+      desc: 'Recupera facturas pendientes, controla los gastos de caja y valida el balance contable.',
+    },
+  }[user?.role || 'GERENTE'] || {
+    badge: 'Mi Ruta de Hoy',
+    greeting: `Hola, ${user?.name || 'Usuario'} 👋`,
+    desc: 'Panel de control de Maral OS.',
+  }
+
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-12">
       {/* 🚀 Header Ejecutivo */}
@@ -96,30 +125,33 @@ export default function Dashboard() {
           <div className="flex items-center gap-2">
             <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
               <Sparkles className="h-3.5 w-3.5 text-blue-600" />
-              Ruta del Gerente
+              {roleInfo.badge}
             </span>
             <span className="text-xs text-slate-400">|</span>
             <span className="text-xs font-semibold text-slate-500 capitalize">{today}</span>
           </div>
           <h1 className="text-2xl font-black text-slate-900 tracking-tight mt-1">
-            Hola, Don John 👋 ¿Qué resolvemos hoy?
+            {roleInfo.greeting}
           </h1>
           <p className="text-xs text-slate-500 mt-0.5">
-            Sigue estos 4 pasos en orden para asegurar la caja, despachar a tiempo y superar a Syscom.
+            {roleInfo.desc}
           </p>
         </div>
 
         <div className="flex items-center gap-2 self-start sm:self-auto">
-          <button
-            onClick={() => handleOpenQuickQuote()}
-            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold bg-slate-900 text-white hover:bg-slate-800 shadow-xs ring-1 ring-slate-800/10 transition-all active:scale-[0.98]"
-          >
-            <Zap className="h-4 w-4 text-amber-400 fill-amber-400" />
-            <span>⚡ Cotizador Flash (30s)</span>
-          </button>
+          {(user?.role === 'GERENTE' || user?.role === 'VENTAS') && (
+            <button
+              onClick={() => handleOpenQuickQuote()}
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold bg-slate-900 text-white hover:bg-slate-800 shadow-xs ring-1 ring-slate-800/10 transition-all active:scale-[0.98]"
+            >
+              <Zap className="h-4 w-4 text-amber-400 fill-amber-400" />
+              <span>⚡ Cotizador Flash (30s)</span>
+            </button>
+          )}
           <TourButton tourId="dashboard" />
         </div>
       </div>
+
 
       {/* 🎯 HERO INCENTIVO FINANCIERO: Meta del Mes ($40M) */}
       <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-slate-900 via-slate-800 to-blue-950 p-6 text-white shadow-md border border-slate-700/50">
