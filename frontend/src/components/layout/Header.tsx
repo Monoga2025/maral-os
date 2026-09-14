@@ -212,13 +212,13 @@ export function Header() {
       {user && (
         <div className="flex items-center gap-2.5">
           <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-600 text-xs font-bold text-white">
-            {getInitials(user.name)}
+            {getInitials(user?.name)}
           </div>
           <div className="hidden md:block">
             <p className="text-sm font-medium text-gray-800 leading-tight">
-              {user.name.split(' ')[0]}
+              {user?.name ? user.name.split(' ')[0] : 'Usuario'}
             </p>
-            <p className="text-xs text-gray-400 leading-tight">{user.role}</p>
+            <p className="text-xs text-gray-400 leading-tight">{user?.role ?? ''}</p>
           </div>
         </div>
       )}

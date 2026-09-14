@@ -330,15 +330,15 @@ export function Sidebar({ hotLeadCount = 0 }: { hotLeadCount?: number }) {
             )}
           >
             <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-blue-500 text-xs font-bold text-white">
-              {getInitials(user.name)}
+              {getInitials(user?.name)}
             </div>
             {!sidebarCollapsed && (
               <div className="flex-1 min-w-0">
                 <p className="truncate text-sm font-medium text-white">
-                  {user.name}
+                  {user?.name ?? 'Usuario'}
                 </p>
                 <p className="text-xs text-slate-400">
-                  {roleLabels[user.role] ?? user.role}
+                  {user?.role ? (roleLabels[user.role] ?? user.role) : ''}
                 </p>
               </div>
             )}

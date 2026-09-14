@@ -3,6 +3,7 @@ import { useAuthStore } from './store/auth'
 import AppLayout from './components/layout/AppLayout'
 import MobileLayout from './components/layout/MobileLayout'
 import { TourProvider } from './components/tour/TourProvider'
+import { ErrorBoundary } from './components/ErrorBoundary'
 import { useMobile } from './hooks/useMobile'
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
@@ -53,57 +54,59 @@ export default function App() {
   const isMobile = useMobile()
 
   return (
-    <TourProvider>
-    <Routes>
-      <Route
-        path="/login"
-        element={isAuthenticated ? <Navigate to="/" replace /> : <Login />}
-      />
-      <Route
-        path="/"
-        element={
-          <ProtectedRoute>
-            {isMobile ? <MobileLayout /> : <AppLayout />}
-          </ProtectedRoute>
-        }
-      >
-        <Route index element={isMobile ? <MobileDashboard /> : <Dashboard />} />
-        <Route path="clientes" element={isMobile ? <MobileClients /> : <Clients />} />
-        <Route path="clientes/nuevo" element={<ClientForm />} />
-        <Route path="clientes/:id" element={<ClientDetail />} />
-        <Route path="clientes/:id/editar" element={<ClientForm />} />
-        <Route path="cotizaciones" element={isMobile ? <MobileQuotations /> : <Quotations />} />
-        <Route path="cotizaciones/nueva" element={<QuotationForm />} />
-        <Route path="cotizaciones/:id" element={<QuotationForm />} />
-        <Route path="cotizaciones/:id/editar" element={<QuotationForm />} />
-        <Route path="pedidos" element={isMobile ? <MobileOrders /> : <Orders />} />
-        <Route path="pedidos/nuevo" element={<OrderForm />} />
-        <Route path="pedidos/:id" element={<OrderDetail />} />
-        <Route path="inventario" element={<Inventory />} />
-        <Route path="produccion" element={<Production />} />
-        <Route path="compras" element={<Purchases />} />
-        <Route path="credito" element={<Credit />} />
-        <Route path="facturas/:id" element={<InvoiceDetail />} />
-        <Route path="tareas" element={isMobile ? <MobileTareas /> : <Tareas />} />
-        <Route path="gastos" element={isMobile ? <MobileGastos /> : <Gastos />} />
-        <Route path="catalogo" element={<Catalog />} />
-        <Route path="catalogo/nuevo" element={<ProductForm />} />
-        <Route path="catalogo/:id/editar" element={<ProductForm />} />
-        <Route path="reportes" element={<Reports />} />
-        <Route path="configuracion" element={<Settings />} />
-        <Route path="manual" element={<Manual />} />
-        <Route path="whatsapp" element={<Whatsapp />} />
-        <Route path="campanas" element={<Campaigns />} />
-        <Route path="campanas/nueva" element={<CampaignWizard />} />
-        <Route path="campanas/:id" element={<CampaignLiveView />} />
-        <Route path="campanas/:id/editar" element={<CampaignComposer />} />
-        <Route path="whatsapp/biblioteca" element={<ImageLibrary />} />
-        <Route path="whatsapp/leads" element={<CampaignLeads />} />
-        <Route path="reportes/campanas" element={<CampaignReports />} />
-        <Route path="etiquetas" element={<Tags />} />
-      </Route>
-      <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
-    </TourProvider>
+    <ErrorBoundary>
+      <TourProvider>
+        <Routes>
+          <Route
+            path="/login"
+            element={isAuthenticated ? <Navigate to="/" replace /> : <Login />}
+          />
+          <Route
+            path="/"
+            element={
+              <ProtectedRoute>
+                {isMobile ? <MobileLayout /> : <AppLayout />}
+              </ProtectedRoute>
+            }
+          >
+            <Route index element={isMobile ? <MobileDashboard /> : <Dashboard />} />
+            <Route path="clientes" element={isMobile ? <MobileClients /> : <Clients />} />
+            <Route path="clientes/nuevo" element={<ClientForm />} />
+            <Route path="clientes/:id" element={<ClientDetail />} />
+            <Route path="clientes/:id/editar" element={<ClientForm />} />
+            <Route path="cotizaciones" element={isMobile ? <MobileQuotations /> : <Quotations />} />
+            <Route path="cotizaciones/nueva" element={<QuotationForm />} />
+            <Route path="cotizaciones/:id" element={<QuotationForm />} />
+            <Route path="cotizaciones/:id/editar" element={<QuotationForm />} />
+            <Route path="pedidos" element={isMobile ? <MobileOrders /> : <Orders />} />
+            <Route path="pedidos/nuevo" element={<OrderForm />} />
+            <Route path="pedidos/:id" element={<OrderDetail />} />
+            <Route path="inventario" element={<Inventory />} />
+            <Route path="produccion" element={<Production />} />
+            <Route path="compras" element={<Purchases />} />
+            <Route path="credito" element={<Credit />} />
+            <Route path="facturas/:id" element={<InvoiceDetail />} />
+            <Route path="tareas" element={isMobile ? <MobileTareas /> : <Tareas />} />
+            <Route path="gastos" element={isMobile ? <MobileGastos /> : <Gastos />} />
+            <Route path="catalogo" element={<Catalog />} />
+            <Route path="catalogo/nuevo" element={<ProductForm />} />
+            <Route path="catalogo/:id/editar" element={<ProductForm />} />
+            <Route path="reportes" element={<Reports />} />
+            <Route path="configuracion" element={<Settings />} />
+            <Route path="manual" element={<Manual />} />
+            <Route path="whatsapp" element={<Whatsapp />} />
+            <Route path="campanas" element={<Campaigns />} />
+            <Route path="campanas/nueva" element={<CampaignWizard />} />
+            <Route path="campanas/:id" element={<CampaignLiveView />} />
+            <Route path="campanas/:id/editar" element={<CampaignComposer />} />
+            <Route path="whatsapp/biblioteca" element={<ImageLibrary />} />
+            <Route path="whatsapp/leads" element={<CampaignLeads />} />
+            <Route path="reportes/campanas" element={<CampaignReports />} />
+            <Route path="etiquetas" element={<Tags />} />
+          </Route>
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </TourProvider>
+    </ErrorBoundary>
   )
 }

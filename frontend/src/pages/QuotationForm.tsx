@@ -176,7 +176,7 @@ export default function QuotationForm() {
   const [clientSearch, setClientSearch] = useState('')
   const [productSearch, setProductSearch] = useState('')
   const [items, setItems] = useState<LineItem[]>([])
-  const [applyTax, setApplyTax] = useState(true)
+  const [applyTax, setApplyTax] = useState(false)
   const [initialized, setInitialized] = useState(false)
 
   const [editingPriceId, setEditingPriceId] = useState<string | null>(null)

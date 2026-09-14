@@ -1,5 +1,6 @@
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
+import { syncCatalog } from './sync_catalog';
 
 const prisma = new PrismaClient();
 const SALT_ROUNDS = 10;
@@ -7,6 +8,8 @@ const SALT_ROUNDS = 10;
 export async function ensureSeedData() {
   try {
     console.log('🔄 Verificando y sincronizando equipo oficial de MARAL OS...');
+    // Sync official product catalog
+    await syncCatalog();
     const passwordHash = await bcrypt.hash('maral2024', SALT_ROUNDS);
 
     // 1. John Mónoga (Gerente General)

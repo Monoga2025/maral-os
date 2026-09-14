@@ -5,47 +5,61 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
-export function formatCOP(amount: number): string {
+export function formatCOP(amount?: number | null): string {
+  const num = typeof amount === 'number' && !isNaN(amount) ? amount : 0
   return new Intl.NumberFormat('es-CO', {
     style: 'currency',
     currency: 'COP',
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
   })
-    .format(amount)
+    .format(num)
     .replace('COP', '$')
     .trim()
 }
 
 export function formatDate(date: string | Date | null | undefined): string {
   if (!date) return '—'
-  const d = typeof date === 'string' ? new Date(date) : date
-  if (isNaN(d.getTime())) return '—'
-  const day = String(d.getDate()).padStart(2, '0')
-  const month = String(d.getMonth() + 1).padStart(2, '0')
-  const year = d.getFullYear()
-  return `${day}/${month}/${year}`
+  try {
+    const d = typeof date === 'string' ? new Date(date) : date
+    if (isNaN(d.getTime())) return '—'
+    const day = String(d.getDate()).padStart(2, '0')
+    const month = String(d.getMonth() + 1).padStart(2, '0')
+    const year = d.getFullYear()
+    return `${day}/${month}/${year}`
+  } catch {
+    return '—'
+  }
 }
 
 export function getDaysAgo(date: string | null | undefined): number {
   if (!date) return 0
-  const now = new Date()
-  const past = new Date(date)
-  if (isNaN(past.getTime())) return 0
-  const diff = now.getTime() - past.getTime()
-  return Math.floor(diff / (1000 * 60 * 60 * 24))
+  try {
+    const now = new Date()
+    const past = new Date(date)
+    if (isNaN(past.getTime())) return 0
+    const diff = now.getTime() - past.getTime()
+    return Math.floor(diff / (1000 * 60 * 60 * 24))
+  } catch {
+    return 0
+  }
 }
 
 export function getDaysUntil(date: string | null | undefined): number {
   if (!date) return 0
-  const now = new Date()
-  const future = new Date(date)
-  if (isNaN(future.getTime())) return 0
-  const diff = future.getTime() - now.getTime()
-  return Math.ceil(diff / (1000 * 60 * 60 * 24))
+  try {
+    const now = new Date()
+    const future = new Date(date)
+    if (isNaN(future.getTime())) return 0
+    const diff = future.getTime() - now.getTime()
+    return Math.ceil(diff / (1000 * 60 * 60 * 24))
+  } catch {
+    return 0
+  }
 }
 
-export function getStatusColor(status: string): string {
+export function getStatusColor(status?: string | null): string {
+  if (!status) return 'bg-gray-100 text-gray-600'
   const map: Record<string, string> = {
     // Quotation
     BORRADOR: 'bg-gray-100 text-gray-700',
@@ -83,13 +97,15 @@ export function getStatusColor(status: string): string {
   return map[status] ?? 'bg-gray-100 text-gray-600'
 }
 
-export function getInitials(name: string): string {
-  return name
-    .split(' ')
+export function getInitials(name?: string | null): string {
+  if (!name || typeof name !== 'string') return 'U'
+  const parts = name.trim().split(/\s+/).filter(Boolean)
+  if (parts.length === 0) return 'U'
+  return parts
     .map((n) => n[0])
     .slice(0, 2)
     .join('')
-    .toUpperCase()
+    .toUpperCase() || 'U'
 }
 
 export function truncate(str: string, length: number): string {

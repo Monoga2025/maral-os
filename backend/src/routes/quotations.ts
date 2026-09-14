@@ -34,15 +34,18 @@ router.param('id', async (req, res, next, raw: string) => {
 // ─── Empresa (datos para el PDF) ───────────────────────────────
 function fmtNIT(raw: string): string {
   const d = raw.replace(/\D/g, '');
-  return d.length === 10 ? `${d.slice(0,3)}.${d.slice(3,6)}.${d.slice(6,9)}-${d.slice(9)}` : raw;
+  if (d.length === 10 && !raw.includes('.')) {
+    return `${d.slice(0,1)}.${d.slice(1,4)}.${d.slice(4,7)}.${d.slice(7,10)}-${raw.slice(-1)}`;
+  }
+  return raw;
 }
 const COMPANY = {
-  name:    process.env.COMPANY_NAME    ?? 'MARAL TECNOLOGIA Y COMUNICACIONES S.A.S.',
-  nit:     fmtNIT(process.env.COMPANY_NIT ?? '9018894798'),
-  address: process.env.COMPANY_ADDRESS ?? 'Calle 3 # 6 A - 22 (Bodega 101)',
-  city:    process.env.COMPANY_CITY    ?? 'Curití - Santander, Colombia',
-  phone:   process.env.COMPANY_PHONE   ?? '3177606126',
-  email:   process.env.COMPANY_EMAIL   ?? 'ventas@industriasmaral.com',
+  name:    process.env.COMPANY_NAME    ?? 'INDUSTRIAS MARAL / IVAN DIAZ GONZALEZ',
+  nit:     process.env.COMPANY_NIT     ?? '1.096.514.139-1',
+  address: process.env.COMPANY_ADDRESS ?? 'Calle 3 # 6A- 22 Bodega 1',
+  city:    process.env.COMPANY_CITY    ?? 'Curití - Santander',
+  phone:   process.env.COMPANY_PHONE   ?? '3167760692',
+  email:   process.env.COMPANY_EMAIL   ?? 'contabilidad@industriasmaral.com',
   website: process.env.COMPANY_WEBSITE ?? 'www.industriasmaral.com',
 };
 
