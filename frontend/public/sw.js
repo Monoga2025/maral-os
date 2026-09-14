@@ -1,5 +1,5 @@
-// Service Worker for MARAL OS PWA
-const CACHE_NAME = 'maral-os-cache-v2';
+// Service Worker for MARAL OS PWA - Auto Purge Stale Caches
+const CACHE_NAME = 'maral-os-v3-' + Date.now();
 
 self.addEventListener('install', (event) => {
   self.skipWaiting();
@@ -8,13 +8,7 @@ self.addEventListener('install', (event) => {
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((keys) =>
-      Promise.all(
-        keys.map((key) => {
-          if (key !== CACHE_NAME) {
-            return caches.delete(key);
-          }
-        })
-      )
+      Promise.all(keys.map((key) => caches.delete(key)))
     ).then(() => self.clients.claim())
   );
 });
@@ -25,22 +19,18 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Para navegaciones de rutas SPA (HTML de páginas), siempre servir desde la red con fallback a index.html
+  // Para navegaciones (HTML), SIEMPRE red directa, nunca cachear HTML viejo
   if (event.request.mode === 'navigate') {
     event.respondWith(
-      fetch(event.request).catch(async () => {
-        const cached = await caches.match('/index.html');
-        return cached || fetch('/index.html');
-      })
+      fetch(event.request).catch(() => caches.match('/index.html'))
     );
     return;
   }
 
-  // Para assets estáticos (CSS, JS, imágenes)
+  // Network-first con fallback a cache para assets estáticos
   event.respondWith(
     fetch(event.request)
       .then((response) => {
-        // Cachear respuestas exitosas de assets estáticos
         if (response.status === 200 && event.request.url.includes('/assets/')) {
           const clone = response.clone();
           caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
@@ -50,3 +40,4 @@ self.addEventListener('fetch', (event) => {
       .catch(() => caches.match(event.request))
   );
 });
+

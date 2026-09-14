@@ -25,6 +25,26 @@ export class ErrorBoundary extends Component<Props, State> {
     this.setState({ hasError: false, error: undefined })
   }
 
+  handleHardRefresh = async () => {
+    try {
+      if ('serviceWorker' in navigator) {
+        const regs = await navigator.serviceWorker.getRegistrations()
+        for (const reg of regs) {
+          await reg.unregister()
+        }
+      }
+      if ('caches' in window) {
+        const keys = await caches.keys()
+        for (const key of keys) {
+          await caches.delete(key)
+        }
+      }
+    } catch {
+      // ignore
+    }
+    window.location.reload()
+  }
+
   render() {
     if (this.state.hasError) {
       return (
@@ -35,7 +55,7 @@ export class ErrorBoundary extends Component<Props, State> {
           <div className="max-w-md">
             <h2 className="text-lg font-bold text-slate-900">Algo no cargó correctamente en este módulo</h2>
             <p className="text-xs text-slate-500 mt-1.5 leading-relaxed">
-              El sistema aisló el inconveniente para proteger tu sesión. Puedes reintentar cargar la vista o ir al inicio.
+              El sistema aisló el inconveniente para proteger tu sesión. Puedes reintentar cargar la vista o actualizar la versión.
             </p>
             {this.state.error?.message && (
               <p className="text-[11px] text-red-500 mt-3 p-2.5 bg-red-50 rounded-xl font-mono text-left break-all border border-red-100">
@@ -43,13 +63,20 @@ export class ErrorBoundary extends Component<Props, State> {
               </p>
             )}
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center justify-center gap-3">
             <button
               onClick={this.handleRetry}
               className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl text-xs font-semibold hover:bg-blue-700 shadow-sm transition-all"
             >
               <RotateCcw className="w-3.5 h-3.5" />
               Reintentar módulo
+            </button>
+            <button
+              onClick={this.handleHardRefresh}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-amber-500 text-white rounded-xl text-xs font-semibold hover:bg-amber-600 shadow-sm transition-all"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+              Actualizar versión y limpiar caché
             </button>
             <button
               onClick={() => { window.location.href = '/' }}

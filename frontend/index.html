@@ -23,9 +23,28 @@
   <body>
     <div id="root"></div>
     <script>
+      // Auto-recovery for chunk load errors & dynamic import failures
+      window.addEventListener('error', function(e) {
+        if (e && e.message && (e.message.includes('dynamically imported') || e.message.includes('Loading chunk') || e.message.includes('Failed to fetch') || e.message.includes('SyntaxError'))) {
+          console.warn('Detectado error de versión/módulo. Recuperando automáticamente...', e.message);
+          if (!sessionStorage.getItem('maral_auto_recover')) {
+            sessionStorage.setItem('maral_auto_recover', '1');
+            if ('serviceWorker' in navigator) {
+              navigator.serviceWorker.getRegistrations().then(function(regs) {
+                for (var i = 0; i < regs.length; i++) regs[i].unregister();
+                window.location.reload();
+              });
+            } else {
+              window.location.reload();
+            }
+          }
+        }
+      });
       if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/sw.js').catch(() => {});
+        window.addEventListener('load', function() {
+          navigator.serviceWorker.register('/sw.js').then(function(reg) {
+            reg.update().catch(function() {});
+          }).catch(function() {});
         });
       }
     </script>
