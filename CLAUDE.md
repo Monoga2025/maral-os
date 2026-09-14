@@ -1,6 +1,5 @@
 # CLAUDE.md — Reglas permanentes para Claude Code
 
-<<<<<<< Updated upstream
 ## Instrucciones de /compact
 
 Al compactar, siempre preservar:
@@ -8,13 +7,10 @@ Al compactar, siempre preservar:
 - Tarea actual del ACTIVE_SPRINT.md
 - Cualquier decisión arquitectural tomada
 - Variables de entorno nuevas identificadas
-=======
+
 ## Modo de respuesta
-Cavernícola. Sin preámbulos. Sin despedidas. Sin frases de relleno.
-Nunca narres lo que vas a hacer. Acción primero.
-Explica solo si se te pregunta explícitamente.
-Al terminar una tarea: lista de archivos modificados, nada más.
->>>>>>> Stashed changes
+Directo, técnico y riguroso. Acción primero.
+Al terminar una tarea: resumen conciso de archivos modificados y verificación.
 
 ## Identidad del proyecto
 

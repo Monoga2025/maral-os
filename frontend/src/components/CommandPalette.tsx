@@ -66,9 +66,80 @@ export function CommandPalette() {
   const isLoading = loadingClients || loadingQuotations || loadingOrders
   const hasResults = clients.length > 0 || quotations.length > 0 || orders.length > 0
 
+  const [selectedIndex, setSelectedIndex] = useState(0)
+
+  // Items combinados para selección por teclado
+  const allResults: Array<{ id: string; title: string; subtitle?: string; path: string; tag?: string; type: string }> = []
+  
+  if (!enabled) {
+    allResults.push(
+      { id: 'act-tarea', title: 'Nueva Tarea de Operaciones', subtitle: 'Crear y asignar tarea al equipo', path: '/tareas', tag: 'Acción', type: 'action' },
+      { id: 'act-gasto', title: 'Registrar Gasto / Caja Menor', subtitle: 'Ingreso rápido de comprobante', path: '/gastos', tag: 'Acción', type: 'action' },
+      { id: 'act-cot', title: 'Nueva Cotización', subtitle: 'Crear cotización comercial', path: '/cotizaciones/nueva', tag: 'Acción', type: 'action' },
+      { id: 'nav-clientes', title: 'Clientes', subtitle: 'Directorio de clientes y prospectos', path: '/clientes', tag: 'Navegar', type: 'nav' },
+      { id: 'nav-pedidos', title: 'Pedidos', subtitle: 'Órdenes de producción activas', path: '/pedidos', tag: 'Navegar', type: 'nav' },
+    )
+  } else {
+    clients.forEach((c) => {
+      allResults.push({
+        id: `cli-${c.id}`,
+        title: c.name,
+        subtitle: [c.company, c.city].filter(Boolean).join(' · '),
+        path: `/clientes/${c.id}`,
+        tag: c.category?.replace('_', ' '),
+        type: 'client',
+      })
+    })
+    quotations.forEach((q) => {
+      allResults.push({
+        id: `cot-${q.id}`,
+        title: `COT-${String(q.number).padStart(5, '0')}`,
+        subtitle: q.client?.name ?? '',
+        path: `/cotizaciones/${q.id}/editar`,
+        tag: formatCOP(q.total),
+        type: 'quotation',
+      })
+    })
+    orders.forEach((o) => {
+      allResults.push({
+        id: `ped-${o.id}`,
+        title: `PED-${String(o.number).padStart(5, '0')}`,
+        subtitle: o.client?.name ?? '',
+        path: `/pedidos/${o.id}`,
+        tag: formatCOP(o.total),
+        type: 'order',
+      })
+    })
+  }
+
+  // Keyboard navigation up/down/enter
+  useEffect(() => {
+    setSelectedIndex(0)
+  }, [query])
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'ArrowDown') {
+      e.preventDefault()
+      setSelectedIndex((prev) => (allResults.length > 0 ? (prev + 1) % allResults.length : 0))
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault()
+      setSelectedIndex((prev) => (allResults.length > 0 ? (prev - 1 + allResults.length) % allResults.length : 0))
+    } else if (e.key === 'Enter') {
+      e.preventDefault()
+      if (allResults[selectedIndex]) {
+        go(allResults[selectedIndex].path)
+      }
+    }
+  }
+
   const go = (path: string) => {
     navigate(path)
     setCommandPaletteOpen(false)
+    if (path === '/tareas') {
+      setTimeout(() => window.dispatchEvent(new CustomEvent('maral:quick-new', { detail: { path: '/tareas' } })), 50)
+    } else if (path === '/gastos') {
+      setTimeout(() => window.dispatchEvent(new CustomEvent('maral:quick-new', { detail: { path: '/gastos' } })), 50)
+    }
   }
 
   return (
@@ -79,6 +150,7 @@ export function CommandPalette() {
       <div
         className="w-full max-w-xl rounded-2xl bg-white shadow-2xl border border-gray-200 overflow-hidden"
         onClick={(e) => e.stopPropagation()}
+        onKeyDown={handleKeyDown}
       >
         {/* Input */}
         <div className="flex items-center gap-3 px-4 py-3.5 border-b border-gray-100">
@@ -87,7 +159,7 @@ export function CommandPalette() {
             ref={inputRef}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Buscar clientes, cotizaciones, pedidos..."
+            placeholder="Buscar clientes, cotizaciones, pedidos o escribir una acción..."
             className="flex-1 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none bg-transparent"
           />
           <div className="flex items-center gap-2">
@@ -106,27 +178,35 @@ export function CommandPalette() {
         <div className="max-h-[60vh] overflow-y-auto">
           {!enabled ? (
             /* Estado inicial — accesos directos */
-            <div className="py-8 px-4">
-              <p className="text-xs text-gray-400 mb-4 text-center">
-                Escribe para buscar · mínimo 2 caracteres
+            <div className="py-3 px-2">
+              <p className="text-[11px] font-semibold text-gray-400 px-3 py-1.5 uppercase tracking-wider">
+                Acciones Rápidas & Accesos
               </p>
-              <div className="grid grid-cols-3 gap-2">
-                {[
-                  { label: 'Clientes', path: '/clientes', icon: <Users className="h-5 w-5" />, color: 'text-blue-600 bg-blue-50' },
-                  { label: 'Cotizaciones', path: '/cotizaciones', icon: <FileText className="h-5 w-5" />, color: 'text-purple-600 bg-purple-50' },
-                  { label: 'Pedidos', path: '/pedidos', icon: <Package className="h-5 w-5" />, color: 'text-orange-600 bg-orange-50' },
-                ].map((item) => (
-                  <button
-                    key={item.path}
-                    onClick={() => go(item.path)}
-                    className="flex flex-col items-center gap-2 rounded-xl p-4 hover:bg-gray-50 transition-colors"
-                  >
-                    <span className={`flex h-10 w-10 items-center justify-center rounded-xl ${item.color}`}>
-                      {item.icon}
-                    </span>
-                    <span className="text-xs font-medium text-gray-700">{item.label}</span>
-                  </button>
-                ))}
+              <div className="space-y-1">
+                {allResults.map((item, idx) => {
+                  const isSelected = selectedIndex === idx
+                  return (
+                    <button
+                      key={item.id}
+                      onClick={() => go(item.path)}
+                      className={`flex w-full items-center justify-between px-3.5 py-2.5 rounded-xl text-left transition-colors ${
+                        isSelected ? 'bg-blue-50/90 text-blue-900 ring-1 ring-blue-500/20' : 'hover:bg-gray-50 text-gray-800'
+                      }`}
+                    >
+                      <div className="min-w-0">
+                        <p className={`text-sm font-semibold ${isSelected ? 'text-blue-900' : 'text-gray-900'}`}>
+                          {item.title}
+                        </p>
+                        {item.subtitle && <p className="text-xs text-gray-500">{item.subtitle}</p>}
+                      </div>
+                      <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-md ${
+                        isSelected ? 'bg-blue-200/60 text-blue-800' : 'bg-gray-100 text-gray-600'
+                      }`}>
+                        {item.tag}
+                      </span>
+                    </button>
+                  )
+                })}
               </div>
             </div>
           ) : isLoading && !hasResults ? (
@@ -138,82 +218,35 @@ export function CommandPalette() {
             </div>
           ) : (
             <div className="py-1">
-              {clients.length > 0 && (
-                <Section icon={<Users className="h-3.5 w-3.5" />} label="Clientes">
-                  {clients.map((c) => (
-                    <ResultRow
-                      key={c.id}
-                      onClick={() => go(`/clientes/${c.id}`)}
-                      primary={c.name}
-                      secondary={[c.company, c.city].filter(Boolean).join(' · ')}
-                      tag={c.category?.replace('_', ' ')}
-                    />
-                  ))}
-                </Section>
-              )}
-              {quotations.length > 0 && (
-                <Section icon={<FileText className="h-3.5 w-3.5" />} label="Cotizaciones">
-                  {quotations.map((q) => (
-                    <ResultRow
-                      key={q.id}
-                      onClick={() => go(`/cotizaciones/${q.id}/editar`)}
-                      primary={`COT-${String(q.number).padStart(5, '0')}`}
-                      secondary={q.client?.name ?? ''}
-                      tag={formatCOP(q.total)}
-                    />
-                  ))}
-                </Section>
-              )}
-              {orders.length > 0 && (
-                <Section icon={<Package className="h-3.5 w-3.5" />} label="Pedidos">
-                  {orders.map((o) => (
-                    <ResultRow
-                      key={o.id}
-                      onClick={() => go(`/pedidos/${o.id}`)}
-                      primary={`PED-${String(o.number).padStart(5, '0')}`}
-                      secondary={o.client?.name ?? ''}
-                      tag={formatCOP(o.total)}
-                    />
-                  ))}
-                </Section>
-              )}
+              {allResults.map((res, idx) => {
+                const isSelected = selectedIndex === idx
+                return (
+                  <ResultRow
+                    key={res.id}
+                    onClick={() => go(res.path)}
+                    primary={res.title}
+                    secondary={res.subtitle}
+                    tag={res.tag}
+                    isSelected={isSelected}
+                  />
+                )
+              })}
             </div>
           )}
         </div>
 
         {/* Footer */}
-        <div className="flex items-center gap-4 border-t border-gray-100 px-4 py-2.5">
+        <div className="flex items-center gap-4 border-t border-gray-100 px-4 py-2.5 bg-slate-50/60">
           <span className="flex items-center gap-1 text-[11px] text-gray-400">
-            <Hash className="h-3 w-3" /> Número exacto de pedido/cotización
+            <Hash className="h-3 w-3" /> Búsqueda en tiempo real
           </span>
-          <span className="ml-auto text-[11px] text-gray-400">
-            <kbd className="rounded bg-gray-100 px-1 py-0.5 text-[10px]">↑↓</kbd> navegar ·{' '}
-            <kbd className="rounded bg-gray-100 px-1 py-0.5 text-[10px]">Enter</kbd> abrir
+          <span className="ml-auto text-[11px] text-gray-500 font-medium">
+            <kbd className="rounded bg-white border border-gray-200 px-1 py-0.5 text-[10px] shadow-xs">↑↓</kbd> navegar ·{' '}
+            <kbd className="rounded bg-white border border-gray-200 px-1 py-0.5 text-[10px] shadow-xs">Enter</kbd> abrir ·{' '}
+            <kbd className="rounded bg-white border border-gray-200 px-1 py-0.5 text-[10px] shadow-xs">ESC</kbd> cerrar
           </span>
         </div>
       </div>
-    </div>
-  )
-}
-
-function Section({
-  icon,
-  label,
-  children,
-}: {
-  icon: React.ReactNode
-  label: string
-  children: React.ReactNode
-}) {
-  return (
-    <div>
-      <div className="flex items-center gap-1.5 px-4 pt-3 pb-1">
-        <span className="text-gray-400">{icon}</span>
-        <span className="text-[11px] font-semibold uppercase tracking-wide text-gray-400">
-          {label}
-        </span>
-      </div>
-      {children}
     </div>
   )
 }
@@ -223,25 +256,35 @@ function ResultRow({
   primary,
   secondary,
   tag,
+  isSelected,
 }: {
   onClick: () => void
   primary: string
-  secondary: string
+  secondary?: string
   tag?: string
+  isSelected?: boolean
 }) {
   return (
     <button
       onClick={onClick}
-      className="flex w-full items-center gap-3 px-4 py-2.5 text-left hover:bg-blue-50 transition-colors group"
+      className={`flex w-full items-center gap-3 px-4 py-2.5 text-left transition-colors group ${
+        isSelected ? 'bg-blue-50/90 text-blue-900' : 'hover:bg-slate-50 text-gray-900'
+      }`}
     >
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-semibold text-gray-900 truncate">{primary}</p>
+        <p className={`text-sm font-semibold truncate ${isSelected ? 'text-blue-900' : 'text-gray-900'}`}>
+          {primary}
+        </p>
         {secondary && <p className="text-xs text-gray-500 truncate">{secondary}</p>}
       </div>
       {tag && (
-        <span className="text-xs text-gray-400 shrink-0">{tag}</span>
+        <span className={`text-xs shrink-0 ${isSelected ? 'text-blue-700 font-medium' : 'text-gray-400'}`}>
+          {tag}
+        </span>
       )}
-      <ArrowRight className="h-3.5 w-3.5 text-gray-300 group-hover:text-blue-500 transition-colors shrink-0" />
+      <ArrowRight className={`h-3.5 w-3.5 transition-colors shrink-0 ${
+        isSelected ? 'text-blue-600 translate-x-0.5' : 'text-gray-300 group-hover:text-blue-500'
+      }`} />
     </button>
   )
 }

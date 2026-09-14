@@ -258,6 +258,7 @@ export interface Order {
   items: OrderItem[]
   productionOrders?: ProductionOrder[]
   shipments?: Shipment[]
+  invoices?: Invoice[]
   updatedBy?: Pick<User, 'id' | 'name'>
   createdAt: string
   updatedAt: string
@@ -756,4 +757,32 @@ export interface B2BProspectingData {
     industryLeadsCount: number
   }
   leads: B2BProspect[]
+}
+
+export type DianStatus = 'PENDIENTE' | 'EN_PROCESO' | 'ACEPTADA' | 'RECHAZADA' | 'ERROR' | 'NO_GENERADO'
+
+export interface DIANConfig {
+  id?: string
+  companyNIT: string
+  testingMode: boolean
+  softwareId?: string
+  softwarePin?: string
+  resolucionDIAN?: string
+  resolucionFechaInicio?: string
+  resolucionFechaFin?: string
+  prefijoFactura: string
+  rangoDesde?: number
+  rangoHasta?: number
+  consecutivoActual?: number
+  hasCertificate?: boolean
+  configured: boolean
+  source?: 'database' | 'env'
+}
+
+export interface DIANInvoiceStatus {
+  status: DianStatus
+  cufe: string | null
+  sentAt?: string
+  errorMessage?: string | null
+  invoiceNumber?: number
 }

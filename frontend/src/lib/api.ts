@@ -668,3 +668,20 @@ export const prospectingApi = {
       { prospectId }
     ),
 }
+
+// 🏛️ Facturación Electrónica DIAN
+export const dianApi = {
+  getConfig: () => api.get<import('../types').DIANConfig>('/dian/config'),
+  updateConfig: (data: Partial<import('../types').DIANConfig>) => api.put<{ id: string; message: string }>('/dian/config', data),
+  generateUBL: (invoiceId: string) =>
+    api.post<{ message: string; cufe: string; invoiceNumber: string; xmlPath: string; testingMode: boolean }>(
+      `/dian/invoices/${invoiceId}/generate-ubl`
+    ),
+  sendToDian: (invoiceId: string) =>
+    api.post<{ success: boolean; status: string; cufe: string; errorMessage?: string; statusDescription?: string }>(
+      `/dian/invoices/${invoiceId}/send`
+    ),
+  getStatus: (invoiceId: string) =>
+    api.get<import('../types').DIANInvoiceStatus>(`/dian/invoices/${invoiceId}/status`),
+  getXmlUrl: (invoiceId: string) => `/api/dian/invoices/${invoiceId}/xml`,
+}

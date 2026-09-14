@@ -5,10 +5,11 @@ import {
   ArrowLeft, Circle, Upload, Printer, Package,
   MapPin, AlertTriangle, Check, Save, Copy, X, FileText,
   Factory, Plus, ChevronRight, Calendar, Truck, CreditCard,
+  Landmark, FileCode, QrCode, ExternalLink, ShieldCheck, Download
 } from 'lucide-react'
-import { ordersApi, productionApi, productsApi, usersApi } from '../lib/api'
+import { ordersApi, productionApi, productsApi, usersApi, dianApi, invoicesApi } from '../lib/api'
 import { formatCOP, formatDate, getStatusColor } from '../lib/utils'
-import type { Order, OrderStatus, ItemDisposition, ProductionStatus, Shipment, ShipmentStatus } from '../types'
+import type { Order, OrderStatus, ItemDisposition, ProductionStatus, Shipment, ShipmentStatus, DIANInvoiceStatus } from '../types'
 import { toast } from 'sonner'
 
 const PHASES = [
@@ -223,6 +224,235 @@ function MerlinModal({ order, onClose }: { order: Order; onClose: () => void }) 
   )
 }
 
+function DianModal({ order, onClose }: { order: Order; onClose: () => void }) {
+  const qc = useQueryClient()
+  const items = order.items ?? []
+  const subtotal = items.reduce((s, i) => s + i.qty * i.unitPrice, 0)
+  const iva = Math.round(subtotal * 0.19)
+  const total = subtotal + iva
+
+  const [invoiceId, setInvoiceId] = useState<string | null>(order.invoices?.[0]?.id ?? null)
+  const [loading, setLoading] = useState(false)
+  const [dianData, setDianData] = useState<{
+    cufe?: string | null
+    status?: string
+    xmlPath?: string
+    message?: string
+    error?: string
+  }>({})
+
+  // Fetch status if invoiceId exists
+  const { data: statusData, refetch: refetchStatus } = useQuery({
+    queryKey: ['dian-status', invoiceId],
+    queryFn: () => dianApi.getStatus(invoiceId!).then(r => r.data),
+    enabled: !!invoiceId,
+  })
+
+  useEffect(() => {
+    if (statusData) {
+      setDianData(prev => ({
+        ...prev,
+        status: statusData.status,
+        cufe: statusData.cufe,
+        error: statusData.errorMessage || undefined,
+      }))
+    }
+  }, [statusData])
+
+  const handleEmitDian = async () => {
+    try {
+      setLoading(true)
+      setDianData({})
+
+      // 1. Ensure invoice exists
+      let currentInvId = invoiceId
+      if (!currentInvId) {
+        toast.info('Creando registro de factura...')
+        const dueDate = new Date()
+        dueDate.setDate(dueDate.getDate() + 30)
+        const invRes = await invoicesApi.create({
+          orderId: order.id,
+          clientId: order.client?.id ?? order.clientId,
+          amount: total,
+          dueDate: dueDate.toISOString(),
+        })
+        currentInvId = invRes.data.id
+        setInvoiceId(currentInvId)
+      }
+
+      // 2. Generate UBL XML & CUFE
+      toast.info('Generando XML UBL 2.1 y CUFE...')
+      const ublRes = await dianApi.generateUBL(currentInvId)
+      setDianData(prev => ({ ...prev, cufe: ublRes.data.cufe, xmlPath: ublRes.data.xmlPath }))
+
+      // 3. Send to DIAN
+      toast.info('Transmitiendo a la DIAN...')
+      const sendRes = await dianApi.sendToDian(currentInvId)
+      setDianData(prev => ({
+        ...prev,
+        status: sendRes.data.status,
+        cufe: sendRes.data.cufe || prev.cufe,
+        message: sendRes.data.statusDescription,
+        error: sendRes.data.errorMessage,
+      }))
+
+      if (sendRes.data.success || sendRes.data.status === 'ACEPTADA') {
+        toast.success('🎉 ¡Factura electrónica ACEPTADA por la DIAN!')
+      } else {
+        toast.warning(`Estado DIAN: ${sendRes.data.status}`)
+      }
+      refetchStatus()
+      qc.invalidateQueries({ queryKey: ['order', order.id] })
+    } catch (err: any) {
+      console.error('DIAN emission error:', err)
+      const msg = err?.response?.data?.error || 'Error en el proceso de facturación DIAN'
+      setDianData(prev => ({ ...prev, error: msg }))
+      toast.error(msg)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const cufe = dianData.cufe || statusData?.cufe
+  const currentStatus = dianData.status || statusData?.status || 'NO_GENERADO'
+  const qrUrl = cufe ? `https://catalogo-vpfe.dian.gov.co/document/searchqr?documentkey=${cufe}` : null
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 animate-fade-in">
+      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl max-h-[92vh] flex flex-col border border-slate-100 overflow-hidden">
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 bg-slate-50/50">
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 rounded-2xl bg-blue-600 flex items-center justify-center text-white shadow-md shadow-blue-500/20">
+              <Landmark size={20} />
+            </div>
+            <div>
+              <h2 className="text-base font-bold text-gray-900">Facturación Electrónica DIAN</h2>
+              <p className="text-xs text-gray-500">UBL 2.1 · Anexo Técnico 1.9 · Pedido #{order.number}</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="p-1.5 hover:bg-gray-200/60 rounded-full transition-colors text-gray-400 hover:text-gray-700">
+            <X size={18} />
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="overflow-y-auto flex-1 p-6 space-y-4 text-sm">
+          {/* Status banner */}
+          <div className={`p-4 rounded-2xl border flex items-start gap-3 ${
+            currentStatus === 'ACEPTADA'
+              ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
+              : currentStatus === 'RECHAZADA' || currentStatus === 'ERROR'
+              ? 'bg-red-50 border-red-200 text-red-900'
+              : currentStatus === 'EN_PROCESO' || currentStatus === 'PENDIENTE'
+              ? 'bg-amber-50 border-amber-200 text-amber-900'
+              : 'bg-slate-50 border-slate-200 text-slate-700'
+          }`}>
+            <ShieldCheck size={20} className={currentStatus === 'ACEPTADA' ? 'text-emerald-600' : 'text-slate-400'} />
+            <div className="flex-1">
+              <div className="flex items-center justify-between">
+                <p className="font-bold text-xs uppercase tracking-wide">
+                  Estado DIAN: {currentStatus}
+                </p>
+                {statusData?.sentAt && (
+                  <span className="text-[11px] opacity-75">{formatDate(statusData.sentAt)}</span>
+                )}
+              </div>
+              <p className="text-xs mt-0.5">
+                {currentStatus === 'ACEPTADA'
+                  ? 'Documento validado y aprobado exitosamente por la DIAN.'
+                  : currentStatus === 'NO_GENERADO'
+                  ? 'La factura aún no ha sido emitida electrónicamente ante la DIAN.'
+                  : dianData.message || dianData.error || 'Procesando validación tributaria...'}
+              </p>
+            </div>
+          </div>
+
+          {/* Client & Totals summary */}
+          <div className="grid grid-cols-2 gap-3 bg-slate-50 p-4 rounded-2xl border border-slate-200/70">
+            <div>
+              <p className="text-xs text-slate-400 font-semibold uppercase">Receptor / Adquiriente</p>
+              <p className="font-bold text-slate-900 mt-0.5">{order.client?.name ?? order.client?.company}</p>
+              <p className="text-xs text-slate-500 font-mono mt-0.5">NIT/CC: {order.client?.rut ?? 'Sin NIT'}</p>
+            </div>
+            <div className="text-right">
+              <p className="text-xs text-slate-400 font-semibold uppercase">Total a Facturar</p>
+              <p className="text-lg font-black text-slate-900 mt-0.5">{formatCOP(total)}</p>
+              <p className="text-xs text-slate-500">Subtotal: {formatCOP(subtotal)} + IVA 19%</p>
+            </div>
+          </div>
+
+          {/* CUFE & Verification Details */}
+          {cufe && (
+            <div className="space-y-3 pt-2">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wide mb-1">
+                  Código Único de Factura Electrónica (CUFE)
+                </label>
+                <div className="flex items-center gap-2">
+                  <div className="flex-1 bg-slate-100 p-2.5 rounded-xl font-mono text-[11px] text-slate-700 break-all select-all border border-slate-200">
+                    {cufe}
+                  </div>
+                  <CopyButton text={cufe} label="Copiar CUFE" />
+                </div>
+              </div>
+
+              {/* Action Buttons: QR & XML */}
+              <div className="flex items-center gap-2 pt-1 flex-wrap">
+                {qrUrl && (
+                  <a
+                    href={qrUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 text-xs font-bold transition-colors"
+                  >
+                    <ExternalLink size={13} />
+                    Validar en Catálogo DIAN
+                  </a>
+                )}
+                {invoiceId && (
+                  <a
+                    href={dianApi.getXmlUrl(invoiceId)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-200 text-xs font-bold transition-colors"
+                  >
+                    <Download size={13} />
+                    Descargar XML UBL
+                  </a>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Footer actions */}
+        <div className="px-6 py-4 border-t border-gray-100 bg-slate-50/50 flex items-center justify-between">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 border border-slate-200 text-slate-600 rounded-xl text-xs font-bold hover:bg-white transition-colors"
+          >
+            Cerrar
+          </button>
+          <button
+            onClick={handleEmitDian}
+            disabled={loading}
+            className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 text-white rounded-xl text-xs font-bold hover:bg-blue-700 transition-colors disabled:opacity-50 shadow-md shadow-blue-600/20"
+          >
+            {loading ? (
+              <><div className="h-4 w-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Procesando DIAN...</>
+            ) : currentStatus === 'ACEPTADA' ? (
+              <><Landmark size={14} /> Re-emitir Factura DIAN</>
+            ) : (
+              <><Landmark size={14} /> Emitir Factura Electrónica DIAN</>
+            )}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function OrderDetail() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
@@ -233,6 +463,7 @@ export default function OrderDetail() {
   const [dispatchDateDraft, setDispatchDateDraft] = useState('')
   const [noteDraft, setNoteDraft] = useState('')
   const [showMerlinModal, setShowMerlinModal] = useState(false)
+  const [showDianModal, setShowDianModal] = useState(false)
   const [showCreateOP, setShowCreateOP] = useState(false)
   const [opProductId, setOpProductId] = useState('')
   const [opQty, setOpQty] = useState(1)
@@ -449,6 +680,9 @@ export default function OrderDetail() {
       {showMerlinModal && (
         <MerlinModal order={order} onClose={() => setShowMerlinModal(false)} />
       )}
+      {showDianModal && (
+        <DianModal order={order} onClose={() => setShowDianModal(false)} />
+      )}
 
       {/* Back + header */}
       <div className="flex items-center gap-3">
@@ -471,7 +705,15 @@ export default function OrderDetail() {
             )}
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            onClick={() => setShowDianModal(true)}
+            className="flex items-center gap-2 px-3.5 py-2 border border-blue-600 bg-blue-600 text-white rounded-xl hover:bg-blue-700 text-sm font-bold shadow-md shadow-blue-600/20 transition-all active:scale-95"
+            title="Emitir factura electrónica DIAN (UBL 2.1 & CUFE)"
+          >
+            <Landmark size={14} />
+            Facturar DIAN
+          </button>
           <button
             onClick={() => setShowMerlinModal(true)}
             className="flex items-center gap-2 px-3 py-2 border border-blue-200 bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 text-sm font-medium transition-colors"

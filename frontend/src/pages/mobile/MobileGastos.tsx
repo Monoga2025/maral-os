@@ -1,7 +1,7 @@
 import { useState, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, Camera, X, Wallet, CreditCard, TrendingDown, Check } from 'lucide-react'
-import { expensesApi } from '../../lib/api'
+import { Plus, Camera, X, Wallet, CreditCard, TrendingDown, Check, Mic, Loader2, Sparkles } from 'lucide-react'
+import { expensesApi, aiApi } from '../../lib/api'
 import { useAuthStore } from '../../store/auth'
 import { toast } from 'sonner'
 import type { Expense } from '../../types'
@@ -47,6 +47,71 @@ export default function MobileGastos() {
   const [receiptFile, setReceiptFile] = useState<File | null>(null)
   const [receiptPreview, setReceiptPreview] = useState<string | null>(null)
   const receiptRef = useRef<HTMLInputElement>(null)
+
+  // Voice recording
+  const [voiceState, setVoiceState] = useState<'idle' | 'recording' | 'processing'>('idle')
+  const [voiceTranscript, setVoiceTranscript] = useState('')
+  const recognitionRef = useRef<any>(null)
+
+  const startVoiceCapture = () => {
+    const w = window as any
+    const SR = w.SpeechRecognition || w.webkitSpeechRecognition
+    if (!SR) {
+      toast.error('Tu navegador no soporta dictado por voz.')
+      return
+    }
+    const rec = new SR()
+    rec.lang = 'es-CO'
+    rec.interimResults = true
+    rec.continuous = false
+    let finalText = ''
+    rec.onresult = (e: any) => {
+      let interim = ''
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        const t = e.results[i][0].transcript
+        if (e.results[i].isFinal) finalText += t
+        else interim += t
+      }
+      setVoiceTranscript(finalText + interim)
+    }
+    rec.onerror = (e: any) => {
+      console.error('Voice error:', e)
+      toast.error(e.error === 'not-allowed' ? 'Permiso de micrófono denegado' : 'Error al escuchar')
+      setVoiceState('idle')
+    }
+    rec.onend = async () => {
+      if (!finalText.trim()) {
+        setVoiceState('idle')
+        toast.error('No se detectó audio.')
+        return
+      }
+      setVoiceState('processing')
+      try {
+        const { data: parsed } = await aiApi.parseExpenseVoice(finalText.trim())
+        setForm({
+          concept: parsed.concept,
+          amount: String(parsed.amount),
+          type: parsed.type,
+          notes: parsed.notes ?? '',
+        })
+        setShowModal(true)
+        toast.success('Gasto interpretado por IA')
+      } catch (err: any) {
+        toast.error(err?.response?.data?.error ?? 'Error al interpretar gasto')
+      } finally {
+        setVoiceState('idle')
+        setVoiceTranscript('')
+      }
+    }
+    recognitionRef.current = rec
+    setVoiceTranscript('')
+    setVoiceState('recording')
+    rec.start()
+  }
+
+  const stopVoiceCapture = () => {
+    try { recognitionRef.current?.stop() } catch { /* noop */ }
+  }
 
   const { data, isLoading } = useQuery({
     queryKey: ['expenses-mobile', week],
@@ -98,7 +163,45 @@ export default function MobileGastos() {
 
   return (
     <div className="space-y-4 pb-2">
-      <h1 className="text-[#F1F5F9] text-lg font-bold">Gastos</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-[#F1F5F9] text-lg font-bold">Gastos</h1>
+        <button
+          type="button"
+          onClick={voiceState === 'recording' ? stopVoiceCapture : startVoiceCapture}
+          className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold transition-all ${
+            voiceState === 'recording'
+              ? 'bg-red-600 text-white animate-pulse shadow-md shadow-red-600/30'
+              : voiceState === 'processing'
+              ? 'bg-amber-600 text-white animate-pulse'
+              : 'bg-indigo-600/20 text-indigo-300 border border-indigo-500/40 hover:bg-indigo-600/30'
+          }`}
+        >
+          {voiceState === 'recording' ? (
+            <>
+              <div className="w-2 h-2 rounded-full bg-white animate-ping" />
+              <span>Escuchando... (Toca para terminar)</span>
+            </>
+          ) : voiceState === 'processing' ? (
+            <>
+              <Loader2 size={13} className="animate-spin" />
+              <span>Interpretando IA...</span>
+            </>
+          ) : (
+            <>
+              <Mic size={13} />
+              <span>Dictar con Voz</span>
+            </>
+          )}
+        </button>
+      </div>
+
+      {/* Voice Transcript Live Banner */}
+      {voiceTranscript && (
+        <div className="bg-indigo-950/60 border border-indigo-800/60 rounded-2xl p-3 flex items-center gap-2 text-xs text-indigo-200">
+          <Sparkles size={14} className="text-indigo-400 shrink-0 animate-pulse" />
+          <p className="truncate italic">"{voiceTranscript}"</p>
+        </div>
+      )}
 
       {/* Weekly summary */}
       <div className="grid grid-cols-3 gap-2">

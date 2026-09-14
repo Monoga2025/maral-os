@@ -409,7 +409,7 @@ interface CreateForm {
 const DEFAULT_FORM: CreateForm = { title: '', description: '', priority: 'NORMAL', assignedToId: '', dueDate: '' }
 
 function CreateModal({
-  onClose, onSubmit, users, currentUser, isPending, initialPriority, initialAssignedToId,
+  onClose, onSubmit, users, currentUser, isPending, initialPriority, initialAssignedToId, isQuickMode = false,
 }: {
   onClose: () => void
   onSubmit: (data: CreateForm) => void
@@ -418,6 +418,7 @@ function CreateModal({
   isPending: boolean
   initialPriority?: TaskPriority
   initialAssignedToId?: string
+  isQuickMode?: boolean
 }) {
   const [form, setForm] = useState<CreateForm>({
     ...DEFAULT_FORM,
@@ -425,6 +426,7 @@ function CreateModal({
     dueDate: todayISO(),
     assignedToId: initialAssignedToId ?? currentUser?.id ?? '',
   })
+  const [showAdvanced, setShowAdvanced] = useState(!isQuickMode)
   const [aiSuggestion, setAiSuggestion] = useState<{ priority: TaskPriority; dueDays: number } | null>(null)
   const [aiLoading, setAiLoading] = useState(false)
   const debounce = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -451,6 +453,9 @@ function CreateModal({
   }
 
   const assignedUser = users.find((u) => u.id === form.assignedToId) ?? currentUser
+  const assignedMeta = assignedUser?.role ? USER_ROLES_META[assignedUser.role] : null
+
+  const priorityLabel = form.priority === 'URGENTE' ? '🔴 Urgente' : form.priority === 'NORMAL' ? '🔵 Normal' : '⚪ Después'
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-slate-950/60 backdrop-blur-xs p-0 sm:p-4 animate-fade-in">
@@ -458,13 +463,38 @@ function CreateModal({
         {/* Header */}
         <div className="sticky top-0 bg-white/95 backdrop-blur-xs flex items-center justify-between border-b border-slate-100 px-6 py-4 rounded-t-3xl z-10">
           <div>
-            <h2 className="text-base font-bold text-slate-900">Nueva Tarea de Operaciones</h2>
-            <p className="text-xs text-slate-400">Asigna responsabilidades a John, Wilson, Iván o Janet</p>
+            <h2 className="text-base font-bold text-slate-900">
+              {isQuickMode ? `Añadir Tarea (${priorityLabel})` : 'Nueva Tarea de Operaciones'}
+            </h2>
+            <p className="text-xs text-slate-400">
+              {isQuickMode
+                ? `Asignada automáticamente a ${assignedUser?.name || 'ti'}`
+                : 'Asigna responsabilidades al equipo'}
+            </p>
           </div>
           <button onClick={onClose} className="h-8 w-8 flex items-center justify-center rounded-full text-slate-400 hover:bg-slate-100 text-xl font-light">×</button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-5">
+        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          {/* Context Badge in Quick Mode */}
+          {isQuickMode && (
+            <div className="flex items-center justify-between bg-slate-50 border border-slate-200/80 rounded-2xl px-3.5 py-2">
+              <div className="flex items-center gap-2 text-xs text-slate-700">
+                <UserAvatar name={assignedUser?.name ?? 'U'} size="xs" />
+                <span className="font-semibold">{assignedUser?.name}</span>
+                <span className="text-slate-400 font-normal">·</span>
+                <span className="font-bold">{priorityLabel}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowAdvanced(!showAdvanced)}
+                className="text-[11px] font-bold text-blue-600 hover:text-blue-700 hover:underline"
+              >
+                {showAdvanced ? 'Ocultar opciones' : 'Modificar asignado/prioridad'}
+              </button>
+            </div>
+          )}
+
           {/* Title */}
           <div>
             <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wide">¿Qué hay que hacer? *</label>
@@ -505,55 +535,59 @@ function CreateModal({
             />
           </div>
 
-          {/* Priority */}
-          <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wide">Prioridad</label>
-            <div className="grid grid-cols-3 gap-2">
-              {([
-                ['URGENTE', '🔴 Urgente', 'bg-red-600 text-white shadow-md shadow-red-500/20',  'border-slate-200 text-red-600 hover:bg-red-50'],
-                ['NORMAL',  '🔵 Normal',  'bg-blue-600 text-white shadow-md shadow-blue-500/20', 'border-slate-200 text-blue-600 hover:bg-blue-50'],
-                ['DESPUES', '⚪ Después', 'bg-slate-700 text-white shadow-md shadow-slate-700/20', 'border-slate-200 text-slate-600 hover:bg-slate-50'],
-              ] as const).map(([val, label, active, inactive]) => (
-                <button key={val} type="button"
-                  onClick={() => setForm({ ...form, priority: val as TaskPriority })}
-                  className={`rounded-xl border py-2.5 text-xs font-bold transition-all ${form.priority === val ? active + ' border-transparent' : 'bg-white ' + inactive}`}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Assign to */}
-          <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wide">Asignar a responsable</label>
-            <div className="grid grid-cols-2 gap-2">
-              {users.map((u) => {
-                const selected = form.assignedToId === u.id || (!form.assignedToId && u.id === currentUser?.id)
-                const meta = USER_ROLES_META[u.role] || { roleName: u.role, emoji: '👤' }
-                return (
-                  <button
-                    key={u.id}
-                    type="button"
-                    onClick={() => setForm({ ...form, assignedToId: u.id })}
-                    className={`flex items-center gap-2.5 rounded-2xl border p-2.5 text-left transition-all ${
-                      selected
-                        ? 'border-blue-600 bg-blue-50/80 ring-2 ring-blue-500/20 shadow-xs'
-                        : 'border-slate-200 bg-white hover:bg-slate-50'
-                    }`}
+          {/* Priority (Visible if not quick mode or expanded) */}
+          {showAdvanced && (
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wide">Prioridad</label>
+              <div className="grid grid-cols-3 gap-2">
+                {([
+                  ['URGENTE', '🔴 Urgente', 'bg-red-600 text-white shadow-md shadow-red-500/20',  'border-slate-200 text-red-600 hover:bg-red-50'],
+                  ['NORMAL',  '🔵 Normal',  'bg-blue-600 text-white shadow-md shadow-blue-500/20', 'border-slate-200 text-blue-600 hover:bg-blue-50'],
+                  ['DESPUES', '⚪ Después', 'bg-slate-700 text-white shadow-md shadow-slate-700/20', 'border-slate-200 text-slate-600 hover:bg-slate-50'],
+                ] as const).map(([val, label, active, inactive]) => (
+                  <button key={val} type="button"
+                    onClick={() => setForm({ ...form, priority: val as TaskPriority })}
+                    className={`rounded-xl border py-2.5 text-xs font-bold transition-all ${form.priority === val ? active + ' border-transparent' : 'bg-white ' + inactive}`}
                   >
-                    <UserAvatar name={u.name} size="sm" />
-                    <div className="min-w-0">
-                      <p className="text-xs font-bold text-slate-900 truncate">
-                        {u.name} {u.id === currentUser?.id ? '(Yo)' : ''}
-                      </p>
-                      <p className="text-[10px] text-slate-500 truncate">{meta.emoji} {meta.roleName.split(' ')[0]}</p>
-                    </div>
+                    {label}
                   </button>
-                )
-              })}
+                ))}
+              </div>
             </div>
-          </div>
+          )}
+
+          {/* Assign to (Visible if not quick mode or expanded) */}
+          {showAdvanced && (
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wide">Asignar a responsable</label>
+              <div className="grid grid-cols-2 gap-2">
+                {users.map((u) => {
+                  const selected = form.assignedToId === u.id || (!form.assignedToId && u.id === currentUser?.id)
+                  const meta = USER_ROLES_META[u.role] || { roleName: u.role, emoji: '👤' }
+                  return (
+                    <button
+                      key={u.id}
+                      type="button"
+                      onClick={() => setForm({ ...form, assignedToId: u.id })}
+                      className={`flex items-center gap-2.5 rounded-2xl border p-2.5 text-left transition-all ${
+                        selected
+                          ? 'border-blue-600 bg-blue-50/80 ring-2 ring-blue-500/20 shadow-xs'
+                          : 'border-slate-200 bg-white hover:bg-slate-50'
+                      }`}
+                    >
+                      <UserAvatar name={u.name} size="sm" />
+                      <div className="min-w-0">
+                        <p className="text-xs font-bold text-slate-900 truncate">
+                          {u.name} {u.id === currentUser?.id ? '(Yo)' : ''}
+                        </p>
+                        <p className="text-[10px] text-slate-500 truncate">{meta.emoji} {meta.roleName.split(' ')[0]}</p>
+                      </div>
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          )}
 
           {/* Due date */}
           <div>
@@ -619,6 +653,7 @@ export default function Tareas() {
   const [showModal, setShowModal] = useState(false)
   const [showAppModal, setShowAppModal] = useState(false)
   const [modalPriority, setModalPriority] = useState<TaskPriority | undefined>()
+  const [modalQuickMode, setModalQuickMode] = useState(false)
 
   const isGerente = user?.role === 'GERENTE'
   const canCreate = true
@@ -648,6 +683,19 @@ export default function Tareas() {
     qc.invalidateQueries({ queryKey: ['tasks'] })
     qc.invalidateQueries({ queryKey: ['tasks-all-stats'] })
   }
+
+  useEffect(() => {
+    const handleQuickNew = (e: Event) => {
+      const customEvent = e as CustomEvent
+      if (!customEvent.detail?.path || customEvent.detail.path.includes('/tareas')) {
+        setModalPriority('NORMAL')
+        setModalQuickMode(false)
+        setShowModal(true)
+      }
+    }
+    window.addEventListener('maral:quick-new', handleQuickNew)
+    return () => window.removeEventListener('maral:quick-new', handleQuickNew)
+  }, [])
 
   const createMutation = useMutation({
     mutationFn: (data: CreateForm) => tasksApi.create({
@@ -715,7 +763,7 @@ export default function Tareas() {
             </span>
           </div>
           <p className="mt-1 text-xs text-slate-500 font-medium">
-            Seguimiento de responsabilidades del equipo: <strong className="text-slate-800">John Monoga (Gerencia)</strong>, <strong className="text-slate-800">Wilson (Ventas)</strong>, <strong className="text-slate-800">Iván (Producción)</strong> y <strong className="text-slate-800">Janet (Contabilidad)</strong>.
+            Seguimiento de responsabilidades del equipo y cumplimiento de metas operativas.
           </p>
         </div>
 
@@ -735,7 +783,7 @@ export default function Tareas() {
           {canCreate && (
             <Button
               leftIcon={<Plus className="h-4 w-4" />}
-              onClick={() => { setModalPriority(undefined); setShowModal(true) }}
+              onClick={() => { setModalPriority(undefined); setModalQuickMode(false); setShowModal(true) }}
               className="rounded-2xl shadow-md shadow-blue-600/20"
             >
               Nueva Tarea
@@ -794,7 +842,7 @@ export default function Tareas() {
             </span>
           </button>
 
-          {/* Direct buttons for each of the 4 key team members */}
+          {/* Direct buttons for each of the key team members */}
           {users.map((u) => {
             const meta = USER_ROLES_META[u.role] || { roleName: u.role, emoji: '👤' }
             const count = allTasksForStats.filter(t => t.assignedTo?.id === u.id && t.status !== 'COMPLETADA' && t.status !== 'CANCELADA').length
@@ -852,7 +900,7 @@ export default function Tareas() {
             {canCreate && (
               <Button
                 leftIcon={<Plus className="h-4 w-4" />}
-                onClick={() => { setModalPriority(undefined); setShowModal(true) }}
+                onClick={() => { setModalPriority(undefined); setModalQuickMode(false); setShowModal(true) }}
                 className="mt-4 text-xs"
               >
                 Crear primera tarea
@@ -901,10 +949,14 @@ export default function Tareas() {
 
                 {canCreate && (
                   <button
-                    onClick={() => { setModalPriority(priority as TaskPriority); setShowModal(true) }}
-                    className="mt-3 w-full flex items-center justify-center gap-1.5 text-xs font-bold text-slate-500 hover:text-blue-600 py-2.5 rounded-2xl border border-dashed border-slate-300 hover:border-blue-400 hover:bg-white/80 transition-all"
+                    onClick={() => {
+                      setModalPriority(priority as TaskPriority)
+                      setModalQuickMode(true)
+                      setShowModal(true)
+                    }}
+                    className="mt-3 w-full flex items-center justify-center gap-1.5 text-xs font-bold text-slate-600 hover:text-blue-600 py-2.5 rounded-2xl border border-dashed border-slate-300 hover:border-blue-400 hover:bg-white/90 transition-all bg-white/40 shadow-2xs"
                   >
-                    <Plus className="h-3.5 w-3.5" /> Añadir Tarea a {label.split(' ')[1]}
+                    <Plus className="h-3.5 w-3.5" /> + Añadir Tarea a {label.split(' ')[1]}
                   </button>
                 )}
               </div>
@@ -951,6 +1003,7 @@ export default function Tareas() {
           isPending={createMutation.isPending}
           initialPriority={modalPriority}
           initialAssignedToId={resolvedUserId ?? user?.id}
+          isQuickMode={modalQuickMode}
         />
       )}
 

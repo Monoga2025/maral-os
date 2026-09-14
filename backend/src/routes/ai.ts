@@ -278,17 +278,63 @@ Responde SOLO con JSON: {"priority":"URGENTE|NORMAL|DESPUES","dueDays":número}`
   }
 });
 
+function parseExpenseFallback(text: string): { amount: number; concept: string; type: 'CAJA_MENOR' | 'TARJETA'; notes: string | null } {
+  const lower = text.toLowerCase().trim();
+  let type: 'CAJA_MENOR' | 'TARJETA' = 'CAJA_MENOR';
+  if (lower.includes('tarjeta') || lower.includes('nequi') || lower.includes('daviplata') || lower.includes('bancolombia') || lower.includes('cuenta')) {
+    type = 'TARJETA';
+  }
+
+  // Parse amount in Colombian phrasing
+  let amount = 0;
+  const millonMatch = lower.match(/(\d+(?:[.,]\d+)?)\s*(?:millon|millones)/);
+  const milMatch = lower.match(/(\d+(?:[.,]\d+)?)\s*(?:mil|k)\b/);
+  const rawNumMatch = lower.match(/\$?\s*(\d{1,3}(?:\.\d{3})+|\d+)/);
+
+  if (millonMatch) {
+    amount = Math.round(parseFloat(millonMatch[1].replace(',', '.')) * 1000000);
+  } else if (milMatch) {
+    amount = Math.round(parseFloat(milMatch[1].replace(',', '.')) * 1000);
+  } else if (rawNumMatch) {
+    const cleanNum = rawNumMatch[1].replace(/\./g, '');
+    amount = parseInt(cleanNum, 10) || 0;
+  }
+
+  // Concept: remove filler words
+  let concept = lower
+    .replace(/gasto\s*(?:de)?/gi, '')
+    .replace(/(?:por\s*valor\s*de|por|de|en|con|pesos|cop|caja\s*menor|efectivo|tarjeta)/gi, ' ')
+    .replace(/\b\d+(?:[.,]\d+)?\s*(?:mil|millon|millones|k)?\b/gi, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  if (!concept) {
+    concept = 'Gasto operacional';
+  } else {
+    concept = concept.charAt(0).toUpperCase() + concept.slice(1);
+  }
+
+  return {
+    amount,
+    concept: concept.slice(0, 100),
+    type: amount >= 300000 && type === 'CAJA_MENOR' ? 'TARJETA' : type,
+    notes: `Dictado por voz: "${text.trim()}"`,
+  };
+}
+
 // ─── Parse expense voice ──────────────────────────────────────────
 
 router.post('/parse-expense-voice', async (req: AuthRequest, res: Response) => {
-  if (!process.env.OPENROUTER_API_KEY) {
-    res.status(503).json({ error: 'IA no configurada' });
-    return;
-  }
   try {
     const { text } = req.body as { text: string };
     if (!text || typeof text !== 'string' || text.trim().length < 3) {
       res.status(400).json({ error: 'Texto requerido' });
+      return;
+    }
+
+    if (!process.env.OPENROUTER_API_KEY) {
+      const fallback = parseExpenseFallback(text);
+      res.json(fallback);
       return;
     }
 
@@ -305,21 +351,26 @@ Extrae y devuelve SOLO un JSON (sin markdown) con:
 Formato estricto:
 {"amount":número,"concept":"texto","type":"CAJA_MENOR|TARJETA","notes":"texto o null"}`;
 
-    const raw = await callAI(prompt);
-    const stripped = raw.replace(/```(?:json)?\s*/gi, '').replace(/```/g, '');
-    const jsonMatch = stripped.match(/\{[\s\S]*?\}/);
-    if (!jsonMatch) {
-      res.status(500).json({ error: 'No se pudo entender el gasto' });
-      return;
+    try {
+      const raw = await callAI(prompt);
+      const stripped = raw.replace(/```(?:json)?\s*/gi, '').replace(/```/g, '');
+      const jsonMatch = stripped.match(/\{[\s\S]*?\}/);
+      if (jsonMatch) {
+        const parsed = JSON.parse(jsonMatch[0]);
+        res.json({
+          amount: Number(parsed.amount) || 0,
+          concept: String(parsed.concept ?? '').slice(0, 200),
+          type: parsed.type === 'TARJETA' ? 'TARJETA' : 'CAJA_MENOR',
+          notes: parsed.notes ? String(parsed.notes).slice(0, 200) : null,
+        });
+        return;
+      }
+    } catch {
+      // AI call failed, fallback gracefully
     }
 
-    const parsed = JSON.parse(jsonMatch[0]);
-    res.json({
-      amount: Number(parsed.amount) || 0,
-      concept: String(parsed.concept ?? '').slice(0, 200),
-      type: parsed.type === 'TARJETA' ? 'TARJETA' : 'CAJA_MENOR',
-      notes: parsed.notes ? String(parsed.notes).slice(0, 200) : null,
-    });
+    const fallback = parseExpenseFallback(text);
+    res.json(fallback);
   } catch (error) {
     console.error('Parse expense voice error:', error);
     res.status(500).json({ error: 'Error al procesar audio' });

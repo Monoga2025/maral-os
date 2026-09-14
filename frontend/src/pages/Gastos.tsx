@@ -59,6 +59,18 @@ export default function Gastos() {
   const [aiLoading, setAiLoading] = useState(false)
   const conceptDebounce = useRef<ReturnType<typeof setTimeout> | null>(null)
 
+  useEffect(() => {
+    const handleQuickNew = (e: Event) => {
+      const customEvent = e as CustomEvent
+      if (!customEvent.detail?.path || customEvent.detail.path.includes('/gastos')) {
+        setForm(defaultForm())
+        setShowModal(true)
+      }
+    }
+    window.addEventListener('maral:quick-new', handleQuickNew)
+    return () => window.removeEventListener('maral:quick-new', handleQuickNew)
+  }, [])
+
   // Voice input
   const [voiceState, setVoiceState] = useState<'idle' | 'recording' | 'processing'>('idle')
   const [voiceTranscript, setVoiceTranscript] = useState('')

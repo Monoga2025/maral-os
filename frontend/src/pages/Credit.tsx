@@ -1,8 +1,9 @@
+import { useState, useEffect } from 'react'
+import { Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { CreditCard, AlertTriangle, Clock, TrendingUp, Check, X, Bell } from 'lucide-react'
+import { CreditCard, AlertTriangle, Clock, TrendingUp, Check, X, Bell, Landmark } from 'lucide-react'
 import { invoicesApi } from '../lib/api'
 import { formatCOP, formatDate, getDaysAgo } from '../lib/utils'
-import { useState, useEffect } from 'react'
 import { toast } from 'sonner'
 import { TourButton } from '../components/tour/TourButton'
 import { Hint } from '../components/ui/Hint'
@@ -242,7 +243,16 @@ export default function Credit() {
               const isNearDue = daysUntilDue !== null && daysUntilDue >= 0 && daysUntilDue <= 3
               return (
                 <tr key={inv.id} className={`hover:bg-gray-50 transition-colors ${isOverdue ? 'bg-red-50' : isNearDue ? 'bg-amber-50' : ''}`}>
-                  <td className="px-4 py-3 font-bold text-blue-600 text-xs">#{inv.number}</td>
+                  <td className="px-4 py-3 font-bold text-xs">
+                    <Link
+                      to={`/facturas/${inv.id}`}
+                      className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-800 hover:underline"
+                      title="Ver detalle y estado DIAN de la factura"
+                    >
+                      <Landmark size={12} className="text-slate-400" />
+                      #{inv.number}
+                    </Link>
+                  </td>
                   <td className="px-4 py-3 font-medium text-gray-900">{inv.client?.name ?? '—'}</td>
                   <td className="px-4 py-3 text-gray-500 text-xs">{formatDate(inv.createdAt)}</td>
                   <td className={`px-4 py-3 text-xs font-medium ${isOverdue ? 'text-red-600' : isNearDue ? 'text-amber-600' : 'text-gray-600'}`}>

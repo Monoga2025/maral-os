@@ -107,6 +107,16 @@ export default function MobileTareas() {
     window.open(targetPhone ? `https://wa.me/${targetPhone}?text=${msg}` : `https://wa.me/?text=${msg}`, '_blank')
   }
 
+  const openCreateModal = (p?: TaskPriority) => {
+    if (p) setPriority(p)
+    if (selectedUserFilter !== 'all' && selectedUserFilter !== 'me') {
+      setAssignedToId(selectedUserFilter)
+    } else {
+      setAssignedToId(user?.id ?? '')
+    }
+    setShowModal(true)
+  }
+
   return (
     <div className="space-y-4 pb-20">
       {/* Header & Install CTA */}
@@ -178,14 +188,23 @@ export default function MobileTareas() {
           const cfg = PRIORITY_CONFIG[p]
           return (
             <div key={p}>
-              <div className="flex items-center gap-2 mb-2">
-                <span style={{ color: cfg.color }}>{cfg.icon}</span>
-                <h2 className="text-xs font-semibold uppercase tracking-wider" style={{ color: cfg.color }}>
-                  {cfg.label}
-                </h2>
-                <span className="text-xs font-bold px-1.5 py-0.5 rounded-full" style={{ backgroundColor: `${cfg.color}22`, color: cfg.color }}>
-                  {items.length}
-                </span>
+              <div className="flex items-center justify-between gap-2 mb-2">
+                <div className="flex items-center gap-2">
+                  <span style={{ color: cfg.color }}>{cfg.icon}</span>
+                  <h2 className="text-xs font-semibold uppercase tracking-wider" style={{ color: cfg.color }}>
+                    {cfg.label}
+                  </h2>
+                  <span className="text-xs font-bold px-1.5 py-0.5 rounded-full" style={{ backgroundColor: `${cfg.color}22`, color: cfg.color }}>
+                    {items.length}
+                  </span>
+                </div>
+                <button
+                  onClick={() => openCreateModal(p)}
+                  className="text-[11px] font-bold px-2 py-0.5 rounded-lg border border-dashed hover:bg-white/5 transition-all flex items-center gap-1"
+                  style={{ color: cfg.color, borderColor: `${cfg.color}55` }}
+                >
+                  <Plus size={12} /> Añadir
+                </button>
               </div>
               <div className="space-y-2">
                 {items.map((task) => {
@@ -240,7 +259,7 @@ export default function MobileTareas() {
 
       {/* FAB */}
       <button
-        onClick={() => setShowModal(true)}
+        onClick={() => openCreateModal()}
         className="fixed bottom-24 right-4 w-14 h-14 bg-[#22C55E] rounded-full flex items-center justify-center shadow-lg shadow-green-900/40 z-40 active:scale-95"
       >
         <Plus size={24} className="text-white" />

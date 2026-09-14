@@ -1,11 +1,11 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useAuthStore } from '../store/auth'
 import { getInitials } from '../lib/utils'
-import { Settings as SettingsIcon, User, Shield, CheckCircle, Users, Plus, Pencil, UserX, X, Eye, EyeOff } from 'lucide-react'
+import { Settings as SettingsIcon, User, Shield, CheckCircle, Users, Plus, Pencil, UserX, X, Eye, EyeOff, Landmark, Save, FileCheck2, AlertCircle } from 'lucide-react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { usersApi } from '../lib/api'
+import { usersApi, dianApi } from '../lib/api'
 import { toast } from 'sonner'
-import type { User as UserType } from '../types'
+import type { User as UserType, DIANConfig } from '../types'
 
 
 // ── User modal ────────────────────────────────────────────────────────────────
@@ -297,6 +297,176 @@ function UsersSection({ currentUserId }: { currentUserId: string }) {
   )
 }
 
+// ── DIAN section ──────────────────────────────────────────────────────────────
+
+function DIANSection() {
+  const qc = useQueryClient()
+  const { data: config, isLoading } = useQuery<DIANConfig>({
+    queryKey: ['dian-config'],
+    queryFn: () => dianApi.getConfig().then((r) => r.data),
+  })
+
+  const [form, setForm] = useState<Partial<DIANConfig>>({
+    companyNIT: '',
+    prefijoFactura: 'FE',
+    resolucionDIAN: '',
+    softwareId: '',
+    softwarePin: '',
+    testingMode: true,
+  })
+
+  useEffect(() => {
+    if (config) {
+      setForm({
+        companyNIT: config.companyNIT || '900123456-1',
+        prefijoFactura: config.prefijoFactura || 'FE',
+        resolucionDIAN: config.resolucionDIAN || '',
+        softwareId: config.softwareId || '',
+        softwarePin: config.softwarePin || '',
+        testingMode: config.testingMode ?? true,
+      })
+    }
+  }, [config])
+
+  const saveMutation = useMutation({
+    mutationFn: (data: Partial<DIANConfig>) => dianApi.updateConfig(data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['dian-config'] })
+      toast.success('Configuración DIAN guardada con éxito')
+    },
+    onError: (e: any) => {
+      toast.error(e?.response?.data?.error || 'Error al guardar configuración DIAN')
+    },
+  })
+
+  const handleSave = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!form.companyNIT?.trim()) {
+      toast.error('El NIT de la empresa es obligatorio')
+      return
+    }
+    saveMutation.mutate(form)
+  }
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-4">
+        <div>
+          <h2 className="font-semibold text-gray-900 flex items-center gap-2">
+            <Landmark size={16} className="text-blue-600" />
+            Facturación Electrónica DIAN (UBL 2.1 & CUFE)
+          </h2>
+          <p className="text-xs text-gray-500 mt-0.5">
+            Anexo Técnico 1.9 DIAN Colombia · Emisión y Firma Digital
+          </p>
+        </div>
+        <span
+          className={`text-xs font-bold px-2.5 py-1 rounded-full border ${
+            form.testingMode
+              ? 'bg-amber-50 text-amber-700 border-amber-200'
+              : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+          }`}
+        >
+          {form.testingMode ? '🧪 Modo Habilitación (Pruebas)' : '🚀 Modo Producción'}
+        </span>
+      </div>
+
+      {isLoading ? (
+        <div className="text-sm text-gray-400 text-center py-4">Cargando configuración DIAN...</div>
+      ) : (
+        <form onSubmit={handleSave} className="space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">NIT de la Empresa *</label>
+              <input
+                type="text"
+                value={form.companyNIT}
+                onChange={(e) => setForm({ ...form, companyNIT: e.target.value })}
+                placeholder="900123456-1"
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Prefijo de Factura</label>
+              <input
+                type="text"
+                value={form.prefijoFactura}
+                onChange={(e) => setForm({ ...form, prefijoFactura: e.target.value.toUpperCase() })}
+                placeholder="FE o SETP"
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Software ID DIAN</label>
+              <input
+                type="text"
+                value={form.softwareId}
+                onChange={(e) => setForm({ ...form, softwareId: e.target.value })}
+                placeholder="UUID de software en Muisca DIAN"
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">PIN de Software DIAN</label>
+              <input
+                type="password"
+                value={form.softwarePin}
+                onChange={(e) => setForm({ ...form, softwarePin: e.target.value })}
+                placeholder="PIN numérico"
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">Resolución de Facturación DIAN</label>
+            <input
+              type="text"
+              value={form.resolucionDIAN}
+              onChange={(e) => setForm({ ...form, resolucionDIAN: e.target.value })}
+              placeholder="Ej: 18760000001 del 2024-01-01"
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+
+          {/* Testing mode toggle */}
+          <div className="flex items-center justify-between p-3.5 rounded-xl border border-gray-200 bg-gray-50/70">
+            <div>
+              <p className="text-xs font-bold text-gray-900">Entorno de Pruebas (Habilitación VPFE)</p>
+              <p className="text-[11px] text-gray-500">
+                Al activar este modo, los envíos se validan contra el servidor de pruebas DIAN sin generar efectos tributarios reales.
+              </p>
+            </div>
+            <label className="relative inline-flex items-center cursor-pointer">
+              <input
+                type="checkbox"
+                checked={form.testingMode}
+                onChange={(e) => setForm({ ...form, testingMode: e.target.checked })}
+                className="sr-only peer"
+              />
+              <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600" />
+            </label>
+          </div>
+
+          <div className="flex justify-end pt-2">
+            <button
+              type="submit"
+              disabled={saveMutation.isPending}
+              className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 text-white rounded-xl text-xs font-bold hover:bg-blue-700 transition-colors disabled:opacity-50 shadow-sm"
+            >
+              <Save size={14} />
+              {saveMutation.isPending ? 'Guardando...' : 'Guardar Configuración DIAN'}
+            </button>
+          </div>
+        </form>
+      )}
+    </div>
+  )
+}
+
 // ── Main ──────────────────────────────────────────────────────────────────────
 
 export default function Settings() {
@@ -359,6 +529,13 @@ export default function Settings() {
       {user?.role === 'GERENTE' && (
         <div className="bg-white rounded-xl border border-gray-200 p-6">
           <UsersSection currentUserId={user.id} />
+        </div>
+      )}
+
+      {/* Facturación Electrónica DIAN — solo GERENTE */}
+      {user?.role === 'GERENTE' && (
+        <div className="bg-white rounded-xl border border-gray-200 p-6">
+          <DIANSection />
         </div>
       )}
 

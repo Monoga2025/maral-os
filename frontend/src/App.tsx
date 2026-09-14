@@ -18,6 +18,7 @@ import Inventory from './pages/Inventory'
 import Production from './pages/Production'
 import Purchases from './pages/Purchases'
 import Credit from './pages/Credit'
+import InvoiceDetail from './pages/InvoiceDetail'
 import Catalog from './pages/Catalog'
 import ProductForm from './pages/ProductForm'
 import Reports from './pages/Reports'
@@ -82,6 +83,7 @@ export default function App() {
         <Route path="produccion" element={<Production />} />
         <Route path="compras" element={<Purchases />} />
         <Route path="credito" element={<Credit />} />
+        <Route path="facturas/:id" element={<InvoiceDetail />} />
         <Route path="tareas" element={isMobile ? <MobileTareas /> : <Tareas />} />
         <Route path="gastos" element={isMobile ? <MobileGastos /> : <Gastos />} />
         <Route path="catalogo" element={<Catalog />} />
