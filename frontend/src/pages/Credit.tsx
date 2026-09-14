@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { CreditCard, AlertTriangle, Clock, TrendingUp, Check, X, Bell, Landmark } from 'lucide-react'
+import { CreditCard, AlertTriangle, Clock, TrendingUp, Check, X, Bell, Landmark, MessageCircle } from 'lucide-react'
 import { invoicesApi } from '../lib/api'
 import { formatCOP, formatDate, getDaysAgo } from '../lib/utils'
 import { toast } from 'sonner'
@@ -277,34 +277,59 @@ export default function Credit() {
                     {daysOverdue > 0 ? `${daysOverdue}d` : '—'}
                   </td>
                   <td className="px-4 py-3">
-                    {inv.status !== 'PAGADA' && (
-                      payingId === inv.id ? (
-                        <div className="flex items-center gap-1">
-                          <input
-                            type="number"
-                            min="0"
-                            step="1000"
-                            placeholder="Monto"
-                            value={payAmount}
-                            onChange={(e) => setPayAmount(e.target.value)}
-                            className="w-24 border border-gray-200 rounded px-1.5 py-0.5 text-xs focus:outline-none focus:border-blue-400"
-                            autoFocus
-                          />
-                          <button
-                            onClick={() => registerPayment.mutate({ id: inv.id, amount: parseFloat(payAmount) || 0 })}
-                            disabled={!payAmount || parseFloat(payAmount) <= 0}
-                            className="text-green-600 hover:text-green-800 disabled:opacity-40"
-                          ><Check size={16} /></button>
-                          <button onClick={() => { setPayingId(null); setPayAmount('') }}
-                            className="text-gray-400 hover:text-gray-600"><X size={16} /></button>
-                        </div>
-                      ) : (
-                        <button onClick={() => setPayingId(inv.id)}
-                          className="text-xs text-blue-600 border border-blue-200 rounded px-2 py-1 hover:bg-blue-50 transition-colors">
-                          Registrar pago
+                    <div className="flex items-center gap-1.5">
+                      {inv.status !== 'PAGADA' && (
+                        payingId === inv.id ? (
+                          <div className="flex items-center gap-1">
+                            <input
+                              type="number"
+                              min="0"
+                              step="1000"
+                              placeholder="Monto"
+                              value={payAmount}
+                              onChange={(e) => setPayAmount(e.target.value)}
+                              className="w-24 border border-gray-200 rounded px-1.5 py-0.5 text-xs focus:outline-none focus:border-blue-400"
+                              autoFocus
+                            />
+                            <button
+                              onClick={() => registerPayment.mutate({ id: inv.id, amount: parseFloat(payAmount) || 0 })}
+                              disabled={!payAmount || parseFloat(payAmount) <= 0}
+                              className="text-green-600 hover:text-green-800 disabled:opacity-40"
+                              title="Confirmar pago"
+                            ><Check size={16} /></button>
+                            <button onClick={() => { setPayingId(null); setPayAmount('') }}
+                              className="text-gray-400 hover:text-gray-600" title="Cancelar"><X size={16} /></button>
+                          </div>
+                        ) : (
+                          <button onClick={() => setPayingId(inv.id)}
+                            className="text-xs text-blue-600 border border-blue-200 rounded-lg px-2 py-1 hover:bg-blue-50 transition-colors font-medium">
+                            Registrar pago
+                          </button>
+                        )
+                      )}
+
+                      {inv.status !== 'PAGADA' && (
+                        <button
+                          onClick={() => {
+                            const clientPhone = inv.client?.phone?.replace(/\D/g, '') || ''
+                            const clientName = inv.client?.name || 'Cliente'
+                            const message = encodeURIComponent(
+                              `Hola ${clientName}, cordial saludo de MARAL S.A.S.\n\nLe recordamos amablemente el estado de su Factura #${inv.number} por valor de ${formatCOP(inv.amount)} con fecha de vencimiento ${formatDate(inv.dueDate)}.\n\nAgradecemos informarnos una vez realizado el pago para actualizar su saldo en sistema. ¡Muchas gracias!`
+                            )
+                            if (clientPhone) {
+                              window.open(`https://wa.me/57${clientPhone}?text=${message}`, '_blank')
+                            } else {
+                              window.open(`https://wa.me/?text=${message}`, '_blank')
+                            }
+                            toast.success('Abriendo plantilla de recordatorio de cobro')
+                          }}
+                          className="p-1.5 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 rounded-lg border border-emerald-200 transition-colors"
+                          title="Enviar recordatorio de cobro por WhatsApp"
+                        >
+                          <MessageCircle size={14} />
                         </button>
-                      )
-                    )}
+                      )}
+                    </div>
                   </td>
                 </tr>
               )

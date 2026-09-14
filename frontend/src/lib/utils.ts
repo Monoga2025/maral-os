@@ -95,3 +95,73 @@ export function getInitials(name: string): string {
 export function truncate(str: string, length: number): string {
   return str.length > length ? str.slice(0, length) + '…' : str
 }
+
+/**
+ * Comprime y convierte una imagen a formato WebP optimizado en el navegador
+ * antes de subirla al backend. Reduce el tamaño de 5-15MB a ~150-300KB.
+ */
+export async function compressImageToWebP(
+  file: File,
+  maxWidth = 1600,
+  maxHeight = 1600,
+  quality = 0.82
+): Promise<File> {
+  // Si no es imagen o el entorno no soporta Canvas, devolver original
+  if (!file.type.startsWith('image/') || typeof window === 'undefined') {
+    return file
+  }
+
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.readAsDataURL(file)
+    reader.onload = (e) => {
+      const img = new Image()
+      img.src = e.target?.result as string
+      img.onload = () => {
+        let { width, height } = img
+
+        // Mantener relación de aspecto
+        if (width > maxWidth || height > maxHeight) {
+          if (width / height > maxWidth / maxHeight) {
+            height = Math.round((height * maxWidth) / width)
+            width = maxWidth
+          } else {
+            width = Math.round((width * maxHeight) / height)
+            height = maxHeight
+          }
+        }
+
+        const canvas = document.createElement('canvas')
+        canvas.width = width
+        canvas.height = height
+
+        const ctx = canvas.getContext('2d')
+        if (!ctx) {
+          resolve(file)
+          return
+        }
+
+        ctx.drawImage(img, 0, 0, width, height)
+
+        canvas.toBlob(
+          (blob) => {
+            if (!blob) {
+              resolve(file)
+              return
+            }
+            const cleanName = file.name.replace(/\.[^/.]+$/, '') + '.webp'
+            const optimizedFile = new File([blob], cleanName, {
+              type: 'image/webp',
+              lastModified: Date.now(),
+            })
+            resolve(optimizedFile)
+          },
+          'image/webp',
+          quality
+        )
+      }
+      img.onerror = () => resolve(file)
+    }
+    reader.onerror = () => resolve(file)
+  })
+}

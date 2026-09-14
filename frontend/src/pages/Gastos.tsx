@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Receipt, Wallet, CreditCard, TrendingDown, ChevronLeft, ChevronRight, Camera, X, ImageIcon, Sparkles, Mic, Loader2 } from 'lucide-react'
 import { expensesApi, aiApi } from '../lib/api'
 import api from '../lib/api'
-import { formatCOP } from '../lib/utils'
+import { formatCOP, compressImageToWebP } from '../lib/utils'
 import { useAuthStore } from '../store/auth'
 import { toast } from 'sonner'
 import type { Expense } from '../types'
@@ -576,11 +576,17 @@ export default function Gastos() {
                   accept="image/*"
                   capture="environment"
                   className="hidden"
-                  onChange={(e) => {
+                  onChange={async (e) => {
                     const file = e.target.files?.[0]
                     if (file) {
-                      setReceiptFile(file)
-                      setReceiptPreview(URL.createObjectURL(file))
+                      try {
+                        const compressed = await compressImageToWebP(file)
+                        setReceiptFile(compressed)
+                        setReceiptPreview(URL.createObjectURL(compressed))
+                      } catch {
+                        setReceiptFile(file)
+                        setReceiptPreview(URL.createObjectURL(file))
+                      }
                     }
                   }}
                 />

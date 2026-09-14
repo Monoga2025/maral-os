@@ -8,12 +8,20 @@ import { TourOverlay } from '../tour/TourOverlay'
 import { CommandPalette } from '../CommandPalette'
 import HotLeadsToast from '../HotLeadsToast'
 import { KeyboardShortcutsModal } from '../KeyboardShortcutsModal'
+import { flushOfflineQueue } from '../../lib/offlineQueue'
 
 export default function AppLayout() {
   const [hotCount, setHotCount] = useState(0)
   const [shortcutsModalOpen, setShortcutsModalOpen] = useState(false)
   const { pathname } = useLocation()
   const navigate = useNavigate()
+
+  useEffect(() => {
+    // Sincronizar cola offline si hay conexión al cargar
+    if (typeof navigator !== 'undefined' && navigator.onLine) {
+      flushOfflineQueue()
+    }
+  }, [])
 
   useEffect(() => {
     let sequenceTimer: ReturnType<typeof setTimeout> | null = null
