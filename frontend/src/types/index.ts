@@ -457,9 +457,11 @@ export interface WaChat {
   jid: string
   number: string
   name: string
+  pushName?: string
   type: 'contacto' | 'grupo'
   unread: number
   lastMessage: string
+  lastText?: string
   lastTimestamp: string
   fromMeLast: boolean
   unanswered: boolean

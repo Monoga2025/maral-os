@@ -50,22 +50,24 @@ function formatTime(ts: string) {
   return d.toLocaleDateString('es-CO', { day: '2-digit', month: 'short' })
 }
 
-function formatChatName(chat: WaChat) {
-  const name = chat.name ?? ''
-  const numDigits = chat.number.replace(/\D/g, '')
+function formatChatName(chat: WaChat | null | undefined) {
+  if (!chat) return ''
+  const name = chat.name ?? chat.pushName ?? ''
+  const numDigits = (chat.number ?? '').replace(/\D/g, '')
   const nameDigits = name.replace(/\D/g, '')
   // If name is just the number (with or without spaces/formatting), show as +57 XXXX
   if (!name || nameDigits === numDigits) {
     const local = numDigits.replace(/^57/, '')
-    return `+57 ${local}`
+    return local ? `+57 ${local}` : (chat.number || 'Chat')
   }
   return name
 }
 
-function getInitials(name: string) {
-  const parts = name.trim().split(/\s+/)
-  if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase()
-  return name.slice(0, 2).toUpperCase()
+function getInitials(name: string | null | undefined) {
+  if (!name) return '?'
+  const parts = name.trim().split(/\s+/).filter(Boolean)
+  if (parts.length >= 2) return ((parts[0][0] || '') + (parts[1][0] || '')).toUpperCase()
+  return name.slice(0, 2).toUpperCase() || '?'
 }
 
 function fileToBase64(file: File): Promise<string> {
@@ -81,11 +83,11 @@ function fileToBase64(file: File): Promise<string> {
 
 function Avatar({ chat, size = 'md' }: { chat: WaChat; size?: 'sm' | 'md' | 'lg' }) {
   const [picFailed, setPicFailed] = useState(false)
-  const isGroup = chat.type === 'grupo'
+  const isGroup = chat?.type === 'grupo'
   const name = formatChatName(chat)
   const sizeClass = size === 'sm' ? 'h-8 w-8 text-xs' : size === 'lg' ? 'h-12 w-12 text-base' : 'h-10 w-10 text-sm'
-  const [g1, g2] = getGradient(chat.number || name)
-  const picUrl = !isGroup && !picFailed ? whatsappApi.profilePicUrl(chat.number) : null
+  const [g1, g2] = getGradient(chat?.number || name || 'chat')
+  const picUrl = !isGroup && !picFailed && chat?.number ? whatsappApi.profilePicUrl(chat.number) : null
 
   if (picUrl) {
     return (
@@ -1389,9 +1391,14 @@ export default function Whatsapp() {
     staleTime: 2000,
   })
 
-  const allChats: WaChat[] = data?.data.data ?? []
+  const allChats: WaChat[] = Array.isArray(data?.data?.data)
+    ? data.data.data
+    : Array.isArray(data?.data)
+    ? (data.data as unknown as WaChat[])
+    : []
 
   const chats = allChats.filter(c => {
+    if (!c) return false
     // filter by tab
     if (filter === 'grupos' && c.type !== 'grupo') return false
     if (filter === 'sinleer' && (!c.unread || c.unread === 0)) return false
@@ -1400,28 +1407,31 @@ export default function Whatsapp() {
     // search
     if (search) {
       const q = search.toLowerCase()
-      return formatChatName(c).toLowerCase().includes(q) || c.number.includes(q) || (c.lastMessage ?? '').toLowerCase().includes(q)
+      const chatFormatted = formatChatName(c).toLowerCase()
+      const numStr = (c.number ?? '').toLowerCase()
+      const lastMsg = (c.lastMessage ?? c.lastText ?? '').toLowerCase()
+      return chatFormatted.includes(q) || numStr.includes(q) || lastMsg.includes(q)
     }
     return true
   })
 
-  const totalUnread = allChats.filter(c => c.type !== 'grupo').reduce((sum, c) => sum + (c.unread ?? 0), 0)
-  const gruposUnread = allChats.filter(c => c.type === 'grupo').reduce((sum, c) => sum + (c.unread ?? 0), 0)
-  const configured = data?.data.configured ?? true
+  const totalUnread = allChats.filter(c => c && c.type !== 'grupo').reduce((sum, c) => sum + (c.unread ?? 0), 0)
+  const gruposUnread = allChats.filter(c => c && c.type === 'grupo').reduce((sum, c) => sum + (c.unread ?? 0), 0)
+  const configured = data?.data?.configured ?? true
 
   useEffect(() => {
     if (jid && allChats.length) {
-      const target = allChats.find(c => c.jid === jid)
+      const target = allChats.find(c => c && c.jid === jid)
       if (target) setSelectedChat(target)
     }
   }, [jid, allChats.length])
 
   useEffect(() => {
     if (selectedChat && allChats.length) {
-      const updated = allChats.find(c => c.jid === selectedChat.jid)
+      const updated = allChats.find(c => c && c.jid === selectedChat.jid)
       if (updated) setSelectedChat(updated)
     }
-  }, [data?.data.data, selectedChat?.jid])
+  }, [data?.data, selectedChat?.jid])
 
   return (
     <div className="flex h-[calc(100vh-4rem)] -m-6 overflow-hidden">
@@ -1543,7 +1553,7 @@ export default function Whatsapp() {
         {/* Footer */}
         <div className="px-4 py-2 border-t border-gray-100 bg-[#f0f2f5]">
           <p className="text-[10px] text-[#8696a0]">
-            {data?.data.total ?? 0} conversaciones · {allChats.filter(c => c.unanswered).length} sin responder
+            {data?.data?.total ?? allChats.length ?? 0} conversaciones · {allChats.filter(c => c?.unanswered).length} sin responder
           </p>
         </div>
       </div>
