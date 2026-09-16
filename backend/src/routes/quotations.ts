@@ -40,13 +40,15 @@ function fmtNIT(raw: string): string {
   return raw;
 }
 const COMPANY = {
-  name:    process.env.COMPANY_NAME    ?? 'INDUSTRIAS MARAL / IVAN DIAZ GONZALEZ',
-  nit:     process.env.COMPANY_NIT     ?? '1.096.514.139-1',
-  address: process.env.COMPANY_ADDRESS ?? 'Calle 3 # 6A- 22 Bodega 1',
-  city:    process.env.COMPANY_CITY    ?? 'Curití - Santander',
-  phone:   process.env.COMPANY_PHONE   ?? '3167760692',
-  email:   process.env.COMPANY_EMAIL   ?? 'contabilidad@industriasmaral.com',
-  website: process.env.COMPANY_WEBSITE ?? 'www.industriasmaral.com',
+  name:      'INDUSTRIAS MARAL',
+  legalName: 'INDUSTRIAS MARAL / IVAN DIAZ GONZALEZ',
+  nit:       '1096.514.139',
+  nitFull:   '1.096.514.139-1',
+  address:   'Calle 3 # 6A- 22 Bodega 1',
+  city:      'Curití - Santander',
+  phone:     '3167760692',
+  email:     'contabilidad@industriasmaral.com',
+  website:   'www.industriasmaral.com',
 };
 
 function getSellerPhone(seller: { name?: string; email?: string; phone?: string | null } | null): string {
@@ -282,9 +284,17 @@ router.post('/', async (req: AuthRequest, res: Response) => {
 
     const { subtotal, tax, total } = calculateTotals(items, taxPercent);
 
+    // Consecutivo oficial: empieza en 650 si no hay cotizaciones superiores
+    const lastQuote = await prisma.quotation.findFirst({
+      orderBy: { number: 'desc' },
+      select: { number: true },
+    });
+    const nextNumber = Math.max((lastQuote?.number ?? 0) + 1, 650);
+
     const quotation = await prisma.quotation.create({
       data: {
         ...rest,
+        number: nextNumber,
         sellerId: effectiveSellerId,
         subtotal,
         tax,
@@ -574,26 +584,9 @@ function generateQuotationHTML(q: any): string {
   expiry.setDate(expiry.getDate() + q.validityDays);
   const expiryLong = expiry.toLocaleDateString('es-CO', { day: 'numeric', month: 'long', year: 'numeric' });
   const taxPct = q.subtotal > 0 ? Math.round((q.tax / q.subtotal) * 100) : 0;
-  const sig      = getSellerSignature(q.seller);
-  const sellerPhone = sig.phone;
-  const catCode  = CATEGORY_CODES[q.client?.category ?? ''] ?? null;
   const catLabel = CATEGORY_LABELS[q.client?.category ?? ''] ?? null;
   const num = String(q.number).padStart(5, '0');
   const cl = q.client;
-
-  // Logo base64 if exists
-  let logoHtml = '';
-  if (fs.existsSync(LOGO_PATH)) {
-    const ext = path.extname(LOGO_PATH).slice(1).toLowerCase();
-    const mime = ext === 'svg' ? 'image/svg+xml' : `image/${ext}`;
-    const data = fs.readFileSync(LOGO_PATH).toString('base64');
-    logoHtml = `<img src="data:${mime};base64,${data}" alt="Logo MARAL" style="max-height:70px;max-width:130px;object-fit:contain;display:block;">`;
-  } else {
-    logoHtml = `<div style="width:100px;height:70px;background:#1e3a5f;display:flex;flex-direction:column;align-items:center;justify-content:center;border-radius:6px;gap:4px;">
-      <span style="color:white;font-size:30px;font-weight:900;line-height:1;">M</span>
-      <span style="color:#93c5fd;font-size:8px;letter-spacing:3px;font-weight:700;">MARAL</span>
-    </div>`;
-  }
 
   // Empresa column (left)
   const empresaRows: [string, string][] = [
@@ -615,35 +608,7 @@ function generateQuotationHTML(q: any): string {
     ['Vigencia', `${q.validityDays} días`],
     ['Válida hasta', fmtDate(expiry)],
     ['Condición de pago', escape(q.paymentTerms || 'Contado')],
-    ['IVA aplicado', taxPct > 0 ? `${taxPct}%` : 'No aplica'],
-    ['Asesor comercial', escape(q.seller?.name || '—')],
-    ['Tel. asesor', escape(sellerPhone)],
   ];
-
-  const makeInfoTable = (rows: [string, string][]) =>
-    rows.map(([lbl, val]) => `
-      <tr>
-        <td style="color:#6b7280;font-size:11px;padding:3px 0;white-space:nowrap;vertical-align:top;">${lbl}:</td>
-        <td style="padding:3px 0 3px 10px;font-size:12px;vertical-align:top;">${val}</td>
-      </tr>`).join('');
-
-  // Product rows
-  const itemRows = (q.items as any[]).map((item, i: number) => {
-    const prod = item.product;
-    const finalPrice = item.unitPrice * (1 - (item.discount || 0) / 100);
-    const bg = i % 2 === 0 ? '#ffffff' : '#f8fafc';
-    const discStyle = item.discount > 0 ? 'color:#dc2626;font-weight:700;' : 'color:#9ca3af;';
-    return `<tr style="background:${bg};">
-      <td style="text-align:right;padding:7px 8px;font-weight:600;white-space:nowrap;">${item.qty % 1 === 0 ? item.qty : item.qty.toFixed(2)}</td>
-      <td style="padding:7px 8px;color:#4b5563;font-size:11px;white-space:nowrap;">${escape(prod.reference || '—')}</td>
-      <td style="padding:7px 8px;word-break:break-word;white-space:normal;line-height:1.4;">${escape(prod.name)}</td>
-      <td style="text-align:center;padding:7px 8px;color:#6b7280;white-space:nowrap;">${escape(prod.unit || 'UN')}</td>
-      <td style="text-align:right;padding:7px 8px;color:#6b7280;white-space:nowrap;">${fmtCOP(item.unitPrice)}</td>
-      <td style="text-align:right;padding:7px 8px;white-space:nowrap;${discStyle}">${item.discount > 0 ? item.discount + '%' : '—'}</td>
-      <td style="text-align:right;padding:7px 8px;font-weight:700;white-space:nowrap;">${fmtCOP(finalPrice)}</td>
-      <td style="text-align:right;padding:7px 8px;font-weight:700;white-space:nowrap;">${fmtCOP(item.subtotal)}</td>
-    </tr>`;
-  }).join('');
 
   // Shipping data
   const destCompany = escape(cl.company || cl.name || '—');
@@ -652,12 +617,11 @@ function generateQuotationHTML(q: any): string {
   const destAddress = escape(q.shippingAddress || cl.address || '—');
   const destCity = escape([cl.city, cl.department].filter(Boolean).join(', ') || '—');
   const destPhone = escape(cl.phone || '—');
-  const destEmail = escape(cl.email || '—');
 
   const notesBlock = q.notes ? `
-    <div style="margin-top:18px;border-left:4px solid #b45309;background:#fffbeb;padding:13px 16px;border-radius:4px;">
-      <div style="color:#b45309;font-weight:700;font-size:10px;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:6px;">⚠ Observaciones</div>
-      <div style="color:#78350f;font-size:13px;line-height:1.6;">${escape(q.notes)}</div>
+    <div style="margin-top:14px;border-left:4px solid #b45309;background:#fffbeb;padding:12px 16px;border-radius:8px;">
+      <div style="color:#b45309;font-weight:700;font-size:10px;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:4px;">⚠ Observaciones</div>
+      <div style="color:#78350f;font-size:12px;line-height:1.5;">${escape(q.notes)}</div>
     </div>` : '';
 
   const taxRow = q.tax > 0 ? `
@@ -679,10 +643,10 @@ function generateQuotationHTML(q: any): string {
 *,*::before,*::after{margin:0;padding:0;box-sizing:border-box;}
 body{
   font-family:'Inter',system-ui,-apple-system,sans-serif;
-  font-size:12.5px;
+  font-size:12px;
   background:#0B132B;
   color:#1E293B;
-  line-height:1.5;
+  line-height:1.45;
   -webkit-font-smoothing:antialiased;
   padding:24px 12px;
 }
@@ -722,12 +686,16 @@ body{
 .sheet{
   width:21.5cm;
   min-height:28cm;
-  margin:0 auto;
+  margin:0 auto 30px;
   background:#FFFFFF;
-  padding:36px 42px;
+  padding:32px 38px;
   border-radius:16px;
   box-shadow:0 20px 60px rgba(0,0,0,0.25), 0 0 0 1px rgba(255,255,255,0.1);
   position:relative;
+}
+.sheet-shipping{
+  page-break-before:always;
+  break-before:page;
 }
 
 /* Header */
@@ -736,18 +704,18 @@ body{
   align-items:flex-start;
   justify-content:space-between;
   gap:20px;
-  padding-bottom:22px;
+  padding-bottom:18px;
   border-bottom:2px solid #F1F5F9;
 }
 .brand-block{
   display:flex;
   align-items:center;
-  gap:16px;
+  gap:14px;
 }
 .logo-box{
-  width:54px;
-  height:54px;
-  border-radius:14px;
+  width:50px;
+  height:50px;
+  border-radius:12px;
   background:linear-gradient(135deg,#0F172A,#1E293B);
   display:flex;
   align-items:center;
@@ -764,39 +732,39 @@ body{
   text-transform:uppercase;
 }
 .brand-meta{
-  font-size:11px;
+  font-size:10.5px;
   color:#64748B;
-  margin-top:3px;
-  line-height:1.6;
+  margin-top:2px;
+  line-height:1.5;
 }
 
 .badge-box{
   background:linear-gradient(135deg,#0F172A 0%,#1E293B 100%);
   color:#FFFFFF;
-  padding:14px 22px;
-  border-radius:14px;
+  padding:12px 18px;
+  border-radius:12px;
   text-align:right;
-  min-width:185px;
+  min-width:175px;
   box-shadow:0 6px 18px rgba(15,23,42,0.18);
   border:1px solid rgba(255,255,255,0.08);
 }
 .badge-tag{
-  font-size:9.5px;
+  font-size:9px;
   font-weight:800;
   text-transform:uppercase;
-  letter-spacing:1.8px;
+  letter-spacing:1.6px;
   color:#38BDF8;
 }
 .badge-number{
   font-family:'Plus Jakarta Sans',sans-serif;
-  font-size:24px;
+  font-size:22px;
   font-weight:800;
   color:#FFFFFF;
   letter-spacing:-0.5px;
   margin:2px 0;
 }
 .badge-date{
-  font-size:10.5px;
+  font-size:10px;
   color:#94A3B8;
   font-weight:500;
 }
@@ -805,47 +773,47 @@ body{
 .bento-grid{
   display:grid;
   grid-template-columns:1.1fr 1.1fr 0.95fr;
-  gap:14px;
-  margin:20px 0;
+  gap:12px;
+  margin:16px 0;
 }
 .bento-card{
   background:#F8FAFC;
   border:1px solid #E2E8F0;
-  border-radius:12px;
-  padding:14px 16px;
+  border-radius:10px;
+  padding:12px 14px;
 }
 .bento-title{
   font-family:'Plus Jakarta Sans',sans-serif;
-  font-size:9.5px;
+  font-size:9px;
   font-weight:800;
   text-transform:uppercase;
   letter-spacing:1.2px;
   color:#0284C7;
-  margin-bottom:10px;
+  margin-bottom:8px;
   display:flex;
   align-items:center;
-  gap:6px;
+  gap:5px;
 }
 .bento-title::before{
   content:'';
   display:inline-block;
-  width:6px;
-  height:6px;
+  width:5px;
+  height:5px;
   border-radius:50%;
   background:#0284C7;
 }
 .bento-table{width:100%;border-collapse:collapse;}
 .bento-label{
   color:#64748B;
-  font-size:11px;
-  padding:3px 0;
+  font-size:10.5px;
+  padding:2px 0;
   white-space:nowrap;
   vertical-align:top;
   font-weight:500;
 }
 .bento-value{
-  padding:3px 0 3px 8px;
-  font-size:11.5px;
+  padding:2px 0 2px 6px;
+  font-size:11px;
   color:#0F172A;
   font-weight:600;
   vertical-align:top;
@@ -854,27 +822,27 @@ body{
 /* Products Table */
 .table-wrap{
   border:1px solid #E2E8F0;
-  border-radius:12px;
+  border-radius:10px;
   overflow:hidden;
-  margin:20px 0 16px;
+  margin:16px 0 12px;
 }
 table.products{
   width:100%;
   border-collapse:collapse;
-  font-size:11.5px;
+  font-size:11px;
 }
 table.products thead th{
   background:#0F172A;
   color:#F8FAFC;
-  padding:10px 10px;
+  padding:8px 10px;
   font-family:'Plus Jakarta Sans',sans-serif;
-  font-size:9.5px;
+  font-size:9px;
   font-weight:700;
   text-transform:uppercase;
   letter-spacing:0.8px;
 }
 table.products tbody td{
-  padding:9px 10px;
+  padding:7px 10px;
   border-bottom:1px solid #F1F5F9;
   vertical-align:middle;
   color:#334155;
@@ -884,21 +852,21 @@ table.products tbody tr:nth-child(even){background:#F8FAFC;}
 .ref-pill{
   display:inline-block;
   font-family:monospace;
-  font-size:10.5px;
+  font-size:10px;
   font-weight:700;
   background:#EFF6FF;
   color:#1D4ED8;
-  padding:2px 6px;
-  border-radius:5px;
+  padding:1px 5px;
+  border-radius:4px;
   border:1px solid #DBEAFE;
 }
 .disc-pill{
   display:inline-block;
-  font-size:10px;
+  font-size:9.5px;
   font-weight:700;
   background:#FEF2F2;
   color:#DC2626;
-  padding:2px 5px;
+  padding:1px 4px;
   border-radius:4px;
 }
 
@@ -906,21 +874,21 @@ table.products tbody tr:nth-child(even){background:#F8FAFC;}
 .summary-container{
   display:flex;
   justify-content:flex-end;
-  margin-top:6px;
+  margin-top:4px;
 }
 .summary-box{
-  width:320px;
+  width:300px;
   background:#F8FAFC;
   border:1px solid #E2E8F0;
-  border-radius:14px;
-  padding:14px 18px;
+  border-radius:12px;
+  padding:12px 16px;
 }
 .summary-row{
   display:flex;
   justify-content:space-between;
   align-items:center;
-  padding:4px 0;
-  font-size:12px;
+  padding:3px 0;
+  font-size:11.5px;
   color:#64748B;
   font-weight:500;
 }
@@ -931,9 +899,9 @@ table.products tbody tr:nth-child(even){background:#F8FAFC;}
 .summary-total{
   background:linear-gradient(135deg,#0F172A,#1E293B);
   color:#FFFFFF;
-  margin-top:10px;
-  padding:12px 14px;
-  border-radius:10px;
+  margin-top:8px;
+  padding:10px 12px;
+  border-radius:8px;
   display:flex;
   justify-content:space-between;
   align-items:center;
@@ -941,7 +909,7 @@ table.products tbody tr:nth-child(even){background:#F8FAFC;}
 }
 .total-label{
   font-family:'Plus Jakarta Sans',sans-serif;
-  font-size:11px;
+  font-size:10.5px;
   font-weight:800;
   letter-spacing:1px;
   text-transform:uppercase;
@@ -949,103 +917,101 @@ table.products tbody tr:nth-child(even){background:#F8FAFC;}
 }
 .total-amount{
   font-family:'Plus Jakarta Sans',sans-serif;
-  font-size:20px;
+  font-size:18px;
   font-weight:800;
   color:#FFFFFF;
   letter-spacing:-0.5px;
 }
 
-/* Observaciones */
-.notes-box{
-  margin-top:16px;
-  background:#FFFBEB;
-  border:1px solid #FDE68A;
-  border-left:4px solid #D97706;
+/* Notice Box */
+.notice-box{
+  margin-top:14px;
+  background:#EFF6FF;
+  border:1px solid #BFDBFE;
+  border-left:4px solid #2563EB;
   padding:12px 16px;
   border-radius:10px;
 }
-.notes-title{
-  font-family:'Plus Jakarta Sans',sans-serif;
-  font-size:9.5px;
+.notice-title{
+  color:#1E40AF;
   font-weight:800;
+  font-size:10px;
   text-transform:uppercase;
   letter-spacing:1.2px;
-  color:#B45309;
-  margin-bottom:4px;
+  margin-bottom:5px;
 }
-.notes-text{
-  font-size:11.5px;
-  color:#92400E;
-  line-height:1.6;
+.notice-text{
+  color:#1E3A8A;
+  font-size:11px;
+  line-height:1.55;
+}
+.bank-pill{
+  margin-top:8px;
+  display:inline-block;
+  background:#FFFFFF;
+  border:1px solid #93C5FD;
+  border-radius:6px;
+  padding:6px 12px;
+  color:#0F172A;
+  font-size:11px;
 }
 
 /* Signature & Guarantees */
 .signature-section{
-  margin-top:22px;
-  padding-top:18px;
+  margin-top:18px;
+  padding-top:14px;
   border-top:1px solid #E2E8F0;
   display:flex;
   justify-content:space-between;
   align-items:flex-end;
-  gap:24px;
+  gap:20px;
 }
-.sig-card{
-  flex:1;
-}
+.sig-card{flex:1;}
 .sig-name{
   font-family:'Plus Jakarta Sans',sans-serif;
-  font-size:15px;
+  font-size:14px;
   font-weight:800;
   color:#0F172A;
 }
 .sig-role{
-  font-size:11px;
-  color:#0284C7;
-  font-weight:600;
-  margin-top:1px;
-}
-.sig-firm{
-  font-size:11px;
+  font-size:10.5px;
   color:#64748B;
-  margin-top:3px;
-  line-height:1.6;
+  font-weight:600;
+  margin-top:2px;
 }
 .sig-guarantee{
-  font-size:10px;
+  font-size:9.5px;
   color:#059669;
   font-weight:600;
   background:#ECFDF5;
   border:1px solid #A7F3D0;
   display:inline-block;
-  padding:3px 8px;
-  border-radius:6px;
-  margin-top:6px;
+  padding:2px 6px;
+  border-radius:5px;
+  margin-top:5px;
 }
 .sig-right{
   text-align:right;
-  font-size:10.5px;
+  font-size:10px;
   color:#64748B;
-  line-height:1.7;
+  line-height:1.6;
 }
 .sig-right strong{
   color:#0F172A;
   font-weight:700;
 }
 
-/* Shipping Cutout Guide */
+/* Shipping Page 2 */
 .shipping-block{
-  margin-top:28px;
-  padding-top:18px;
-  border-top:2px dashed #CBD5E1;
-  position:relative;
+  margin-top:20px;
 }
 .cut-tag{
   text-align:center;
   font-family:'Plus Jakarta Sans',sans-serif;
-  font-size:9.5px;
+  font-size:9px;
   font-weight:800;
   text-transform:uppercase;
-  letter-spacing:1.8px;
+  letter-spacing:1.6px;
   color:#64748B;
   margin-bottom:12px;
 }
@@ -1096,10 +1062,16 @@ table.products tbody tr:nth-child(even){background:#F8FAFC;}
   .floating-bar{display:none!important;}
   .sheet{
     box-shadow:none;
-    padding:0;
+    padding:20px 24px;
     width:100%;
     margin:0;
     border-radius:0;
+    min-height:auto;
+  }
+  .sheet-shipping{
+    page-break-before:always!important;
+    break-before:page!important;
+    padding-top:24px;
   }
   @page{size:letter;margin:1cm 1.2cm;}
 }
@@ -1112,12 +1084,13 @@ table.products tbody tr:nth-child(even){background:#F8FAFC;}
   <button class="btn btn-print" onclick="window.print()">🖨 Imprimir / Guardar PDF</button>
 </div>
 
+<!-- HOJA 1: COTIZACIÓN COMERCIAL -->
 <div class="sheet">
   <!-- Header -->
   <div class="top-header">
     <div class="brand-block">
       <div class="logo-box">
-        <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M4.9 19.1C1 15.2 1 8.8 4.9 4.9"/>
           <path d="M7.8 16.2c-2.3-2.3-2.3-6.1 0-8.5"/>
           <circle cx="12" cy="12" r="2"/>
@@ -1236,20 +1209,28 @@ table.products tbody tr:nth-child(even){background:#F8FAFC;}
     </div>
   </div>
 
-  ${notesBlock ? `
-  <div class="notes-box">
-    <div class="notes-title">Observaciones & Instrucciones Especiales</div>
-    <div class="notes-text">${escape(q.notes)}</div>
-  </div>` : ''}
+  <!-- Aviso de Cambio de Razón Social y Datos Bancarios -->
+  <div class="notice-box">
+    <div class="notice-title">📢 Información Importante / Cambio de Razón Social y Datos Bancarios</div>
+    <div class="notice-text">
+      Queremos informarte que cambiamos de razón social y, a partir de ahora, operaremos bajo el nombre de <strong>INDUSTRIAS MARAL / IVAN DIAZ GONZALEZ</strong>, identificado con el <strong>NIT 1.096.514.139-1</strong>.<br>
+      Actualmente pertenecemos al régimen de no responsable del IVA, por lo que nuestras ventas no generan este impuesto.<br>
+      La cuenta anterior ya no corresponde, por lo que te agradecemos <strong>utilizar los nuevos datos bancarios</strong> que encontrarás a continuación:
+    </div>
+    <div class="bank-pill">
+      <span style="font-weight:800;color:#1D4ED8;">BANCOLOMBIA</span> &nbsp;·&nbsp;
+      <strong>CTA ahorros:</strong> <code>32200043676</code> &nbsp;·&nbsp;
+      <strong>Titular:</strong> Ivan Camilo Diaz G.
+    </div>
+  </div>
+
+  ${notesBlock}
 
   <!-- Signatures -->
   <div class="signature-section">
     <div class="sig-card">
-      <div class="sig-name">${escape(sig.name)}</div>
-      <div class="sig-role">${escape(sig.title)} · ${escape(COMPANY.name)}</div>
-      <div class="sig-firm">
-        Tel / WhatsApp: <strong>${escape(sig.phone)}</strong> &nbsp;·&nbsp; Email: <strong>${escape(sig.email)}</strong>
-      </div>
+      <div class="sig-name">MARAL TECNOLOGÍA</div>
+      <div class="sig-role">Apoyando el mercado de las telecomunicaciones desde 2003</div>
       <div class="sig-guarantee">✓ Garantía directa de fábrica MARAL · Industria Colombiana desde 2003</div>
     </div>
     <div class="sig-right">
@@ -1258,8 +1239,36 @@ table.products tbody tr:nth-child(even){background:#F8FAFC;}
       <em>Fabricación y despachos nacionales desde Curití, Santander</em>
     </div>
   </div>
+</div>
 
-  <!-- Shipping Label Cutout -->
+<!-- HOJA 2: RÓTULO DE DESPACHO LOGÍSTICO -->
+<div class="sheet sheet-shipping">
+  <div class="top-header">
+    <div class="brand-block">
+      <div class="logo-box">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M4.9 19.1C1 15.2 1 8.8 4.9 4.9"/>
+          <path d="M7.8 16.2c-2.3-2.3-2.3-6.1 0-8.5"/>
+          <circle cx="12" cy="12" r="2"/>
+          <path d="M16.2 7.8c2.3 2.3 2.3 6.1 0 8.5"/>
+          <path d="M19.1 4.9C23 8.8 23 15.2 19.1 19.1"/>
+        </svg>
+      </div>
+      <div>
+        <div class="brand-name">${escape(COMPANY.name)}</div>
+        <div class="brand-meta">
+          <strong>NIT:</strong> ${escape(COMPANY.nit)} &nbsp;·&nbsp; ${escape(COMPANY.city)}<br>
+          ${escape(COMPANY.address)} &nbsp;·&nbsp; <strong>Cel:</strong> ${escape(COMPANY.phone)}
+        </div>
+      </div>
+    </div>
+    <div class="badge-box">
+      <div class="badge-tag">Rótulo de Envío</div>
+      <div class="badge-number">COT-${num}</div>
+      <div class="badge-date">Despacho Logístico</div>
+    </div>
+  </div>
+
   <div class="shipping-block">
     <div class="cut-tag">✂ &nbsp;Rótulo de Despacho Logístico (Recortar y fijar en el paquete)</div>
     <div class="shipping-container">
@@ -1323,8 +1332,6 @@ function drawQuotationPDF(doc: PDFKit.PDFDocument, q: any): void {
   const expiry = new Date(q.createdAt);
   expiry.setDate(expiry.getDate() + q.validityDays);
 
-  const sig = getSellerSignature(q.seller);
-  const sellerPhone = sig.phone;
   const catCode = CATEGORY_CODES[q.client?.category ?? ''] ?? null;
 
   let y = 40;
@@ -1409,10 +1416,7 @@ function drawQuotationPDF(doc: PDFKit.PDFDocument, q: any): void {
   const condRows: [string, string][] = [
     ['Vigencia',          `${q.validityDays} días`],
     ['Válida hasta',      fmtDate(expiry)],
-    ['Condición de pago', q.paymentTerms],
-    ['IVA aplicado',      taxPct > 0 ? `${taxPct}%` : 'No aplica'],
-    ['Asesor comercial',  q.seller?.name || '—'],
-    ['Tel. asesor',       sellerPhone],
+    ['Condición de pago', q.paymentTerms || 'Contado'],
   ];
 
   const nRows = Math.max(clientRows.length, condRows.length);
@@ -1474,8 +1478,6 @@ function drawQuotationPDF(doc: PDFKit.PDFDocument, q: any): void {
     const prod = item.product;
     const finalPrice = item.unitPrice * (1 - (item.discount || 0) / 100);
 
-    // Calculate how many lines the description needs
-    // Helvetica at 7.5pt: average char width ~4.2pt; use conservative 4.0pt for safety
     const descW = cols[2].w - 6;
     const charsPerLine = Math.floor(descW / 4.0);
     const descLines = Math.ceil(prod.name.length / charsPerLine);
@@ -1501,7 +1503,7 @@ function drawQuotationPDF(doc: PDFKit.PDFDocument, q: any): void {
     doc.fillColor(C.black).font('Helvetica').fontSize(7.5)
        .text(prod.reference || '—', cols[1].x + 3, ty,
              { width: cols[1].w - 6, align: 'left', lineBreak: false, ellipsis: true });
-    // Desc — wraps; height clamps to ROW_HEIGHT so it never bleeds into next row
+    // Desc
     doc.fillColor(C.black).font('Helvetica').fontSize(7.5)
        .text(prod.name, cols[2].x + 3, ty,
              { width: descW, align: 'left', lineBreak: true, height: ROW_HEIGHT - 8 });
@@ -1535,7 +1537,6 @@ function drawQuotationPDF(doc: PDFKit.PDFDocument, q: any): void {
   y += 10;
 
   // ── TOTALS ────────────────────────────────────────────────────
-
   const totX = ML + 310;
   const lblW = 110;
   const valX = totX + lblW;
@@ -1565,10 +1566,23 @@ function drawQuotationPDF(doc: PDFKit.PDFDocument, q: any): void {
   doc.fillColor(C.white).font('Helvetica-Bold').fontSize(11)
      .text(fmtCOP(q.total), valX, y + 4, { width: valW, align: 'right', lineBreak: false });
 
-  y += 34;
+  y += 32;
 
-  // ── OBSERVACIONES (fondo dorado) ──────────────────────────────
+  // ── AVISO DE CAMBIO DE RAZON SOCIAL & BANCOLOMBIA ─────────────
+  doc.rect(ML, y, CW, 50).fill('#EFF6FF');
+  doc.rect(ML, y, CW, 50).lineWidth(0.8).strokeColor('#BFDBFE').stroke();
+  doc.rect(ML, y, 4, 50).fill(C.blue);
 
+  doc.fillColor(C.blue).font('Helvetica-Bold').fontSize(7.5)
+     .text('AVISO IMPORTANTE / CAMBIO DE RAZON SOCIAL Y DATOS BANCARIOS', ML + 10, y + 6, { lineBreak: false });
+
+  doc.fillColor('#1E3A8A').font('Helvetica').fontSize(7)
+     .text('Operamos bajo el nombre INDUSTRIAS MARAL / IVAN DIAZ GONZALEZ (NIT 1.096.514.139-1). Régimen no responsable de IVA.', ML + 10, y + 17, { width: CW - 20 })
+     .text('BANCOLOMBIA  ·  CTA Ahorros: 32200043676  ·  Titular: Ivan Camilo Diaz G.', ML + 10, y + 34, { width: CW - 20 });
+
+  y += 58;
+
+  // ── OBSERVACIONES ─────────────────────────────────────────────
   if (q.notes) {
     doc.rect(ML, y, CW, 4).fill(C.gold);
     y += 8;
@@ -1582,7 +1596,6 @@ function drawQuotationPDF(doc: PDFKit.PDFDocument, q: any): void {
   }
 
   // ── FOOTER ────────────────────────────────────────────────────
-
   doc.moveTo(ML, y).lineTo(MR, y).lineWidth(0.5).strokeColor(C.bgray).stroke();
   y += 10;
 
@@ -1598,19 +1611,13 @@ function drawQuotationPDF(doc: PDFKit.PDFDocument, q: any): void {
            ML, y, { width: CW, lineBreak: false });
   y += 16;
 
-  // Bloque de firma — dinámico según seller
-  doc.fillColor(C.black).font('Helvetica-Bold').fontSize(9)
-     .text(sig.name, ML, y, { lineBreak: false });
+  // Bloque de firma — MARAL TECNOLOGÍA
+  doc.fillColor(C.black).font('Helvetica-Bold').fontSize(10)
+     .text('MARAL TECNOLOGÍA', ML, y, { lineBreak: false });
   doc.fillColor(C.tgray).font('Helvetica').fontSize(8)
-     .text(sig.title, ML, y + 12, { lineBreak: false });
-  doc.fillColor(C.dark).font('Helvetica-Bold').fontSize(8)
-     .text(COMPANY.name, ML, y + 24, { lineBreak: false });
-  doc.fillColor(C.tgray).font('Helvetica').fontSize(8)
-     .text(`${sig.phone}   ·   ${sig.email}`, ML, y + 36, { lineBreak: false });
-  doc.fillColor(C.tgray).font('Helvetica').fontSize(7.5)
-     .text('Apoyando el mercado de las telecomunicaciones desde 2003', ML, y + 48, { lineBreak: false });
+     .text('Apoyando el mercado de las telecomunicaciones desde 2003', ML, y + 13, { lineBreak: false });
 
-  y += 62;
+  y += 36;
 
   // Branding strip
   doc.rect(ML, y, CW, 18).fill(C.dark);
@@ -1621,40 +1628,35 @@ function drawQuotationPDF(doc: PDFKit.PDFDocument, q: any): void {
      );
   y += 18;
 
-  // ── ETIQUETA DE ENVÍO ─────────────────────────────────────────
-
+  // ── HOJA 2: ETIQUETA DE ENVÍO ─────────────────────────────────
   drawShippingLabel(doc, q, y, ML, MR, C);
 }
 
-// ─── Shipping label ────────────────────────────────────────────
+// ─── Shipping label (Hoja 2) ──────────────────────────────────
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function drawShippingLabel(
   doc: PDFKit.PDFDocument,
   q:   any,
-  y:   number,
+  _y:  number,
   ML:  number,
   MR:  number,
   C:   Record<string, string>,
 ): void {
   const CW = MR - ML;
+  const REMITE_H  = 98;
+  const DEST_H    = 115;
 
-  const REMITE_H  = 98;   // sender box — nombre, NIT, dirección, tel, email, ciudad
-  const DEST_H    = 115;  // recipient box
-  const TOTAL_H   = REMITE_H + DEST_H;
+  // Siempre en Hoja 2 independiente
+  doc.addPage({ size: [612, 936], margin: 0 });
+  let y = 40;
 
-  const PAGE_H = 936;
-  const NEEDED = 32 + TOTAL_H + 20;
-  if (y + NEEDED > PAGE_H - 30) {
-    doc.addPage({ size: [612, 936], margin: 0 });
-    y = 40;
-  } else {
-    y += 22;
-  }
-
-  doc.fillColor(C.tgray).font('Helvetica').fontSize(7)
-     .text('ETIQUETA DE ENVIO — recortar y pegar en el paquete',
+  doc.fillColor(C.dark).font('Helvetica-Bold').fontSize(12)
+     .text('RÓTULO DE DESPACHO LOGÍSTICO', ML, y, { width: CW, align: 'center', lineBreak: false });
+  y += 16;
+  doc.fillColor(C.tgray).font('Helvetica').fontSize(7.5)
+     .text('Recortar y fijar en la caja o paquete de envío',
            ML, y, { width: CW, align: 'center', lineBreak: false });
-  y += 12;
+  y += 16;
 
   // ── REMITE (remitente) ────────────────────────────────────────
   doc.rect(ML, y, CW, REMITE_H).fill(C.lgray);
@@ -1666,29 +1668,22 @@ function drawShippingLabel(
 
   const remX = ML + 12;
   const remW = CW - 24;
-  const remR = ML + 10 + 48 + 8; // right of pill + gap, start second column if needed
 
   // Nombre
   doc.fillColor(C.dark).font('Helvetica-Bold').fontSize(10)
      .text(COMPANY.name, remX, y + 26, { width: remW, lineBreak: false, ellipsis: true });
   // NIT
   doc.fillColor(C.tgray).font('Helvetica').fontSize(8.5)
-     .text(COMPANY.nit, remX, y + 39, { lineBreak: false });
+     .text(`NIT: ${COMPANY.nit}`, remX, y + 39, { lineBreak: false });
   // Dirección
   doc.fillColor(C.tgray).font('Helvetica').fontSize(8.5)
      .text(COMPANY.address, remX, y + 50, { width: remW, lineBreak: false, ellipsis: true });
   // Teléfono
   doc.fillColor(C.tgray).font('Helvetica').fontSize(8.5)
-     .text(COMPANY.phone, remX, y + 61, { lineBreak: false });
-  // Email
-  doc.fillColor(C.tgray).font('Helvetica').fontSize(8.5)
-     .text(COMPANY.email, remX, y + 72, { width: remW, lineBreak: false, ellipsis: true });
+     .text(`Tel: ${COMPANY.phone}`, remX, y + 61, { lineBreak: false });
   // Ciudad
   doc.fillColor(C.tgray).font('Helvetica').fontSize(8.5)
-     .text(COMPANY.city, remX, y + 83, { lineBreak: false });
-
-  // Unused remR — keep for potential future right-column use
-  void remR;
+     .text(COMPANY.city, remX, y + 72, { lineBreak: false });
 
   y += REMITE_H;
 
@@ -1719,12 +1714,11 @@ function drawShippingLabel(
      .text('DESTINO', ML + 10, y + 11, { width: 52, align: 'center', lineBreak: false });
 
   const cl = q.client;
-  const destContact2 = cl.company ? cl.name || null : null;  // person name (only when company exists)
+  const destContact2 = cl.company ? cl.name || null : null;
   const destCompany  = cl.company || cl.name || '—';
   const destNIT     = cl.rut     || '—';
   const destAddress = q.shippingAddress || cl.address || '—';
   const destPhone   = cl.phone   || '—';
-  const destEmail   = cl.email   || '—';
   const destCity    = [cl.city, cl.department].filter(Boolean).join(', ') || '—';
 
   const dX = ML + 12;
@@ -1732,37 +1726,27 @@ function drawShippingLabel(
 
   let dY = y + 24;
 
-  // Nombre (contacto) — si existe, va primero, más pequeño
   if (destContact2) {
     doc.fillColor(C.black).font('Helvetica-Bold').fontSize(9)
        .text(destContact2, dX, dY, { width: dW, lineBreak: false, ellipsis: true });
     dY += 13;
   }
 
-  // Empresa / Razón social — 13pt bold
   doc.fillColor(C.black).font('Helvetica-Bold').fontSize(13)
      .text(destCompany, dX, dY, { width: dW, lineBreak: false, ellipsis: true });
   dY += 18;
 
-  // NIT
   doc.fillColor(C.tgray).font('Helvetica').fontSize(9)
-     .text(destNIT, dX, dY, { lineBreak: false });
+     .text(`NIT / CC: ${destNIT}`, dX, dY, { lineBreak: false });
   dY += 12;
-  // Dirección
   doc.fillColor(C.tgray).font('Helvetica').fontSize(9)
-     .text(destAddress, dX, dY, { width: dW, lineBreak: false, ellipsis: true });
+     .text(`Dirección: ${destAddress}`, dX, dY, { width: dW, lineBreak: false, ellipsis: true });
   dY += 12;
-  // Teléfono
   doc.fillColor(C.tgray).font('Helvetica').fontSize(9)
-     .text(destPhone, dX, dY, { lineBreak: false });
+     .text(`Teléfono: ${destPhone}`, dX, dY, { lineBreak: false });
   dY += 12;
-  // Correo
-  doc.fillColor(C.tgray).font('Helvetica').fontSize(9)
-     .text(destEmail, dX, dY, { width: dW, lineBreak: false, ellipsis: true });
-  dY += 12;
-  // Ciudad
   doc.fillColor(C.black).font('Helvetica-Bold').fontSize(9)
-     .text(destCity, dX, dY, { width: dW, lineBreak: false, ellipsis: true });
+     .text(`Ciudad / Depto: ${destCity}`, dX, dY, { width: dW, lineBreak: false, ellipsis: true });
 }
 
 // POST /api/quotations/:id/production-order — crea OPs desde cotización

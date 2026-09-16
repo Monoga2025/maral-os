@@ -95,7 +95,7 @@ export function QuickQuoteModal({ isOpen, onClose, initialClient }: QuickQuoteMo
           productRef: prod.reference,
           qty: 1,
           unitPrice: prod.price || 0,
-          discount: 0,
+          discount: 26,
         },
       ])
     }
@@ -112,7 +112,7 @@ export function QuickQuoteModal({ isOpen, onClose, initialClient }: QuickQuoteMo
     setItems((prev) => prev.filter((_, i) => i !== index))
   }
 
-  // Calculations (IVA 19%)
+  // Calculations (0% IVA - Régimen No Responsable)
   const subtotal = useMemo(() => {
     return items.reduce((sum, it) => {
       const itemPrice = it.qty * it.unitPrice
@@ -121,8 +121,7 @@ export function QuickQuoteModal({ isOpen, onClose, initialClient }: QuickQuoteMo
     }, 0)
   }, [items])
 
-  const iva = useMemo(() => Math.round(subtotal * 0.19), [subtotal])
-  const total = subtotal + iva
+  const total = subtotal
 
   const createMutation = useMutation({
     mutationFn: async (actionType: 'SAVE' | 'PDF' | 'WHATSAPP') => {
@@ -168,7 +167,7 @@ export function QuickQuoteModal({ isOpen, onClose, initialClient }: QuickQuoteMo
         const waNumber = cleanPhone.length === 10 ? `57${cleanPhone}` : cleanPhone
         const itemSummary = items.map((i) => `• ${i.qty}x ${i.productName}`).join('\n')
         const text = encodeURIComponent(
-          `Hola ${clientName}, adjuntamos el detalle de tu cotización N° ${quotation.number} de MARAL Tecnología y Comunicaciones ⚡:\n\n${itemSummary}\n\n*Total Oficial: ${formatCOP(total)} (IVA incl.)*\n\n¿Deseas que procedamos con el pedido?`
+          `Hola ${clientName}, adjuntamos el detalle de tu cotización N° ${quotation.number} de MARAL Tecnología y Comunicaciones ⚡:\n\n${itemSummary}\n\n*Total Propuesta: ${formatCOP(total)}*\n\n¿Deseas que procedamos con el pedido?`
         )
         if (waNumber) {
           window.open(`https://wa.me/${waNumber}?text=${text}`, '_blank')
@@ -456,11 +455,11 @@ export function QuickQuoteModal({ isOpen, onClose, initialClient }: QuickQuoteMo
                     <span className="font-semibold text-slate-900">{formatCOP(subtotal)}</span>
                   </div>
                   <div className="flex justify-between text-slate-600">
-                    <span>IVA (19%):</span>
-                    <span className="font-semibold text-slate-900">{formatCOP(iva)}</span>
+                    <span>IVA:</span>
+                    <span className="font-semibold text-slate-500">No aplica (0%)</span>
                   </div>
                   <div className="flex justify-between border-t border-slate-200 pt-1.5 text-sm font-bold text-slate-900">
-                    <span>Total Oficial:</span>
+                    <span>Total Propuesta:</span>
                     <span className="text-indigo-700">{formatCOP(total)}</span>
                   </div>
                 </div>

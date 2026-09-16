@@ -181,7 +181,7 @@ export default function QuotationForm() {
 
   const [editingPriceId, setEditingPriceId] = useState<string | null>(null)
   const [finalPriceInputs, setFinalPriceInputs] = useState<Record<string, string>>({})
-  const [suggestedDiscount, setSuggestedDiscount] = useState(0)
+  const [suggestedDiscount, setSuggestedDiscount] = useState(26)
 
   const [kitEditorProduct, setKitEditorProduct] = useState<Product | null>(null)
   const [kitEditorComponents, setKitEditorComponents] = useState<ProductComponent[]>([])
@@ -638,7 +638,7 @@ export default function QuotationForm() {
                             duration: 5000,
                           })
                         } else {
-                          setSuggestedDiscount(0)
+                          setSuggestedDiscount(26)
                         }
                       }}
                     >
